@@ -1,0 +1,29 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      <emptyTree>
+    end
+  end
+  module ::A<<C A>> < ()
+    <emptyTree>
+
+    def self.<static-init>(<blk>)
+      <emptyTree>
+    end
+  end
+  class ::A::B<<C B>> < (::<todo sym>)
+    def self.<static-init>(<blk>)
+      <emptyTree>
+    end
+  end
+  class ::C<<C C>> < (::<todo sym>)
+    def self.<static-init>(<blk>)
+      <emptyTree>
+    end
+  end
+  <emptyTree>
+end

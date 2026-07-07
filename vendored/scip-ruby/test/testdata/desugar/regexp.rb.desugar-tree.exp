@@ -1,0 +1,17 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  def foo<<todo method>>(&<blk>)
+    begin
+      ::Regexp.new("abc", 0)
+      <emptyTree>::<C Regexp>.new("abc")
+      ::Regexp.new("abc", 1)
+      <emptyTree>::<C Regexp>.new("abc", <emptyTree>::<C Regexp>::<C IGNORECASE>)
+      ::Regexp.new("abc", 7)
+      <emptyTree>::<C Regexp>.new("abc", 0.|(<emptyTree>::<C Regexp>::<C IGNORECASE>).|(<emptyTree>::<C Regexp>::<C EXTENDED>).|(<emptyTree>::<C Regexp>::<C MULTILINE>))
+      a = "a"
+      c = "c"
+      ::Regexp.new(::<Magic>.<string-interpolate>(a, "b", c), 0)
+      <emptyTree>::<C Regexp>.new(a.+("b").+(c))
+      ::Regexp.new("abc", 0)
+    end
+  end
+end

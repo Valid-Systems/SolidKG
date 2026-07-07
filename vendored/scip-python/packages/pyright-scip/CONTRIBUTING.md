@@ -1,0 +1,121 @@
+# Contributing to scip-python
+
+-   [Development](#development)
+    -   [Installing dependencies](#installing-dependencies)
+    -   [Building the code](#building-the-code)
+    -   [Running tests](#running-tests)
+    -   [Formatting](#formatting)
+-   [Publishing releases](#publishing-releases)
+
+## Development
+
+### Installing dependencies
+
+1. Install [mise](https://mise.jdx.dev/getting-started.html).
+2. Install the correct versions of Node and Python:
+
+    ```bash
+    mise plugin install nodejs
+    mise plugin install python
+    # Install appropriate Node and Python versions based on .tool-versions
+    mise install
+    ```
+
+    You may need to restart your shell for the changes to take effect.
+
+3. Install dependencies:
+    ```bash
+    # From the root of the repo
+    npm install
+    cd packages/pyright-scip
+    npm install
+    ```
+
+All the other commands should be run from the `packages/pyright-scip`
+subdirectory.
+
+### Building the code
+
+```bash
+# Build in development mode once
+npm run webpack
+
+# Build in development mode, watch for changes
+npm run watch
+```
+
+To create a release build:
+
+```bash
+npm run build
+```
+
+**WARNING:** If you create the release build and then try to run tests,
+you will not get useful stack traces because source maps are disabled
+for the release build.
+
+All of the above methods should produce an `index.js` file
+in `packages/pyright-scip` which can be invoked with Node
+to index a test project.
+
+```
+node ./index.js <other args>
+```
+
+### Running tests
+
+```bash
+npm run check-snapshots
+```
+
+#### Filter specific snapshot tests
+
+Use the `--filter-tests` flag to run only specific snapshot tests:
+
+```bash
+# Using npm scripts (note the -- to pass arguments)
+npm run check-snapshots -- --filter-tests test1,test2,test3
+```
+
+Available snapshot tests can be found in `snapshots/input/`.
+
+Using a different Python version other than the one specified
+in `.tool-versions` may also lead to errors.
+
+### Formatting
+
+To check for formatting issues:
+
+```bash
+# Check prettier formatting
+npm run check:prettier
+```
+
+To fix formatting issues:
+
+```bash
+# Fix prettier formatting issues
+npm run fix:prettier
+```
+
+## Making changes to Pyright internals
+
+When modifying code in the `pyright-internal` package:
+
+1. Keep changes minimal: Every change introduces a risk of
+   merge conflicts. Adding doc comments is fine, but avoid
+   changing functionality if possible. Instead of changing
+   access modifiers, prefer copying small functions into
+   scip-pyright logic.
+2. Use a `NOTE(scip-python):` prefix when adding comments to
+   make it clearer which comments were added by upstream
+   maintainers vs us.
+
+## Publishing releases
+
+1. Create a PR with the following changes:
+   - Change the version in [package.json](./package.json) 
+     to `M.N.P`.
+   - Add release notes to [CHANGELOG.md](./CHANGELOG.md)
+2. After merging the PR, add a tag `vM.N.P` to the latest
+   commit on the `scip` branch and push that tag.

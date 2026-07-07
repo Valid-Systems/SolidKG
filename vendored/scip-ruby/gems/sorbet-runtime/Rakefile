@@ -1,0 +1,41 @@
+# frozen_string_literal: true
+
+# Make sure that sorbet-runtime does not do any early
+# initialization that would affect the ability to change
+# the checked level default value
+require "./lib/sorbet-runtime"
+T::Configuration.default_checked_level = :always
+
+task default: %i[test rubocop]
+
+def require_tests
+  Dir
+    .glob('./test/**/*.rb')
+    .reject {|path| path.match(%r{^./test/types/fixtures/})}
+    .reject {|path| path.match(%r{^./test/wholesome/})}
+    .each(&method(:require))
+end
+
+task :test do
+  require_tests
+end
+
+task :test_vm_serde do
+  T::Configuration.enable_vm_prop_serde
+  require_tests
+end
+
+task :rubocop do
+  # For some reason, using RuboCop::RakeTask causes our test suite to run a
+  # bazillion times. I'm guessing that something about RuboCop::RakeTask is
+  # causing a file to be required that shouldn't be getting required? I have
+  # lost patience trying to debug it and am simply going to use a Subprocess.
+  require 'subprocess'
+  Subprocess.check_call(['rubocop'])
+end
+
+begin
+  require './bench/tasks'
+rescue LoadError
+  # Expected when using packaged gem
+end

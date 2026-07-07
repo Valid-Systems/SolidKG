@@ -1,0 +1,22 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  def test_ops<<todo method>>(&<blk>)
+    begin
+      begin
+        ||$2 = <self>.a()
+        if ||$2
+          ||$2
+        else
+          <self>.b()
+        end
+      end
+      begin
+        &&$3 = <self>.c()
+        if &&$3
+          <self>.d()
+        else
+          &&$3
+        end
+      end
+    end
+  end
+end

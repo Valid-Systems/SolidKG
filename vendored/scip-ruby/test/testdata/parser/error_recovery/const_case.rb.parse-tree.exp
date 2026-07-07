@@ -1,0 +1,38 @@
+DefMethod {
+  name = <U foo>
+  args = Args {
+    args = [
+      Arg {
+        name = <U x>
+      }
+    ]
+  }
+  body = Begin {
+    stmts = [
+      Const {
+        scope = Const {
+          scope = NULL
+          name = <C <U Integer>>
+        }
+        name = <C <U <ConstantNameMissing>>>
+      }
+      Case {
+        condition = LVar {
+          name = <U x>
+        }
+        whens = [
+          When {
+            patterns = [
+              Const {
+                scope = NULL
+                name = <C <U Integer>>
+              }
+            ]
+            body = NULL
+          }
+        ]
+        else_ = NULL
+      }
+    ]
+  }
+}

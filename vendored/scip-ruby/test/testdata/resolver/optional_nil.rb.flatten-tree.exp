@@ -1,0 +1,50 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      <emptyTree>
+    end
+  end
+  class ::Test<<C Test>> < (::<todo sym>)
+    def foo(x, <blk>)
+      x
+    end
+
+    def bar(y, <blk>)
+      y
+    end
+
+    def qux(z, <blk>)
+      z
+    end
+
+    def baz(w, <blk>)
+      w
+    end
+
+    def self.<static-init>(<blk>)
+      begin
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:x, ::String).returns(::String)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:y, ::String).returns(::String)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:z, ::String).returns(::String)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:w, ::String).returns(::String)
+        end
+        <self>.extend(::T::Sig)
+        <runtime method definition of foo>
+        <runtime method definition of bar>
+        <runtime method definition of qux>
+        <runtime method definition of baz>
+        <emptyTree>
+      end
+    end
+  end
+  <emptyTree>
+end

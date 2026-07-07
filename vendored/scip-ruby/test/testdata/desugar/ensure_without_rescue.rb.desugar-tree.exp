@@ -1,0 +1,17 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  def main<<todo method>>(&<blk>)
+    <self>.a()
+  ensure
+    <self>.b()
+  end
+
+  def a<<todo method>>(&<blk>)
+    <emptyTree>
+  end
+
+  def b<<todo method>>(&<blk>)
+    <emptyTree>
+  end
+
+  <self>.main()
+end

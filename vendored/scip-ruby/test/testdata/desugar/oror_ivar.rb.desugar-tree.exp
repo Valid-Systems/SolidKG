@@ -1,0 +1,144 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  module <emptyTree>::<C Config><<C <todo sym>>> < ()
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C T>::<C Boolean>)
+    end
+
+    def self.expensively_compute_boolean<<todo method>>(&<blk>)
+      false
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C T>::<C Array>.[](<emptyTree>::<C T>.any(<emptyTree>::<C Integer>, <emptyTree>::<C String>)))
+    end
+
+    def self.two_tuple_looks_like_array<<todo method>>(&<blk>)
+      [123, "foo"]
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C T>::<C Array>.[](<emptyTree>::<C String>))
+    end
+
+    def self.supported_methods<<todo method>>(&<blk>)
+      begin
+        if @supported_methods
+          @supported_methods
+        else
+          begin
+            @supported_methods = <emptyTree>::<C T>.let(@supported_methods, <emptyTree>::<C T>.nilable(<emptyTree>::<C T>::<C Array>.[](<emptyTree>::<C String>)))
+            <statTemp>$2 = ["fast", "slow", "special"].uniq().freeze()
+            @supported_methods = <statTemp>$2
+          end
+        end
+        <emptyTree>::<C T>.reveal_type(@supported_methods)
+        <emptyTree>::<C T>.must(@supported_methods)
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def self.initialized_to_nilable<<todo method>>(&<blk>)
+      if @initialized_to_nilable
+        @initialized_to_nilable
+      else
+        begin
+          @initialized_to_nilable = <emptyTree>::<C T>.let(@initialized_to_nilable, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+          <statTemp>$2 = nil
+          @initialized_to_nilable = <statTemp>$2
+        end
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C T>::<C Boolean>)
+    end
+
+    def self.lazy_boolean<<todo method>>(&<blk>)
+      if @lazy_boolean
+        @lazy_boolean
+      else
+        begin
+          @lazy_boolean = <emptyTree>::<C T>.let(@lazy_boolean, <emptyTree>::<C T>.nilable(<emptyTree>::<C T>::<C Boolean>))
+          <statTemp>$2 = <self>.expensively_compute_boolean()
+          @lazy_boolean = <statTemp>$2
+        end
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def self.suggest_t_let<<todo method>>(&<blk>)
+      if @suggest_t_let
+        @suggest_t_let
+      else
+        @suggest_t_let = ""
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def self.needs_cast<<todo method>>(&<blk>)
+      if @needs_cast
+        @needs_cast
+      else
+        begin
+          @needs_cast = <emptyTree>::<C T>.let(@needs_cast, <emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+          <statTemp>$2 = <self>.two_tuple_looks_like_array().first()
+          @needs_cast = <statTemp>$2
+        end
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def self.allows_cast<<todo method>>(&<blk>)
+      if @allows_cast
+        @allows_cast
+      else
+        begin
+          @allows_cast = <emptyTree>::<C T>.let(@allows_cast, <emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+          <statTemp>$2 = <emptyTree>::<C T>.cast(<self>.two_tuple_looks_like_array().first(), <emptyTree>::<C Integer>)
+          @allows_cast = <statTemp>$2
+        end
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def self.accidentally_untyped<<todo method>>(&<blk>)
+      begin
+        if @accidentally_untyped
+          @accidentally_untyped
+        else
+          begin
+            @accidentally_untyped = <emptyTree>::<C T>.let(@accidentally_untyped, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+            <statTemp>$2 = <emptyTree>::<C T>.unsafe(nil)
+            @accidentally_untyped = <statTemp>$2
+          end
+        end
+        <emptyTree>::<C T>.must(@accidentally_untyped)
+      end
+    end
+
+    <self>.sig() do ||
+      <self>.void()
+    end
+
+    def self.main<<todo method>>(&<blk>)
+      <emptyTree>::<C T>.reveal_type(@accidentally_untyped)
+    end
+  end
+end

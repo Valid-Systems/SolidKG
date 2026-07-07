@@ -1,0 +1,200 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C GoodUsages><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def foo<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def bar<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def baz<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def ball<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def string_foo<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def string_bar<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def symbol_foo<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def symbol_bar<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def true_foo<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def true_bar<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.void()
+    end
+
+    def usages<<todo method>>(&<blk>)
+      begin
+        <self>.foo() do ||
+          <emptyTree>
+        end
+        <self>.bar(1, 3, 4, 5)
+        <self>.baz()
+        <self>.ball(:thing, 0) do ||
+          <emptyTree>
+        end
+        <self>.string_foo()
+        <self>.string_bar()
+        <self>.symbol_foo() do ||
+          <emptyTree>
+        end
+        <self>.symbol_bar(1, 2) do ||
+          <emptyTree>
+        end
+        <self>.true_foo()
+        <self>.true_bar()
+      end
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of foo>
+
+    <runtime method definition of bar>
+
+    <runtime method definition of baz>
+
+    <runtime method definition of ball>
+
+    <runtime method definition of string_foo>
+
+    <runtime method definition of string_bar>
+
+    <runtime method definition of symbol_foo>
+
+    <runtime method definition of symbol_bar>
+
+    <runtime method definition of true_foo>
+
+    <runtime method definition of true_bar>
+
+    <runtime method definition of usages>
+  end
+
+  class <emptyTree>::<C WorksWithoutExtendingTSig><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def foo<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def bar<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    <runtime method definition of foo>
+
+    <runtime method definition of bar>
+  end
+
+  class <emptyTree>::<C IgnoredUsages><<C <todo sym>>> < (::<todo sym>)
+    local = 0
+
+    <self>.not_delegate(:thing, :to, :nop)
+
+    <self>.delegate()
+
+    <self>.delegate(:thing)
+
+    <self>.delegate(:to, :thing)
+
+    <self>.delegate(:thing, :prefix, :thing)
+
+    <self>.delegate(:foo, :to, :thing, :prefix, local)
+
+    <self>.delegate(:foo, {local => :thing})
+
+    <self>.delegate(234, :to, :good)
+
+    <self>.delegate(:thing, :thing)
+
+    <self>.delegate(:foo, :bar, :to, :@hi, :prefix, true)
+
+    <self>.delegate(:foo, :bar, :to, "", :prefix, true)
+  end
+
+  class <emptyTree>::<C EnumerableUsage><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped(), :<blk>, ::T.nilable(::Proc)).returns(::T.untyped())
+    end
+
+    def each<<todo method>>(*arg0, &<blk>)
+      <emptyTree>
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Generic>)
+
+    <self>.include(<emptyTree>::<C Enumerable>)
+
+    <emptyTree>::<C Elem> = <self>.type_member()
+
+    <runtime method definition of each>
+  end
+end

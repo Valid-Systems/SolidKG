@@ -1,0 +1,14 @@
+# typed: true
+# assert-fast-path: simple_hover.rb
+
+class Foo
+  extend T::Sig
+
+  sig {returns(Integer)}
+  def bar
+    # ^ hover: ```ruby
+    # ^ hover: sig { returns(Integer) }
+    # ^ hover: def bar; end
+    42
+  end
+end

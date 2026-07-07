@@ -1,0 +1,73 @@
+{
+  "$schema": "https://solidkg.local/schemas/evaluation-corpus-manifest.v1.json",
+  "manifestVersion": 1,
+  "policyVersion": "2026-06-04",
+  "description": "Approved evaluation corpus manifest. Step A policy only; no real corpora are approved or vendored yet.",
+  "corpora": [],
+  "syntheticFixtures": [
+    {
+      "name": "task-8-mixed-stack-synthetic",
+      "identity": "synthetic://evaluation-corpus/task-8-mixed-stack",
+      "purpose": "Task 8 deterministic synthetic coverage for route flow, callback/render flow, architecture coupling, and SCIP precise refs.",
+      "realCorpus": false,
+      "executable": true,
+      "fixtureSource": "__tests__/evaluation/mixed-stack-probes.test.ts",
+      "probeCommand": "node scripts/agent-eval/task-8-mixed-stack-probes.mjs",
+      "evidencePath": ".omo/evidence/task-8-mixed-stack-probes.json",
+      "probes": [
+        "route-flow",
+        "callback-render-flow",
+        "architecture-coupling",
+        "scip-precise-refs"
+      ],
+      "inclusionPolicy": {
+        "shipInRelease": false,
+        "licenseApproval": null
+      }
+    },
+    {
+      "name": "cog-adoption-evaluation-synthetic",
+      "identity": "synthetic://evaluation-corpus/cog-adoption-evaluation",
+      "purpose": "Offline deterministic CoG adoption evaluation schema, proof-gate, and exclusion validation; no real corpus fetching or vendored source.",
+      "realCorpus": false,
+      "executable": true,
+      "fixtureSource": "__tests__/cog-evaluation-plan.test.ts",
+      "probeCommand": "node scripts/agent-eval/cog-evaluation.mjs --sample",
+      "evidencePath": ".omo/evidence/cog-adoption-evaluation-sample.json",
+      "probes": [
+        "deterministic-typed-summaries",
+        "evidence-utility-diagnostic",
+        "deterministic-failure-hints",
+        "offline-semantic-negative-control",
+        "offline-query-plan-harness"
+      ],
+      "inclusionPolicy": {
+        "shipInRelease": false,
+        "licenseApproval": null
+      }
+    },
+    {
+      "name": "cog-local-evaluation-synthetic",
+      "identity": "synthetic://evaluation-corpus/cog-local-evaluation",
+      "purpose": "Synthetic local CoG follow-up diagnostics for persistent FailureSituation records, run-stability overlap, raw-count baselines, high-fanout payload gates, overhead gates, semantic negative controls, and candidate decisions.",
+      "realCorpus": false,
+      "executable": true,
+      "fixtureSource": "__tests__/cog-evaluation-plan.test.ts",
+      "probeCommand": "node scripts/agent-eval/cog-evaluation.mjs --run-local",
+      "evidencePath": ".omo/evidence/cog-adoption-evaluation-local.json",
+      "probes": [
+        "failure-situations",
+        "stability-overlap",
+        "raw-count-baseline",
+        "high-fanout-payload-pain",
+        "tool-call-latency-gate",
+        "semantic-negative-controls",
+        "candidate-gates"
+      ],
+      "inclusionPolicy": {
+        "shipInRelease": false,
+        "licenseApproval": null
+      }
+    }
+  ]
+}

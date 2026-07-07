@@ -1,0 +1,173 @@
+/*
+ * Custom Docusaurus overrides.
+ * See here for more information:
+ * https://docusaurus.io/docs/en/api-pages#styles
+ */
+
+/*
+ * Docusaurus uses blockquote to show warnings / yellow callouts.
+ * Sometimes, we don't want this.
+ */
+blockquote.monotone {
+  background-color: initial;
+  border-color: rgba(0, 0, 0, 0.15);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/*
+ * Docusaurus uses blockquote to show warnings / yellow callouts.
+ * Sometimes, we want it to stand out even more.
+ */
+blockquote.red,
+.red blockquote {
+  background-color: rgba(255, 109, 84, 0.3);
+  border-color: rgb(255, 132, 132);
+}
+
+/*
+ * By default, the link color is the same as the primaryColor.
+ * For us, this color is too dark, and links don't pop enough.
+ * Thus, we override the link color to be more vibrant.
+ */
+a {
+  color: var(--sorbet-purple-4);
+}
+a:hover {
+  color: var(--sorbet-purple-4);
+  text-decoration: underline;
+}
+
+/*
+ * The default footer is gray. We override it in a few ways.
+ */
+.nav-footer {
+  background-color: var(--sorbet-purple-3);
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.nav-footer a {
+  color: var(--sorbet-purple-6);
+}
+
+.nav-footer .wrapper svg {
+  position: relative;
+  top: +7px;
+  margin: 0 32px 0 0;
+}
+
+/* Don't highlight the logo in the header on hover:
+ *
+ * .fixedHeaderContainer is hard coded here:
+ * https://github.com/facebook/Docusaurus/blob/1edbeecb/packages/docusaurus-1.x/lib/static/css/main.css#L719
+ */
+.fixedHeaderContainer a:hover {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+/*
+ * Docusaurus does not render footnotes in <sup> tags in superscript.
+ * This renders them in super script.
+ */
+sup {
+  vertical-align: super;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/*
+ * We have primary and secondary color the same, so use a drop shadow to make
+ * the navigation buttons stand out on mobile, and then change the active
+ * item's color directly.
+ */
+@media only screen and (max-width: 1023px) {
+  .navigationSlider .slidingNav ul {
+    box-shadow: 0px 1px 1px rgba(0, 0, 0, 0.5);
+  }
+
+  .navigationSlider .slidingNav ul li > a:focus,
+  .navigationSlider .slidingNav ul li > a:hover,
+  .navigationSlider .slidingNav ul li.siteNavItemActive > a,
+  .navigationSlider .slidingNav ul li.siteNavGroupActive > a {
+    background-color: var(--sorbet-purple-3);
+  }
+}
+
+/*
+ * The .wrapper class defaults to max-width: 1400px on large screens (>1500px).
+ * We never want to use more than 1100px, even at that breakpoint.
+ */
+@media only screen and (min-width: 1500px) {
+  .wrapper {
+    max-width: 1100px;
+  }
+}
+
+/*
+ * The default showcase section heading uses our one of the colors from our
+ * siteConfig.js. This color only looks good in the headers for us, not in text
+ * colors, so we're resetting it to initial (black) here.
+ */
+.productShowcaseSection h2 {
+  color: initial;
+}
+
+/*
+ * This is needed to the logos to play nicely with company names that wrap, so
+ * that the images line up with each other.
+ */
+.productShowcaseSection .logos {
+  align-items: flex-start;
+}
+
+/*
+ * To avoid squashing non-square logos
+ */
+.productShowcaseSection .logos img {
+  height: 110px;
+  width: auto;
+}
+
+@media only screen and (max-width: 735px) {
+  .productShowcaseSection .logos img {
+    height: 64px;
+    width: auto;
+  }
+}
+
+/*
+ * Lets us stack the images + captions in a column.
+ */
+.productShowcaseSection .link {
+  display: flex;
+  flex-direction: column;
+
+  /* 110px for the image + (2 x 20px) for the padding. */
+  max-width: 150px;
+}
+
+/*
+ * Lets us stack the image + captions in a column,
+ * at a mobile width breakpoint.
+ */
+@media only screen and (max-width: 735px) {
+  .productShowcaseSection .link {
+    /* 64px for the image + (2 x 20px) for the padding. */
+    max-width: 104px;
+  }
+
+  .nav-footer .wrapper svg {
+    display: block;
+    margin: 0 0 8px;
+  }
+}
+
+/*
+ * NOTE: This file is for overrides.
+ *
+ * Before adding to this file, consider whether this is an override of an
+ * existing Docusaurus style, or a new style for a new thing we're building for
+ * the first time.
+ */

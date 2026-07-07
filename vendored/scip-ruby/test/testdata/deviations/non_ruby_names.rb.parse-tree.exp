@@ -1,0 +1,28 @@
+Begin {
+  stmts = [
+    Module {
+      name = Const {
+        scope = NULL
+        name = <C <U B>>
+      }
+      body = NULL
+    }
+    Module {
+      name = Const {
+        scope = NULL
+        name = <C <U A>>
+      }
+      body = Class {
+        name = Const {
+          scope = Const {
+            scope = NULL
+            name = <C <U B>>
+          }
+          name = <C <U C>>
+        }
+        superclass = NULL
+        body = NULL
+      }
+    }
+  ]
+}

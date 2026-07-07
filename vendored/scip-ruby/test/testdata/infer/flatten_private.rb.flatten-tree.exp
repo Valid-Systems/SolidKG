@@ -1,0 +1,52 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      <emptyTree>
+    end
+  end
+  class ::A<<C A>> < (::<todo sym>)
+    def self.private(arg0, <blk>)
+      <emptyTree>
+    end
+
+    def self.private_class_method(arg0, <blk>)
+      <emptyTree>
+    end
+
+    def self.outer_static(<blk>)
+      <self>.private_class_method(<runtime method definition of self.inner_static>)
+    end
+
+    def self.inner_static(<blk>)
+      <emptyTree>
+    end
+
+    def outer_instance(<blk>)
+      <self>.class().private(<runtime method definition of inner_instance>)
+    end
+
+    def inner_instance(<blk>)
+      <emptyTree>
+    end
+
+    def self.<static-init>(<blk>)
+      begin
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:arg0, ::Integer).void()
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:arg0, ::Integer).void()
+        end
+        <self>.extend(::T::Sig)
+        <runtime method definition of self.private>
+        <runtime method definition of self.private_class_method>
+        <self>.private_class_method(<runtime method definition of self.outer_static>)
+        <self>.private(<runtime method definition of outer_instance>)
+        <emptyTree>
+      end
+    end
+  end
+  <emptyTree>
+end

@@ -1,0 +1,107 @@
+# -- test/testdata/packager/invalid_imports_and_exports/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C A><<C <todo sym>>> < (::PackageSpec)
+    <self>.import(123)
+
+    <self>.import("hello")
+
+    <self>.import(<self>.method())
+
+    <self>.import(::<PackageSpecRegistry>::<C REFERENCE>)
+
+    <self>.import(::<PackageSpecRegistry>::<C B>)
+
+    <self>.import(::<PackageSpecRegistry>::<C B>)
+
+    <self>.export(123)
+
+    <self>.export("hello")
+
+    <self>.export(<self>.method())
+
+    <self>.export(::<root>::<C A>::<C REFERENCE>)
+
+    <self>.export(::<root>::<C A>::<C AClass>)
+
+    <self>.export(::<root>::<C A>::<C AModule>)
+  end
+end
+# -- test/testdata/packager/invalid_imports_and_exports/b/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C B><<C <todo sym>>> < (::PackageSpec)
+    <self>.import(::<PackageSpecRegistry>::<C A>)
+
+    <self>.export(::<root>::<C B>::<C BClass>)
+
+    <self>.export(::<root>::<C B>::<C BModule>)
+  end
+end
+# -- test/testdata/packager/invalid_imports_and_exports/a.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  module <emptyTree>::<C A><<C <todo sym>>> < ()
+    <emptyTree>::<C REFERENCE> = <emptyTree>::<C ASecondClass>
+
+    class <emptyTree>::<C ASecondClass><<C <todo sym>>> < (::<todo sym>)
+    end
+
+    class <emptyTree>::<C AClass><<C <todo sym>>> < (::<todo sym>)
+      ::Sorbet::Private::Static.sig(<self>) do ||
+        <self>.returns(<emptyTree>::<C AClass>)
+      end
+
+      def get_a<<todo method>>(&<blk>)
+        <emptyTree>::<C B>::<C BModule>.get_a()
+      end
+
+      <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+      <runtime method definition of get_a>
+    end
+
+    module <emptyTree>::<C AModule><<C <todo sym>>> < ()
+      ::Sorbet::Private::Static.sig(<self>) do ||
+        <self>.returns(<emptyTree>::<C Integer>)
+      end
+
+      def self.one<<todo method>>(&<blk>)
+        1
+      end
+
+      <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+      <runtime method definition of self.one>
+    end
+  end
+end
+# -- test/testdata/packager/invalid_imports_and_exports/b/b.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  module <emptyTree>::<C B><<C <todo sym>>> < ()
+    class <emptyTree>::<C BClass><<C <todo sym>>> < (::<todo sym>)
+      ::Sorbet::Private::Static.sig(<self>) do ||
+        <self>.returns(<emptyTree>::<C Integer>)
+      end
+
+      def get_one<<todo method>>(&<blk>)
+        <emptyTree>::<C A>::<C AModule>.one()
+      end
+
+      <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+      <runtime method definition of get_one>
+    end
+
+    module <emptyTree>::<C BModule><<C <todo sym>>> < ()
+      ::Sorbet::Private::Static.sig(<self>) do ||
+        <self>.returns(<emptyTree>::<C A>::<C AClass>)
+      end
+
+      def self.get_a<<todo method>>(&<blk>)
+        <emptyTree>::<C A>::<C AClass>.new()
+      end
+
+      <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+      <runtime method definition of self.get_a>
+    end
+  end
+end

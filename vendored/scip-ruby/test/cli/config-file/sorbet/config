@@ -1,0 +1,5 @@
+--silence-dev-message
+--typed=true
+--dir
+.
+--ignore=/vendor/bundle

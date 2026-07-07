@@ -1,0 +1,46 @@
+name: test
+
+on:
+  push:
+    branches:
+      - main
+      - scip
+  pull_request:
+
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install mise
+        uses: jdx/mise-action@v2.4.4
+        with:
+          version: 2025.8.10
+      - name: Get npm cache directory
+        id: npm-cache
+        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
+        with:
+          path: ${{ steps.npm-cache.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      - name: 'Check package-lock.json up-to-date'
+        run: |
+          CMD="cd ./packages/pyright-scip && npm install --package-lock-only --ignore-scripts"
+          bash -c "$CMD"
+          if ! git diff --quiet; then
+            git diff
+            echo ""
+            echo "----------------------------------------------------------------------------------------------"
+            echo "Re-run $CMD and push"
+            echo "----------------------------------------------------------------------------------------------"
+            exit 1
+          fi
+      - run: npm install
+      - run: cd ./packages/pyright-scip/ && npm install && npm run build
+      - run: python --version
+      - run: cd ./packages/pyright-scip/ && npm run check-snapshots

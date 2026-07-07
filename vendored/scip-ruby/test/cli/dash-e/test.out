@@ -1,0 +1,20 @@
+No errors! Great job.
+class ::<root> < ::Object ()
+  class ::<Class:<root>>[<AttachedClass>] < ::<Class:Object> ()
+    method ::<Class:<root>>#<static-init> (<blk>) @ -e:1
+      argument <blk><block> @ Loc {file=-e start=??? end=???}
+  class ::Foo < ::Object () @ -e:1
+  class ::<Class:Foo>[<AttachedClass>] < ::<Class:Object> () @ -e:1
+    type-member(+) ::<Class:Foo>::<AttachedClass> -> T.attached_class (of Foo) @ -e:1
+    method ::<Class:Foo>#<static-init> (<blk>) @ -e:1
+      argument <blk><block> @ Loc {file=-e start=??? end=???}
+
+-e:2: The method `foo` does not have a `sig` https://srb.help/7017
+     2 |def foo; end
+        ^^^^^^^
+  Autocorrect: Use `-a` to autocorrect
+    -e:2: Insert `extend T::Sig
+    sig { returns(NilClass) }`
+     2 |def foo; end
+        ^
+Errors: 1

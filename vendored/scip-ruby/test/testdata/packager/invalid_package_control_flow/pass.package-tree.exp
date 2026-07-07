@@ -1,0 +1,68 @@
+# -- test/testdata/packager/invalid_package_control_flow/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  <emptyTree>::<C SomeConstant> = <emptyTree>::<C PackageSpec>
+
+  class ::<PackageSpecRegistry>::<C MyPackage><<C <todo sym>>> < (::PackageSpec)
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.void()
+    end
+
+    def package_method<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.void()
+    end
+
+    def self.static_method<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Helpers>)
+
+    <self>.include(<emptyTree>::<C T>::<C Helpers>)
+
+    <self>.some_method(<self>.method_call_arg())
+
+    <self>.some_method(<emptyTree>::<C ConstantArg>)
+
+    <self>.some_method("add".+("ition"))
+
+    <self>.some_method(1.+(2))
+
+    <self>.some_method([0, 1, 2])
+
+    <self>.some_method({:prop => 10})
+
+    <self>.some_method("Literal")
+
+    <self>.some_method(1)
+
+    <runtime method definition of package_method>
+
+    <runtime method definition of self.static_method>
+
+    @hello = <cast:let>(nil, <todo sym>, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+  end
+end
+# -- test/testdata/packager/invalid_package_control_flow/package_spec_additions.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<root>::<C PackageSpec><<C <todo sym>>> < (::<todo sym>)
+    def self.some_method<<todo method>>(x, &<blk>)
+      <emptyTree>
+    end
+
+    def self.method_call_arg<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of self.some_method>
+
+    <runtime method definition of self.method_call_arg>
+
+    <emptyTree>::<C ConstantArg> = 10
+  end
+end

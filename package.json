@@ -1,0 +1,70 @@
+{
+  "name": "solidkg",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Local semantic code intelligence for AI coding agents, with benchmark suite context for retrieval savings.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "solidkg": "./dist/bin/solidkg.js"
+  },
+  "files": [
+    "dist",
+    "scripts",
+    "README.md",
+    "docs/THIRD_PARTY_LICENSES.md",
+    "docs/third-party-licenses"
+  ],
+  "scripts": {
+    "build": "tsc && npm run copy-assets && node scripts/strip-bin-comments.mjs && node -e \"require('fs').chmodSync('dist/bin/solidkg.js', 0o755)\"",
+    "preuninstall": "node dist/bin/uninstall.js",
+    "copy-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/extraction/wasm',{recursive:true});fs.readdirSync('src/extraction/wasm').filter(f=>f.endsWith('.wasm')).forEach(f=>fs.copyFileSync('src/extraction/wasm/'+f,'dist/extraction/wasm/'+f))\"",
+    "dev": "tsc --watch",
+    "cli": "npm run build && node dist/bin/solidkg.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:eval": "vitest run __tests__/evaluation/",
+    "eval": "npm run build && npx tsx __tests__/evaluation/runner.ts",
+    "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
+    "prepublishOnly": "node scripts/guard-root-publish.mjs",
+    "readiness:artifacts": "node scripts/readiness/verify-release-artifacts.mjs"
+  },
+  "keywords": [
+    "code-intelligence",
+    "knowledge-graph",
+    "static-analysis"
+  ],
+  "author": "",
+  "dependencies": {
+    "@bufbuild/protobuf": "^2.12.0",
+    "@c4312/scip": "^0.1.0",
+    "@sourcegraph/scip-typescript": "0.4.0",
+    "chokidar": "^4.0.3",
+    "commander": "^14.0.2",
+    "ignore": "^7.0.5",
+    "jsonc-parser": "^3.3.1",
+    "picomatch": "^4.0.3",
+    "tree-sitter-wasms": "^0.1.11",
+    "web-tree-sitter": "^0.25.10"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^24.12.4",
+    "@types/picomatch": "^4.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
+  },
+  "engines": {
+    "node": ">=24.0.0 <25.0.0"
+  }
+}

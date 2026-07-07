@@ -1,0 +1,26 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      <emptyTree>
+    end
+  end
+  module ::A<<C A>> < ()
+    def Foo(<blk>)
+      <emptyTree>
+    end
+
+    <emptyTree>
+
+    def self.<static-init>(<blk>)
+      <runtime method definition of Foo>
+    end
+  end
+  class ::A::Foo<<C Foo>> < (::<todo sym>)
+    def self.<static-init>(<blk>)
+      <emptyTree>
+    end
+  end
+  <emptyTree>
+end

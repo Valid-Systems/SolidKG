@@ -1,0 +1,89 @@
+No errors! Great job.
+{
+ "id": <redacted>,
+ "name": {
+  "kind": "CONSTANT",
+  "name": "\u003croot\u003e"
+ },
+ "kind": "CLASS_OR_MODULE",
+ "id": <redacted>,
+ "children": [
+  {
+   "id": <redacted>,
+   "name": {
+    "kind": "UNIQUE",
+    "name": "\u003cClass:\u003croot\u003e\u003e",
+    "unique": "SINGLETON"
+   },
+   "kind": "CLASS_OR_MODULE",
+   "id": <redacted>,
+   "children": [
+    {
+     "id": <redacted>,
+     "name": {
+      "kind": "UNIQUE",
+      "name": "\u003cstatic-init\u003e",
+      "unique": "NAMER"
+     },
+     "kind": "METHOD",
+     "arguments": [
+      {
+       "name": {
+        "kind": "UTF8",
+        "name": "\u003cblk\u003e"
+       },
+       "isBlock": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": <redacted>,
+   "name": {
+    "kind": "CONSTANT",
+    "name": "A"
+   },
+   "kind": "CLASS_OR_MODULE",
+   "id": <redacted>
+  },
+  {
+   "id": <redacted>,
+   "name": {
+    "kind": "UNIQUE",
+    "name": "\u003cClass:A\u003e",
+    "unique": "SINGLETON"
+   },
+   "kind": "CLASS_OR_MODULE",
+   "id": <redacted>,
+   "children": [
+    {
+     "id": <redacted>,
+     "name": {
+      "kind": "UTF8",
+      "name": "\u003cstatic-init\u003e"
+     },
+     "kind": "METHOD",
+     "arguments": [
+      {
+       "name": {
+        "kind": "UTF8",
+        "name": "\u003cblk\u003e"
+       },
+       "isBlock": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": <redacted>,
+   "name": {
+    "kind": "CONSTANT",
+    "name": "B"
+   },
+   "kind": "STATIC_FIELD",
+   "aliasTo": <redacted>
+  }
+ ]
+}

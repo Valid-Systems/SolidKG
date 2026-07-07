@@ -1,0 +1,89 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  begin
+    <assignTemp>$2 = <self>.some_array()
+    <assignTemp>$3 = ::<Magic>.<expand-splat>(<assignTemp>$2, 3, 0)
+    <emptyTree>::<C A> = <assignTemp>$3.[](0)
+    <emptyTree>::<C B> = <assignTemp>$3.[](1)
+    <emptyTree>::<C C> = <assignTemp>$3.[](2)
+    <assignTemp>$2
+  end
+
+  class <emptyTree>::<C Test><<C <todo sym>>> < (::<todo sym>)
+    def some_method<<todo method>>(array, &<blk>)
+      begin
+        begin
+          <assignTemp>$2 = array
+          <assignTemp>$3 = ::<Magic>.<expand-splat>(<assignTemp>$2, 3, 0)
+          a = <assignTemp>$3.[](0)
+          b = <assignTemp>$3.[](1)
+          begin
+            <assignTemp>$4 = <assignTemp>$3.[](2)
+            <assignTemp>$5 = ::<Magic>.<expand-splat>(<assignTemp>$4, 2, 0)
+            c = <assignTemp>$5.[](0)
+            d = <assignTemp>$5.[](1)
+            <assignTemp>$4
+          end
+          <assignTemp>$2
+        end
+        begin
+          <assignTemp>$6 = array
+          <assignTemp>$7 = ::<Magic>.<expand-splat>(<assignTemp>$6, 2, 0)
+          a.[]=(b, <assignTemp>$7.[](0))
+          c = <assignTemp>$7.[](1)
+          <assignTemp>$6
+        end
+        begin
+          <assignTemp>$8 = array
+          <assignTemp>$9 = ::<Magic>.<expand-splat>(<assignTemp>$8, 1, 0)
+          a = <assignTemp>$9.[](0)
+          b = <assignTemp>$9.to_ary()
+          <assignTemp>$8
+        end
+        begin
+          <assignTemp>$10 = array
+          <assignTemp>$11 = ::<Magic>.<expand-splat>(<assignTemp>$10, 0, 1)
+          a = <assignTemp>$11.to_ary()
+          b = <assignTemp>$11.[](-1)
+          <assignTemp>$10
+        end
+        begin
+          <assignTemp>$12 = array
+          <assignTemp>$13 = ::<Magic>.<expand-splat>(<assignTemp>$12, 2, 2)
+          a = <assignTemp>$13.[](0)
+          b = <assignTemp>$13.[](1)
+          c = <assignTemp>$13.to_ary()
+          d = <assignTemp>$13.[](-2)
+          e = <assignTemp>$13.[](-1)
+          <assignTemp>$12
+        end
+        begin
+          <assignTemp>$14 = array
+          <assignTemp>$15 = ::<Magic>.<expand-splat>(<assignTemp>$14, 1, 0)
+          a = <assignTemp>$15.[](0)
+          <assignTemp>$14
+        end
+        begin
+          <assignTemp>$16 = array
+          <assignTemp>$17 = ::<Magic>.<expand-splat>(<assignTemp>$16, 2, 0)
+          a.x=(<assignTemp>$17.[](0))
+          b = <assignTemp>$17.[](1)
+          <assignTemp>$16
+        end
+        begin
+          <assignTemp>$18 = ::<Magic>.<splat>(<emptyTree>::<C T>.unsafe(array))
+          <assignTemp>$19 = ::<Magic>.<expand-splat>(<assignTemp>$18, 1, 0)
+          a = <assignTemp>$19.[](0)
+          b = <assignTemp>$19.to_ary()
+          <assignTemp>$18
+        end
+        begin
+          <assignTemp>$20 = ::<Magic>.<splat>(<emptyTree>::<C T>.unsafe(array))
+          <assignTemp>$21 = ::<Magic>.<expand-splat>(<assignTemp>$20, 0, 1)
+          a = <assignTemp>$21.to_ary()
+          b = <assignTemp>$21.[](-1)
+          <assignTemp>$20
+        end
+      end
+    end
+  end
+end

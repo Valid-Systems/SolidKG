@@ -1,0 +1,56 @@
+{
+  "schemaName": "solidkg.retrieval-improvement-candidate.v1",
+  "id": "react-render-dynamic-path-gap",
+  "title": "Connect measured React render flow through deterministic synthetic edges",
+  "failureClass": "dynamic_path_gap",
+  "workstream": "deterministic_dynamic_connectivity_bridges",
+  "scopeBoundary": "Deterministic AST/framework evidence only; no ML inference and no half-bridged flow.",
+  "reproducibleFailure": {
+    "repo": "excalidraw",
+    "repoRevision": "synthetic-fixture-current-main",
+    "prompt": "How does updating an element re-render the canvas on screen?",
+    "observedFailure": "Current main cannot connect the full mutateElement to renderStaticScene path without fallback exploration.",
+    "currentMainCommand": "node scripts/agent-eval/probe-trace.mjs /tmp/excalidraw mutateElement renderStaticScene"
+  },
+  "baselineMetrics": {
+    "readCount": 5,
+    "grepCount": 2,
+    "toolCalls": 14,
+    "solidkgToolCalls": 6,
+    "wallClockMs": 112000,
+    "payloadBytes": 32000,
+    "answerCompleteness": "partial",
+    "sourceReferenceFidelity": "heuristic_gap",
+    "graphGrowthPercent": 0
+  },
+  "targetMetrics": {
+    "readCount": 0,
+    "grepCount": 0,
+    "toolCalls": 5,
+    "solidkgToolCalls": 3,
+    "wallClockMs": 74000,
+    "payloadBytes": 28000,
+    "answerCompleteness": "complete",
+    "sourceReferenceFidelity": "source_linked",
+    "graphGrowthPercent": 5
+  },
+  "controls": [
+    {
+      "repo": "express",
+      "prompt": "How does the router dispatch a request to a handler?",
+      "expected": "No material Read/Grep, wall-clock, or false-path regression."
+    }
+  ],
+  "killCriteria": [
+    "Kill if Read/Grep or total tool calls increase against current main.",
+    "Kill if synthesized edges create false paths.",
+    "Kill if graph growth exceeds the explicit cap."
+  ],
+  "verificationCommands": {
+    "red": "pnpm exec vitest run __tests__/retrieval-plan-gate.test.ts",
+    "green": "pnpm exec vitest run __tests__/retrieval-plan-gate.test.ts",
+    "surface": "node scripts/agent-eval/retrieval-plan-gate.mjs fixtures/retrieval-plan/valid-candidate.json",
+    "evaluation": "bash scripts/agent-eval/run-all.sh /tmp/excalidraw \"How does updating an element re-render the canvas on screen?\"",
+    "regression": "pnpm exec vitest run __tests__/readiness-evidence.test.ts __tests__/release-artifact-readiness.test.ts"
+  }
+}

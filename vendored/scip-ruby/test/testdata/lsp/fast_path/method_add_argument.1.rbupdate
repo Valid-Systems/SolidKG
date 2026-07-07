@@ -1,0 +1,15 @@
+# typed: true
+# assert-fast-path: method_add_argument.rb
+
+class A extend T::Sig
+  sig {params(x: Integer, y: Integer).returns(String)}
+  def bar(x, y)
+    res = x.to_s
+    T.reveal_type(y) # error: `Integer`
+    res
+  end
+end
+
+A.new.bar # error: Expected: `2`, got: `0`
+A.new.bar(0) # error: Expected: `2`, got: `1`
+A.new.bar(0, 0)

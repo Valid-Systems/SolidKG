@@ -1,0 +1,147 @@
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    Send{
+      flags = {privateOk}
+      recv = Local{
+        localVariable = <U <self>>
+      }
+      fun = <U extend>
+      block = nullptr
+      pos_args = 1
+      args = [
+        UnresolvedConstantLit{
+          cnst = <C <U Sig>>
+          scope = UnresolvedConstantLit{
+            cnst = <C <U T>>
+            scope = EmptyTree
+          }
+        }
+      ]
+    }
+
+    Send{
+      flags = {privateOk}
+      recv = Local{
+        localVariable = <U <self>>
+      }
+      fun = <U sig>
+      block = Block {
+        args = [
+        ]
+        body = Send{
+          flags = {}
+          recv = Send{
+            flags = {privateOk}
+            recv = Local{
+              localVariable = <U <self>>
+            }
+            fun = <U params>
+            block = nullptr
+            pos_args = 0
+            args = [
+              Literal{ value = :blk }
+              Send{
+                flags = {}
+                recv = Send{
+                  flags = {}
+                  recv = Send{
+                    flags = {}
+                    recv = UnresolvedConstantLit{
+                      cnst = <C <U T>>
+                      scope = EmptyTree
+                    }
+                    fun = <U proc>
+                    block = nullptr
+                    pos_args = 0
+                    args = [
+                    ]
+                  }
+                  fun = <U params>
+                  block = nullptr
+                  pos_args = 0
+                  args = [
+                    Literal{ value = :x }
+                    UnresolvedConstantLit{
+                      cnst = <C <U Integer>>
+                      scope = EmptyTree
+                    }
+                    Literal{ value = :y }
+                    UnresolvedConstantLit{
+                      cnst = <C <U Symbol>>
+                      scope = EmptyTree
+                    }
+                  ]
+                }
+                fun = <U returns>
+                block = nullptr
+                pos_args = 1
+                args = [
+                  UnresolvedConstantLit{
+                    cnst = <C <U Integer>>
+                    scope = EmptyTree
+                  }
+                ]
+              }
+            ]
+          }
+          fun = <U void>
+          block = nullptr
+          pos_args = 0
+          args = [
+          ]
+        }
+      }
+      pos_args = 0
+      args = [
+      ]
+    }
+
+    MethodDef{
+      flags = {}
+      name = <U yield_two><<U <todo method>>>
+      args = [BlockArg{ expr = UnresolvedIdent{
+          kind = Local
+          name = <U blk>
+        } }]
+      rhs = InsSeq{
+        stats = [
+          Send{
+            flags = {}
+            recv = UnresolvedIdent{
+              kind = Local
+              name = <U blk>
+            }
+            fun = <U call>
+            block = nullptr
+            pos_args = 2
+            args = [
+              Literal{ value = 1 }
+              Literal{ value = :hi }
+            ]
+          }
+        ],
+        expr = Send{
+          flags = {}
+          recv = UnresolvedIdent{
+            kind = Local
+            name = <U blk>
+          }
+          fun = <U call>
+          block = nullptr
+          pos_args = 2
+          args = [
+            Literal{ value = 1 }
+            Literal{ value = :hi }
+          ]
+        }
+      }
+    }
+  ]
+}

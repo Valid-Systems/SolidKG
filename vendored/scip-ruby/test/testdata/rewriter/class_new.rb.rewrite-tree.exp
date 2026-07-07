@@ -1,0 +1,134 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C Module><<C <todo sym>>> < (::<todo sym>)
+    <self>.include(<emptyTree>::<C T>::<C Sig>)
+  end
+
+  class <emptyTree>::<C A><<C <todo sym>>> < (::<todo sym>)
+    def foo<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <runtime method definition of foo>
+  end
+
+  <emptyTree>::<C A>.new().foo()
+
+  class <emptyTree>::<C B><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def bar<<todo method>>(&<blk>)
+      0
+    end
+
+    <runtime method definition of bar>
+  end
+
+  <emptyTree>::<C T>.reveal_type(<emptyTree>::<C B>.new().bar())
+
+  module <emptyTree>::<C M><<C <todo sym>>> < ()
+  end
+
+  class <emptyTree>::<C C><<C <todo sym>>> < (::<todo sym>)
+    <self>.include(<emptyTree>::<C M>)
+  end
+
+  <cast:let>(<emptyTree>::<C C>.new(), <todo sym>, <emptyTree>::<C M>)
+
+  class <emptyTree>::<C D><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.void()
+    end
+
+    def self.qux<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <runtime method definition of self.qux>
+  end
+
+  <emptyTree>::<C D>.qux()
+
+  module <emptyTree>::<C Top><<C <todo sym>>> < ()
+    class <emptyTree>::<C Parent><<C <todo sym>>> < (::<todo sym>)
+    end
+  end
+
+  class <emptyTree>::<C E><<C <todo sym>>> < (<emptyTree>::<C Top>::<C Parent>)
+  end
+
+  <cast:let>(<emptyTree>::<C E>.new(), <todo sym>, <emptyTree>::<C Top>::<C Parent>)
+
+  class <emptyTree>::<C Foo><<C <todo sym>>> < (::<todo sym>)
+    def self.foo<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <runtime method definition of self.foo>
+  end
+
+  class <emptyTree>::<C C1><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>::<C T>.reveal_type(<self>)
+  end
+
+  class <emptyTree>::<C C2><<C <todo sym>>> < (<emptyTree>::<C Foo>)
+    <emptyTree>::<C T>.reveal_type(<self>)
+
+    <self>.foo()
+  end
+
+  c1 = <emptyTree>::<C Class>.new() do ||
+    begin
+      <cast:<synthetic bind>>(<self>, <todo sym>, ::T::Class.[](::Object))
+      <emptyTree>::<C T>.reveal_type(<self>)
+    end
+  end
+
+  c2 = <emptyTree>::<C Class>.new(<emptyTree>::<C Foo>) do ||
+    begin
+      <cast:<synthetic bind>>(<self>, <todo sym>, ::T.class_of(<emptyTree>::<C Foo>))
+      <emptyTree>::<C T>.reveal_type(<self>)
+      <self>.foo()
+    end
+  end
+
+  <emptyTree>::<C Class>.new() do ||
+    begin
+      <cast:<synthetic bind>>(<self>, <todo sym>, ::T::Class.[](::Object))
+      <emptyTree>::<C T>.reveal_type(<self>)
+    end
+  end
+
+  <emptyTree>::<C Class>.new(<emptyTree>::<C Foo>) do ||
+    begin
+      <cast:<synthetic bind>>(<self>, <todo sym>, ::T.class_of(<emptyTree>::<C Foo>))
+      <emptyTree>::<C T>.reveal_type(<self>)
+      <self>.foo()
+    end
+  end
+
+  class <emptyTree>::<C Bar><<C <todo sym>>> < (::<todo sym>)
+    def bar<<todo method>>(&<blk>)
+      <emptyTree>::<C Class>.new(<emptyTree>::<C Foo>) do ||
+        begin
+          <cast:<synthetic bind>>(<self>, <todo sym>, ::T.class_of(<emptyTree>::<C Foo>))
+          <emptyTree>::<C T>.reveal_type(<self>)
+        end
+      end
+    end
+
+    def self.bar<<todo method>>(&<blk>)
+      <emptyTree>::<C Class>.new(<emptyTree>::<C Foo>) do ||
+        begin
+          <cast:<synthetic bind>>(<self>, <todo sym>, ::T.class_of(<emptyTree>::<C Foo>))
+          <emptyTree>::<C T>.reveal_type(<self>)
+        end
+      end
+    end
+
+    <runtime method definition of bar>
+
+    <runtime method definition of self.bar>
+  end
+end

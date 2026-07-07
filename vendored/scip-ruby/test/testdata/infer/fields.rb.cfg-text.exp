@@ -1,0 +1,67 @@
+method ::<Class:<root>>#<static-init> {
+
+bb0[rubyRegionId=0, firstDead=2]():
+    <self>: T.class_of(<root>) = cast(<self>: NilClass, T.class_of(<root>));
+    <finalReturn>: T.noreturn = return <returnMethodTemp>$2: NilClass
+    <unconditional> -> bb1
+
+# backedges
+# - bb0(rubyRegionId=0)
+bb1[rubyRegionId=0, firstDead=-1]():
+    <unconditional> -> bb1
+
+}
+
+method ::Foo#initialize {
+
+bb0[rubyRegionId=0, firstDead=9]():
+    @ivar$3: Integer = alias @ivar
+    <self>: Foo = cast(<self>: NilClass, Foo);
+    <cfgAlias>$5: T.class_of(Integer) = alias <C Integer>
+    keep_for_ide$4: T.class_of(Integer) = <cfgAlias>$5
+    keep_for_ide$4: T.untyped = <keep-alive> keep_for_ide$4
+    <castTemp>$6: Integer(0) = 0
+    @ivar$3: Integer = cast(<castTemp>$6: Integer(0), Integer);
+    <returnMethodTemp>$2: Integer = @ivar$3
+    <finalReturn>: T.noreturn = return <returnMethodTemp>$2: Integer
+    <unconditional> -> bb1
+
+# backedges
+# - bb0(rubyRegionId=0)
+bb1[rubyRegionId=0, firstDead=-1]():
+    <unconditional> -> bb1
+
+}
+
+method ::Foo#foo {
+
+bb0[rubyRegionId=0, firstDead=6]():
+    @ivar$4: Integer = alias @ivar
+    <self>: Foo = cast(<self>: NilClass, Foo);
+    @ivar$4: Integer(2) = 2
+    @ivar$4: Integer = "ss"
+    <returnMethodTemp>$2: Integer = @ivar$4
+    <finalReturn>: T.noreturn = return <returnMethodTemp>$2: Integer
+    <unconditional> -> bb1
+
+# backedges
+# - bb0(rubyRegionId=0)
+bb1[rubyRegionId=0, firstDead=-1]():
+    <unconditional> -> bb1
+
+}
+
+method ::<Class:Foo>#<static-init> {
+
+bb0[rubyRegionId=0, firstDead=2]():
+    <self>: T.class_of(Foo) = cast(<self>: NilClass, T.class_of(Foo));
+    <finalReturn>: T.noreturn = return <returnMethodTemp>$2: NilClass
+    <unconditional> -> bb1
+
+# backedges
+# - bb0(rubyRegionId=0)
+bb1[rubyRegionId=0, firstDead=-1]():
+    <unconditional> -> bb1
+
+}
+

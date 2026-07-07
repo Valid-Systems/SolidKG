@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace TestData;
+
+use Test\Dep\ClassI;
+use Test\Dep2\ClassJ;
+use TestData5\ClassK;
+
+trait TraitE
+{
+    public int $e1;
+
+    /** @var ClassI */
+    public $e2;
+
+    protected function e1(): bool
+    {
+        return $this->e2->i1;
+    }
+
+    public function e2(): int
+    {
+        $v1 = ClassI::I1;
+        return $this->e2::I1 * $v1 * ClassJ::J1 * ClassK::K1;
+    }
+
+    public function e3(): int
+    {
+        if (true) {
+            return 23 - count([0]);
+        }
+        if (false) {
+            return 42;
+        }
+        return -1;
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "schemaName": "solidkg.llm-answer-quality.results.v1",
+  "profile": "full",
+  "plannedRunOrder": "not-an-array",
+  "runs": [
+    {
+      "armId": "unknown"
+    }
+  ]
+}

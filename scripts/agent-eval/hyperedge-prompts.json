@@ -1,0 +1,50 @@
+[
+  {
+    "id": "semantic-route-handling",
+    "category": "route handling",
+    "relationUnderTest": "framework route registration to request handler",
+    "prompt": "How does an incoming HTTP request reach the handler registered for a representative route? Identify the route registration site and the handler it binds to.",
+    "expectedEvidence": "The answer names the route declaration and the concrete handler/controller function or method reached from it.",
+    "repeatedRunNotice": "Do not publish conclusions from a single run; compare current MCP and hyperedge-enabled arms across repeated runs."
+  },
+  {
+    "id": "semantic-event-emission",
+    "category": "event emission",
+    "relationUnderTest": "event emitter send site to listener registration",
+    "prompt": "How does a representative emitted event reach the code that handles it? Identify both the emission site and the listener or subscription registration site.",
+    "expectedEvidence": "The answer names the emitted event channel and the listener callback or handler connected to that channel.",
+    "repeatedRunNotice": "Do not publish conclusions from a single run; compare current MCP and hyperedge-enabled arms across repeated runs."
+  },
+  {
+    "id": "semantic-ui-render",
+    "category": "UI render",
+    "relationUnderTest": "state or component update to rendered UI output",
+    "prompt": "How does a representative state or data update cause the relevant UI component to render on screen? Identify the update site and the component render boundary.",
+    "expectedEvidence": "The answer connects the update source to the render method, component function, JSX child, or equivalent UI render boundary.",
+    "repeatedRunNotice": "Do not publish conclusions from a single run; compare current MCP and hyperedge-enabled arms across repeated runs."
+  },
+  {
+    "id": "semantic-interface-implementation",
+    "category": "interface implementation",
+    "relationUnderTest": "interface or protocol contract to concrete implementation",
+    "prompt": "Which concrete implementation handles calls made through a representative interface or protocol contract? Identify the contract, the implementation, and the binding evidence.",
+    "expectedEvidence": "The answer names the interface/protocol and the concrete class, struct, or method implementation selected through that contract.",
+    "repeatedRunNotice": "Do not publish conclusions from a single run; compare current MCP and hyperedge-enabled arms across repeated runs."
+  },
+  {
+    "id": "semantic-native-bridge",
+    "category": "native bridge",
+    "relationUnderTest": "cross-language bridge declaration to native implementation",
+    "prompt": "How does a representative JavaScript or managed-language call cross into native code? Identify the bridge declaration or registration site and the native method it reaches.",
+    "expectedEvidence": "The answer names the bridge API surface and the native Objective-C, Swift, Java, Kotlin, C, or C++ implementation reached through it.",
+    "repeatedRunNotice": "Do not publish conclusions from a single run; compare current MCP and hyperedge-enabled arms across repeated runs."
+  },
+  {
+    "id": "semantic-handler-impact",
+    "category": "handler impact",
+    "relationUnderTest": "handler change to affected registrations or callers",
+    "prompt": "If a representative handler changes, what registrations, routes, subscriptions, or bridge sites are affected? Identify the handler and the registration or bridge sites that depend on it.",
+    "expectedEvidence": "The answer reports the handler plus the registration, route, subscription, or bridge declarations that should be reviewed for impact.",
+    "repeatedRunNotice": "Do not publish conclusions from a single run; compare current MCP and hyperedge-enabled arms across repeated runs."
+  }
+]

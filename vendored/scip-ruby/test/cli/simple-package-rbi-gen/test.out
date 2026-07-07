@@ -1,0 +1,7 @@
+No errors! Great job.
+# typed: true
+
+class ::Project::Foo::FooClass
+  def dynamically_defined_method(); end
+end
+

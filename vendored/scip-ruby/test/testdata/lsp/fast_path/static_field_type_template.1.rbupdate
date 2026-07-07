@@ -1,0 +1,9 @@
+# typed: true
+# assert-fast-path: static_field_type_template.rb
+
+class GenericPlaceholder
+  extend T::Helpers
+  extend T::Generic
+
+  ElementPlaceholder = type_template {{fixed: Integer}}
+end

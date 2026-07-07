@@ -1,0 +1,13 @@
+# typed: true
+# assert-fast-path: method_move_files__1.rb,method_move_files__2.rb
+
+class A
+  extend T::Sig
+
+  sig {params(x: Integer).returns(String)}
+  def m(x)
+    ""
+  end
+end
+
+T.reveal_type(A.new.m(0)) # error: Revealed type: `String`

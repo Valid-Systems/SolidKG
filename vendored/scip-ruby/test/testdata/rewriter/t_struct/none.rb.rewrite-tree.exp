@@ -1,0 +1,17 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C None><<C <todo sym>>> < (<emptyTree>::<C T>::<C Struct>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.void()
+    end
+
+    def initialize<<todo method>>(&<blk>)
+      nil
+    end
+
+    <runtime method definition of initialize>
+  end
+
+  <emptyTree>::<C None>.new()
+
+  <emptyTree>::<C None>.new(:foo, 3)
+end

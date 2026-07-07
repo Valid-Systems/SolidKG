@@ -1,0 +1,32 @@
+{
+  "schemaName": "solidkg.task-success-results.v1",
+  "repo": {
+    "name": "tiny-checkout-flow",
+    "path": "fixtures/tiny-checkout-flow"
+  },
+  "thresholds": {
+    "maxReadCount": 0,
+    "maxGrepCount": 0
+  },
+  "scenarios": [
+    {
+      "id": "tiny-context-happy-path",
+      "prompt": "How does CheckoutService submitOrder use PaymentGateway chargeCard?",
+      "expectedEvidenceIds": ["ev_checkout_submit_order", "ev_payment_charge_card"],
+      "run": {
+        "answerPacket": {
+          "schemaVersion": "solidkg.answer-packet.v1",
+          "evidence": [
+            { "evidenceId": "ev_payment_charge_card" },
+            { "evidenceId": "ev_checkout_submit_order" }
+          ]
+        },
+        "toolCalls": [
+          { "tool": "solidkg_context", "input": "CheckoutService submitOrder" },
+          { "tool": "solidkg_trace", "input": "submitOrder -> chargeCard" }
+        ],
+        "filesRead": []
+      }
+    }
+  ]
+}

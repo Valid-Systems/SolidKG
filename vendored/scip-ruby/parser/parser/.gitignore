@@ -1,0 +1,4 @@
+/.cargo-in-container
+/target
+*.o
+Cargo.lock

@@ -1,0 +1,91 @@
+# Dependencies
+node_modules/
+**/node_modules/
+**/.git/
+
+# Build output
+dist/
+
+.cmem
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+/coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*
+!.env.example
+!.env.*.example
+.env.*.local
+
+# Publishing credentials and private keys
+.npmrc
+.pypirc
+.netrc
+*.pem
+*.key
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript build info
+*.tsbuildinfo
+
+# SQLite WAL mode files
+*.db-wal
+*.db-shm
+
+# Local Claude settings
+.claude/settings.local.json
+
+# Parallels Windows VM SSH/connection config (local machine, see CLAUDE.md)
+.parallels
+
+# SolidKG data directories (in test projects)
+.solidkg/
+
+test_frameworks
+
+# Test language repos for manual testing
+test-languages/
+
+# Vendored source is part of the source checkout. Exclude only nested repo
+# metadata and generated dependency/build outputs under vendored trees.
+vendored/**/.git/
+vendored/**/node_modules/
+vendored/**/target/
+vendored/**/build/
+vendored/**/dist/
+
+nul
+release/
+
+# Local agent scratch artifacts
+.omo/
+.fallow/
+.mypy_cache/
+tmpopencode/
+/hyper-solidkg.png
+
+# Local-only agent configuration and skills
+.agents/
+.claude/
+.cursor/
+skills-lock.json
+
+# Accidental local binary artifact under docs
+docs/maintenance.exe

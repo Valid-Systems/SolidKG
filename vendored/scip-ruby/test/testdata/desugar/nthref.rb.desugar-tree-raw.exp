@@ -1,0 +1,20 @@
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    UnresolvedIdent{
+      kind = Global
+      name = <U 1>
+    }
+
+    UnresolvedIdent{
+      kind = Global
+      name = <U 314159>
+    }
+  ]
+}

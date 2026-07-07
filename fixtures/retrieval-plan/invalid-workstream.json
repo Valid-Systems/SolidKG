@@ -1,0 +1,54 @@
+{
+  "schemaName": "solidkg.retrieval-improvement-candidate.v1",
+  "id": "release-review-as-workstream",
+  "title": "Treat release review as an implementation workstream",
+  "failureClass": "benchmark_claim_drift",
+  "workstream": "evidence_scoped_release_review",
+  "scopeBoundary": "Claims review only; this must not be admitted as an implementation workstream.",
+  "reproducibleFailure": {
+    "repo": "solidkg",
+    "repoRevision": "current-main",
+    "prompt": "Are benchmark claims scoped to current artifacts?",
+    "observedFailure": "Release review is a governance step, not one of the six implementation workstreams.",
+    "currentMainCommand": "rg -n \"benchmark\" docs/benchmarks docs/design/claims-register.md"
+  },
+  "baselineMetrics": {
+    "readCount": 1,
+    "grepCount": 1,
+    "toolCalls": 2,
+    "solidkgToolCalls": 0,
+    "wallClockMs": 1000,
+    "payloadBytes": 1000,
+    "answerCompleteness": "partial",
+    "sourceReferenceFidelity": "claim_drift",
+    "graphGrowthPercent": 0
+  },
+  "targetMetrics": {
+    "readCount": 0,
+    "grepCount": 0,
+    "toolCalls": 1,
+    "solidkgToolCalls": 0,
+    "wallClockMs": 500,
+    "payloadBytes": 500,
+    "answerCompleteness": "complete",
+    "sourceReferenceFidelity": "evidence_scoped",
+    "graphGrowthPercent": 0
+  },
+  "controls": [
+    {
+      "repo": "solidkg",
+      "prompt": "Do retrieval implementation candidates remain bounded?",
+      "expected": "Only six implementation workstreams are admitted."
+    }
+  ],
+  "killCriteria": [
+    "Kill if release review becomes an implementation workstream instead of a governance gate."
+  ],
+  "verificationCommands": {
+    "red": "pnpm exec vitest run __tests__/retrieval-plan-gate.test.ts",
+    "green": "pnpm exec vitest run __tests__/retrieval-plan-gate.test.ts",
+    "surface": "node scripts/agent-eval/retrieval-plan-gate.mjs fixtures/retrieval-plan/invalid-workstream.json",
+    "evaluation": "node scripts/agent-eval/retrieval-plan-gate.mjs fixtures/retrieval-plan/invalid-workstream.json",
+    "regression": "pnpm exec vitest run __tests__/readiness-evidence.test.ts __tests__/release-artifact-readiness.test.ts"
+  }
+}

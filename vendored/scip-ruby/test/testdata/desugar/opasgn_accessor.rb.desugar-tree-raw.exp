@@ -1,0 +1,229 @@
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    ClassDef{
+      kind = class
+      name = UnresolvedConstantLit{
+        cnst = <C <U A>>
+        scope = EmptyTree
+      }
+      symbol = <C <U <todo sym>>>
+      ancestors = [ConstantLit{
+          symbol = (class ::<todo sym>)
+          orig = nullptr
+        }]
+      rhs = [
+        Send{
+          flags = {privateOk}
+          recv = Local{
+            localVariable = <U <self>>
+          }
+          fun = <U extend>
+          block = nullptr
+          pos_args = 1
+          args = [
+            UnresolvedConstantLit{
+              cnst = <C <U Sig>>
+              scope = UnresolvedConstantLit{
+                cnst = <C <U T>>
+                scope = EmptyTree
+              }
+            }
+          ]
+        }
+
+        Send{
+          flags = {privateOk}
+          recv = Local{
+            localVariable = <U <self>>
+          }
+          fun = <U sig>
+          block = Block {
+            args = [
+            ]
+            body = Send{
+              flags = {privateOk}
+              recv = Local{
+                localVariable = <U <self>>
+              }
+              fun = <U returns>
+              block = nullptr
+              pos_args = 1
+              args = [
+                Send{
+                  flags = {}
+                  recv = UnresolvedConstantLit{
+                    cnst = <C <U T>>
+                    scope = EmptyTree
+                  }
+                  fun = <U nilable>
+                  block = nullptr
+                  pos_args = 1
+                  args = [
+                    UnresolvedConstantLit{
+                      cnst = <C <U String>>
+                      scope = EmptyTree
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+          pos_args = 0
+          args = [
+          ]
+        }
+
+        Send{
+          flags = {privateOk}
+          recv = Local{
+            localVariable = <U <self>>
+          }
+          fun = <U attr_accessor>
+          block = nullptr
+          pos_args = 1
+          args = [
+            Literal{ value = :value }
+          ]
+        }
+      ]
+    }
+
+    Assign{
+      lhs = UnresolvedIdent{
+        kind = Local
+        name = <U a>
+      }
+      rhs = Send{
+        flags = {}
+        recv = UnresolvedConstantLit{
+          cnst = <C <U A>>
+          scope = EmptyTree
+        }
+        fun = <U new>
+        block = nullptr
+        pos_args = 0
+        args = [
+        ]
+      }
+    }
+
+    InsSeq{
+      stats = [
+        Assign{
+          lhs = UnresolvedIdent{
+            kind = Local
+            name = <D <U value> $2>
+          }
+          rhs = UnresolvedIdent{
+            kind = Local
+            name = <U a>
+          }
+        }
+        Assign{
+          lhs = UnresolvedIdent{
+            kind = Local
+            name = <D <U value> $3>
+          }
+          rhs = Send{
+            flags = {}
+            recv = UnresolvedIdent{
+              kind = Local
+              name = <D <U value> $2>
+            }
+            fun = <U value>
+            block = nullptr
+            pos_args = 0
+            args = [
+            ]
+          }
+        }
+      ],
+      expr = If{
+        cond = UnresolvedIdent{
+          kind = Local
+          name = <D <U value> $3>
+        }
+        thenp = Send{
+          flags = {}
+          recv = UnresolvedIdent{
+            kind = Local
+            name = <D <U value> $2>
+          }
+          fun = <U value=>
+          block = nullptr
+          pos_args = 1
+          args = [
+            Literal{ value = "string" }
+          ]
+        }
+        elsep = UnresolvedIdent{
+          kind = Local
+          name = <D <U value> $3>
+        }
+      }
+    }
+
+    InsSeq{
+      stats = [
+        Assign{
+          lhs = UnresolvedIdent{
+            kind = Local
+            name = <D <U value> $4>
+          }
+          rhs = UnresolvedIdent{
+            kind = Local
+            name = <U a>
+          }
+        }
+        Assign{
+          lhs = UnresolvedIdent{
+            kind = Local
+            name = <D <U value> $5>
+          }
+          rhs = Send{
+            flags = {}
+            recv = UnresolvedIdent{
+              kind = Local
+              name = <D <U value> $4>
+            }
+            fun = <U value>
+            block = nullptr
+            pos_args = 0
+            args = [
+            ]
+          }
+        }
+      ],
+      expr = If{
+        cond = UnresolvedIdent{
+          kind = Local
+          name = <D <U value> $5>
+        }
+        thenp = UnresolvedIdent{
+          kind = Local
+          name = <D <U value> $5>
+        }
+        elsep = Send{
+          flags = {}
+          recv = UnresolvedIdent{
+            kind = Local
+            name = <D <U value> $4>
+          }
+          fun = <U value=>
+          block = nullptr
+          pos_args = 1
+          args = [
+            Literal{ value = "string" }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+# -- test/testdata/packager/nested_inner_namespaces/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C RootPackage><<C <todo sym>>> < (::PackageSpec)
+    <self>.import(::<PackageSpecRegistry>::<C RootPackage>::<C Foo>)
+  end
+end
+# -- test/testdata/packager/nested_inner_namespaces/foo/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C RootPackage>::<C Foo><<C <todo sym>>> < (::PackageSpec)
+    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Constant>)
+
+    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Bar>::<C Constant>)
+
+    <self>.export(::<root>::<C RootPackage>::<C Foo>::<C Bar>::<C Baz>)
+  end
+end
+# -- test/testdata/packager/nested_inner_namespaces/bar.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  module <emptyTree>::<C RootPackage>::<C Bar><<C <todo sym>>> < ()
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:a, <emptyTree>::<C Integer>).returns(<emptyTree>::<C String>)
+    end
+
+    def main<<todo method>>(a, &<blk>)
+      if a.>(10)
+        <emptyTree>::<C RootPackage>::<C Foo>::<C Constant>
+      else
+        if a.<(4)
+          <emptyTree>::<C RootPackage>::<C Foo>::<C Bar>::<C Constant>
+        else
+          <emptyTree>::<C RootPackage>::<C Foo>::<C Bar>::<C Baz>::<C Constant>
+        end
+      end
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of main>
+  end
+end
+# -- test/testdata/packager/nested_inner_namespaces/foo/foo.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  module <emptyTree>::<C RootPackage>::<C Foo><<C <todo sym>>> < ()
+    <emptyTree>::<C Constant> = "Foo"
+
+    module <emptyTree>::<C Bar><<C <todo sym>>> < ()
+      <emptyTree>::<C Constant> = "Bar"
+
+      module <emptyTree>::<C Baz><<C <todo sym>>> < ()
+        <emptyTree>::<C Constant> = "Baz"
+      end
+    end
+  end
+end

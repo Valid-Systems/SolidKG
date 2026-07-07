@@ -1,0 +1,1085 @@
+#include "ast/ArgParsing.h"
+#include "ast/Helpers.h"
+#include "cfg/builder/builder.h"
+#include "common/typecase.h"
+#include "core/Names.h"
+#include "core/errors/cfg.h"
+#include "core/errors/internal.h"
+
+using namespace std;
+
+namespace sorbet::cfg {
+
+void CFGBuilder::conditionalJump(BasicBlock *from, LocalRef cond, BasicBlock *thenb, BasicBlock *elseb, CFG &inWhat,
+                                 core::LocOffsets loc) {
+    thenb->flags.wasJumpDestination = true;
+    elseb->flags.wasJumpDestination = true;
+    if (from != inWhat.deadBlock()) {
+        ENFORCE(!from->bexit.isCondSet(), "condition for block already set");
+        ENFORCE(from->bexit.thenb == nullptr, "thenb already set");
+        ENFORCE(from->bexit.elseb == nullptr, "elseb already set");
+        from->bexit.cond = LocalOccurrence::synthetic(cond);
+        from->bexit.thenb = thenb;
+        from->bexit.elseb = elseb;
+        from->bexit.loc = loc;
+        thenb->backEdges.emplace_back(from);
+        elseb->backEdges.emplace_back(from);
+    }
+}
+
+void CFGBuilder::unconditionalJump(BasicBlock *from, BasicBlock *to, CFG &inWhat, core::LocOffsets loc) {
+    to->flags.wasJumpDestination = true;
+    if (from != inWhat.deadBlock()) {
+        ENFORCE(!from->bexit.isCondSet(), "condition for block already set");
+        ENFORCE(from->bexit.thenb == nullptr, "thenb already set");
+        ENFORCE(from->bexit.elseb == nullptr, "elseb already set");
+        from->bexit.cond = LocalOccurrence::synthetic(LocalRef::unconditional());
+        from->bexit.elseb = to;
+        from->bexit.thenb = to;
+        from->bexit.loc = loc;
+        to->backEdges.emplace_back(from);
+    }
+}
+
+namespace {
+
+LocalRef global2Local(CFGContext cctx, core::SymbolRef what, core::LocOffsets loc) {
+    if (what == core::Symbols::StubModule()) {
+        // We don't need all stub module assignments to alias to the same temporary.
+        // (The fact that there's a StubModule at all means an error was already reported elsewhere)
+        return cctx.newTemporary(what.name(cctx.ctx));
+    }
+
+    // Note: this will add an empty local to aliases if 'what' is not there
+    auto &alias = cctx.aliases[what];
+    if (!alias.variable.exists()) {
+        alias.loc = loc;
+        alias.variable = cctx.newTemporary(what.name(cctx.ctx));
+    }
+    return alias.variable;
+}
+
+pair<LocalRef, bool> unresolvedIdent2Local(CFGContext cctx, const ast::UnresolvedIdent &id, bool isAssign) {
+    core::ClassOrModuleRef klass;
+
+    switch (id.kind) {
+        case ast::UnresolvedIdent::Kind::Class:
+            klass = cctx.ctx.owner.enclosingClass(cctx.ctx);
+            while (klass.data(cctx.ctx)->attachedClass(cctx.ctx).exists()) {
+                klass = klass.data(cctx.ctx)->attachedClass(cctx.ctx);
+            }
+            break;
+        case ast::UnresolvedIdent::Kind::Instance:
+            ENFORCE(cctx.ctx.owner.isMethod());
+            klass = cctx.ctx.owner.owner(cctx.ctx).asClassOrModuleRef();
+            break;
+        case ast::UnresolvedIdent::Kind::Global:
+            klass = core::Symbols::root();
+            break;
+        default:
+            // These should have been removed in the namer
+            Exception::notImplemented();
+    }
+
+    auto sym = klass.data(cctx.ctx)->findMemberTransitive(cctx.ctx, id.name);
+    if (!sym.exists()) {
+        auto hasError = id.kind != ast::UnresolvedIdent::Kind::Global && id.name != core::Names::ivarNameMissing() &&
+                        id.name != core::Names::cvarNameMissing();
+
+        auto fnd = cctx.discoveredUndeclaredFields.find(id.name);
+        if (fnd == cctx.discoveredUndeclaredFields.end()) {
+            // For reads (not assigns) we only report the problem on the first offense.
+            if (hasError && !isAssign) {
+                if (auto e = cctx.ctx.beginError(id.loc, core::errors::CFG::UndeclaredVariable)) {
+                    e.setHeader("Use of undeclared variable `{}`", id.name.show(cctx.ctx));
+                    e.addErrorNote("Use `{}` to declare this variable.\n"
+                                   "    For more information, see https://sorbet.org/docs/type-annotations",
+                                   "T.let");
+                }
+            }
+            auto ret = cctx.newTemporary(id.name);
+            cctx.discoveredUndeclaredFields[id.name] = {ret, id.loc};
+            return {ret, hasError && isAssign};
+        }
+        return {fnd->second.variable, hasError && isAssign};
+    } else {
+        return {global2Local(cctx, sym, id.loc), false};
+    }
+}
+
+bool sendRecvIsT(ast::Send &s) {
+    if (auto cnst = ast::cast_tree<ast::ConstantLit>(s.recv)) {
+        return cnst->symbol == core::Symbols::T();
+    } else {
+        return false;
+    }
+}
+
+InstructionPtr maybeMakeTypeParameterAlias(CFGContext &cctx, ast::Send &s) {
+    const auto &ctx = cctx.ctx;
+    auto method = cctx.inWhat.symbol;
+    if (!method.data(ctx)->flags.isGenericMethod) {
+        // Using staticInit as a crude proxy for "is inside a `sig` block"
+        // This means we do not report as many errors as we should (but cheaply guards against false positives)
+        if (!method.data(ctx)->name.isAnyStaticInitName(ctx)) {
+            if (auto e = ctx.beginError(s.loc, core::errors::CFG::UnknownTypeParameter)) {
+                e.setHeader("Method `{}` does not declare any type parameters", method.show(ctx));
+                e.addErrorLine(method.data(ctx)->loc(), "`{}` defined here", method.show(ctx));
+            }
+        }
+
+        return nullptr;
+    }
+
+    if (s.numPosArgs() != 1 || !ast::isa_tree<ast::Literal>(s.getPosArg(0))) {
+        // Infer will report normal type error
+        return nullptr;
+    }
+    const auto &namedLiteral = ast::cast_tree_nonnull<ast::Literal>(s.getPosArg(0));
+    if (!namedLiteral.isSymbol()) {
+        // Infer will report normal type error
+        return nullptr;
+    }
+
+    auto typeVarName = ctx.state.lookupNameUnique(core::UniqueNameKind::TypeVarName, namedLiteral.asSymbol(), 1);
+    if (!typeVarName.exists()) {
+        if (auto e = ctx.beginError(namedLiteral.loc, core::errors::CFG::UnknownTypeParameter)) {
+            e.setHeader("Type parameter `{}` does not exist on `{}`", namedLiteral.toStringWithTabs(ctx, 0),
+                        method.show(ctx));
+            e.addErrorLine(method.data(ctx)->loc(), "`{}` defined here", method.show(ctx));
+        }
+        return nullptr;
+    }
+
+    core::TypeArgumentRef typeParam;
+    for (const auto &it : method.data(ctx)->typeArguments()) {
+        if (it.data(ctx)->name == typeVarName) {
+            typeParam = it;
+        }
+    }
+
+    if (!typeParam.exists()) {
+        if (auto e = ctx.beginError(namedLiteral.loc, core::errors::CFG::UnknownTypeParameter)) {
+            e.setHeader("Type parameter `{}` does not exist on `{}`", namedLiteral.toStringWithTabs(ctx, 0),
+                        method.show(ctx));
+            e.addErrorLine(method.data(ctx)->loc(), "`{}` defined here", method.show(ctx));
+        }
+        return nullptr;
+    }
+
+    return make_insn<Alias>(typeParam);
+}
+
+ast::Send *isKernelProcOrLambda(ast::ExpressionPtr &expr) {
+    auto *send = ast::cast_tree<ast::Send>(expr);
+    if (send == nullptr || send->hasNonBlockArgs() ||
+        (send->fun != core::Names::lambda() && send->fun != core::Names::proc())) {
+        return nullptr;
+    }
+
+    auto *recv = ast::cast_tree<ast::ConstantLit>(send->recv);
+    if (recv == nullptr || recv->symbol != core::Symbols::Kernel()) {
+        return nullptr;
+    }
+
+    return send;
+}
+
+} // namespace
+
+void CFGBuilder::jumpToDead(BasicBlock *from, CFG &inWhat, core::LocOffsets loc) {
+    auto *db = inWhat.deadBlock();
+    if (from != db) {
+        ENFORCE(!from->bexit.isCondSet(), "condition for block already set");
+        ENFORCE(from->bexit.thenb == nullptr, "thenb already set");
+        ENFORCE(from->bexit.elseb == nullptr, "elseb already set");
+        from->bexit.cond = LocalOccurrence::synthetic(LocalRef::unconditional());
+        from->bexit.elseb = db;
+        from->bexit.thenb = db;
+        from->bexit.loc = loc;
+        db->backEdges.emplace_back(from);
+    }
+}
+
+void CFGBuilder::synthesizeExpr(BasicBlock *bb, LocalOccurrence occ, core::LocOffsets loc, InstructionPtr inst) {
+    auto &inserted = bb->exprs.emplace_back(occ, loc, move(inst));
+    inserted.value.setSynthetic();
+}
+
+void CFGBuilder::synthesizeExpr(BasicBlock *bb, LocalRef var, core::LocOffsets loc, InstructionPtr inst) {
+    synthesizeExpr(bb, LocalOccurrence::synthetic(var), loc, move(inst));
+}
+
+BasicBlock *CFGBuilder::walkHash(CFGContext cctx, ast::Hash &h, BasicBlock *current, core::NameRef method) {
+    InlinedVector<cfg::LocalRef, 2> vars;
+    InlinedVector<core::LocOffsets, 2> locs;
+    for (int i = 0; i < h.keys.size(); i++) {
+        LocalRef keyTmp = cctx.newTemporary(core::Names::hashTemp());
+        LocalRef valTmp = cctx.newTemporary(core::Names::hashTemp());
+        current = walk(cctx.withTarget(LocalOccurrence::synthetic(keyTmp)), h.keys[i], current);
+        current = walk(cctx.withTarget(LocalOccurrence::synthetic(valTmp)), h.values[i], current);
+        vars.emplace_back(keyTmp);
+        vars.emplace_back(valTmp);
+        locs.emplace_back(h.keys[i].loc());
+        locs.emplace_back(h.values[i].loc());
+    }
+    LocalRef magic = cctx.newTemporary(core::Names::magic());
+    synthesizeExpr(current, magic, core::LocOffsets::none(), make_insn<Alias>(core::Symbols::Magic()));
+
+    auto isPrivateOk = false;
+    current->exprs.emplace_back(cctx.target, h.loc,
+                                make_insn<Send>(magic, h.loc, method, core::LocOffsets::none(), vars.size(), vars,
+                                                std::move(locs), isPrivateOk));
+    return current;
+}
+
+BasicBlock *CFGBuilder::joinBlocks(CFGContext cctx, BasicBlock *a, BasicBlock *b) {
+    auto *join = cctx.inWhat.freshBlock(cctx.loops, a);
+    unconditionalJump(a, join, cctx.inWhat, core::LocOffsets::none());
+    unconditionalJump(b, join, cctx.inWhat, core::LocOffsets::none());
+    return join;
+}
+
+tuple<LocalRef, BasicBlock *, BasicBlock *> CFGBuilder::walkDefault(CFGContext cctx, int argIndex,
+                                                                    const core::ArgInfo &argInfo, LocalRef argLocal,
+                                                                    core::LocOffsets argLoc, ast::ExpressionPtr &def,
+                                                                    BasicBlock *presentCont, BasicBlock *defaultCont) {
+    auto defLoc = def.loc();
+
+    auto *presentNext = cctx.inWhat.freshBlock(cctx.loops, presentCont);
+    auto *defaultNext = cctx.inWhat.freshBlock(cctx.loops, presentCont);
+
+    auto present = cctx.newTemporary(core::Names::argPresent());
+    auto methodSymbol = cctx.inWhat.symbol;
+    synthesizeExpr(presentCont, present, argLoc, make_insn<ArgPresent>(methodSymbol, argIndex));
+    conditionalJump(presentCont, present, presentNext, defaultNext, cctx.inWhat, argLoc);
+
+    if (defaultCont != nullptr) {
+        unconditionalJump(defaultCont, defaultNext, cctx.inWhat, core::LocOffsets::none());
+    }
+
+    // Walk the default, and check the type of its final value
+    // Walk the default, and check the type of its final value, but discard the result of the cast.
+    auto result = cctx.newTemporary(core::Names::statTemp());
+    defaultNext = walk(cctx.withTarget(LocalOccurrence::synthetic(result)), def, defaultNext);
+
+    if (argInfo.type != nullptr) {
+        auto tmp = cctx.newTemporary(core::Names::castTemp());
+        synthesizeExpr(defaultNext, tmp, defLoc,
+                       make_insn<Cast>(result, core::LocOffsets::none(), argInfo.type, core::Names::let()));
+        cctx.inWhat.minLoops[tmp.id()] = CFG::MIN_LOOP_LET;
+    }
+
+    return {result, presentNext, defaultNext};
+}
+
+/** Convert `what` into a cfg, by starting to evaluate it in `current` inside method defined by `inWhat`.
+ * store result of evaluation into `target`. Returns basic block in which evaluation should proceed.
+ */
+BasicBlock *CFGBuilder::walk(CFGContext cctx, ast::ExpressionPtr &what, BasicBlock *current) {
+    /** Try to pay additional attention not to duplicate any part of tree.
+     * Though this may lead to more effictient and a better CFG if it was to be actually compiled into code
+     * This will lead to duplicate typechecking and may lead to exponential explosion of typechecking time
+     * for some code snippets. */
+    ENFORCE(!current->bexit.isCondSet() || current == cctx.inWhat.deadBlock(),
+            "current block has already been finalized!");
+
+    try {
+        BasicBlock *ret = nullptr;
+        typecase(
+            what,
+            [&](ast::While &a) {
+                auto headerBlock = cctx.inWhat.freshBlock(cctx.loops + 1, current);
+                // breakNotCalledBlock is only entered if break is not called in
+                // the loop body
+                auto breakNotCalledBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                auto continueBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                unconditionalJump(current, headerBlock, cctx.inWhat, a.loc);
+
+                LocalRef condSym = cctx.newTemporary(core::Names::whileTemp());
+                auto headerEnd =
+                    walk(cctx.withTarget(LocalOccurrence::synthetic(condSym)).withLoopScope(headerBlock, continueBlock),
+                         a.cond, headerBlock);
+                auto bodyBlock = cctx.inWhat.freshBlock(cctx.loops + 1, current);
+                conditionalJump(headerEnd, condSym, bodyBlock, breakNotCalledBlock, cctx.inWhat, a.cond.loc());
+                // finishHeader
+                LocalRef bodySym = cctx.newTemporary(core::Names::statTemp());
+
+                auto body = walk(cctx.withTarget(LocalOccurrence::synthetic(bodySym))
+                                     .withLoopScope(headerBlock, continueBlock)
+                                     .withLoopBreakTarget(cctx.target.variable),
+                                 a.body, bodyBlock);
+                unconditionalJump(body, headerBlock, cctx.inWhat, a.loc);
+
+                synthesizeExpr(breakNotCalledBlock, cctx.target, a.loc, make_insn<Literal>(core::Types::nilClass()));
+                unconditionalJump(breakNotCalledBlock, continueBlock, cctx.inWhat, a.loc);
+                ret = continueBlock;
+
+                /*
+                 * This code:
+                 *
+                 *     a = while cond; break b; end
+                 *
+                 * generates this CFG:
+                 *
+                 *   ┌──▶ Loop Header ──────┐
+                 *   │      │               │
+                 *   │      │               ▼
+                 *   │      ▼        breakNotCalledBlock
+                 *   └─ Loop Body         a = nil
+                 *          │               │
+                 *        a = b             │
+                 *          │               │
+                 *          ▼               │
+                 *    continueBlock ◀──────-┘
+                 *
+                 */
+            },
+            [&](ast::Return &a) {
+                auto retSym = cctx.newTemporaryOccurrence(core::Names::returnTemp());
+                auto cont = walk(cctx.withTarget(retSym), a.expr, current);
+                cont->exprs.emplace_back(cctx.target, a.loc,
+                                         make_insn<Return>(retSym.variable, a.expr.loc())); // dead assign.
+                jumpToDead(cont, cctx.inWhat, a.loc);
+                ret = cctx.inWhat.deadBlock();
+            },
+            [&](ast::If &a) {
+                LocalRef ifSym = cctx.newTemporary(core::Names::ifTemp());
+                ENFORCE(ifSym.exists(), "ifSym does not exist");
+                auto cont = walk(cctx.withTarget(LocalOccurrence::synthetic(ifSym)), a.cond, current);
+                auto thenBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                auto elseBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                conditionalJump(cont, ifSym, thenBlock, elseBlock, cctx.inWhat, a.cond.loc());
+
+                auto thenEnd = walk(cctx, a.thenp, thenBlock);
+                auto elseEnd = walk(cctx, a.elsep, elseBlock);
+                if (thenEnd != cctx.inWhat.deadBlock() || elseEnd != cctx.inWhat.deadBlock()) {
+                    if (thenEnd == cctx.inWhat.deadBlock()) {
+                        ret = elseEnd;
+                    } else if (elseEnd == cctx.inWhat.deadBlock()) {
+                        ret = thenEnd;
+                    } else {
+                        ret = cctx.inWhat.freshBlock(cctx.loops, current);
+                        unconditionalJump(thenEnd, ret, cctx.inWhat, a.loc);
+                        unconditionalJump(elseEnd, ret, cctx.inWhat, a.loc);
+                    }
+                } else {
+                    ret = cctx.inWhat.deadBlock();
+                }
+            },
+            [&](const ast::Literal &a) {
+                current->exprs.emplace_back(cctx.target, a.loc, make_insn<Literal>(a.value));
+                ret = current;
+            },
+            [&](const ast::UnresolvedIdent &id) {
+                auto isAssign = false;
+                auto [loc, _foundError] = unresolvedIdent2Local(cctx, id, isAssign);
+                ENFORCE(loc.exists());
+                current->exprs.emplace_back(cctx.target, id.loc, make_insn<Ident>(loc));
+
+                ret = current;
+            },
+            [&](const ast::UnresolvedConstantLit &a) {
+                Exception::raise("Should have been eliminated by namer/resolver");
+            },
+            [&](ast::ConstantLit &a) {
+                auto aliasName = cctx.newTemporaryOccurrence(core::Names::cfgAlias());
+                if (a.symbol == core::Symbols::StubModule()) {
+                    current->exprs.emplace_back(aliasName, a.loc, make_insn<Alias>(core::Symbols::untyped()));
+                } else {
+                    current->exprs.emplace_back(aliasName, a.loc, make_insn<Alias>(a.symbol));
+                }
+                synthesizeExpr(current, cctx.target, a.loc, make_insn<Ident>(aliasName.variable));
+
+                if (a.original) {
+                    auto *orig = ast::cast_tree<ast::UnresolvedConstantLit>(a.original);
+                    // Empirically, these are the only two cases we've needed so far to service the
+                    // LSP requests we want (hover and completion), but that doesn't mean these are
+                    // the **only** we'll ever want.
+                    if (ast::isa_tree<ast::ConstantLit>(orig->scope)) {
+                        LocalRef deadSym = cctx.newTemporary(core::Names::keepForIde());
+                        current = walk(cctx.withTarget(LocalOccurrence::synthetic(deadSym)), orig->scope, current);
+                    } else if (ast::isa_tree<ast::Send>(orig->scope)) {
+                        LocalRef deadSym = cctx.newTemporary(core::Names::keepForIde());
+                        current = walk(cctx.withTarget(LocalOccurrence::synthetic(deadSym)), orig->scope, current);
+                    }
+                }
+
+                ret = current;
+            },
+            [&](const ast::Local &a) {
+                current->exprs.emplace_back(cctx.target, a.loc,
+                                            make_insn<Ident>(cctx.inWhat.enterLocal(a.localVariable)));
+                ret = current;
+            },
+            [&](ast::Assign &a) {
+                LocalRef lhs;
+                if (auto lhsIdent = ast::cast_tree<ast::ConstantLit>(a.lhs)) {
+                    lhs = global2Local(cctx, lhsIdent->symbol, a.lhs.loc());
+                } else if (auto lhsLocal = ast::cast_tree<ast::Local>(a.lhs)) {
+                    lhs = cctx.inWhat.enterLocal(lhsLocal->localVariable);
+                } else if (auto ident = ast::cast_tree<ast::UnresolvedIdent>(a.lhs)) {
+                    auto isAssign = true;
+                    auto [newLhs, foundError] = unresolvedIdent2Local(cctx, *ident, isAssign);
+                    lhs = newLhs;
+                    // Detect if we would have reported an error
+                    // Only do this transformation if we're sure that it would produce an error, so
+                    // that we don't pay the performance cost of inflating the CFG needlessly.
+                    auto shouldReportErrorOn = cctx.ctx.state.shouldReportErrorOn(
+                        cctx.ctx.locAt(a.loc), core::errors::CFG::UndeclaredVariable);
+                    if (foundError && shouldReportErrorOn) {
+                        auto zeroLoc = a.loc.copyWithZeroLength();
+                        auto magic = ast::MK::Constant(zeroLoc, core::Symbols::Magic());
+                        auto fieldKind = ident->kind == ast::UnresolvedIdent::Kind::Class ? core::Names::class_()
+                                                                                          : core::Names::instance();
+                        // Mutate a.rhs before walking.
+                        a.rhs =
+                            ast::MK::Send4(a.lhs.loc(), move(magic), core::Names::suggestFieldType(), zeroLoc,
+                                           move(a.rhs), ast::MK::String(zeroLoc, fieldKind),
+                                           ast::MK::String(zeroLoc, cctx.ctx.owner.asMethodRef().data(cctx.ctx)->name),
+                                           ast::MK::Symbol(zeroLoc, ident->name));
+                    }
+                    ENFORCE(lhs.exists());
+                } else {
+                    Exception::raise("Unexpected Assign::lhs in builder_walk.cc: {}", a.nodeName());
+                }
+
+                auto locatedLhs = LocalOccurrence{lhs, a.lhs.loc()};
+                auto rhsCont = walk(cctx.withTarget(locatedLhs), a.rhs, current);
+                rhsCont->exprs.emplace_back(cctx.target, a.loc, make_insn<Ident>(lhs));
+                ret = rhsCont;
+            },
+            [&](ast::InsSeq &a) {
+                for (auto &exp : a.stats) {
+                    LocalRef temp = cctx.newTemporary(core::Names::statTemp());
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), exp, current);
+                }
+                ret = walk(cctx, a.expr, current);
+            },
+            [&](ast::Send &s) {
+                LocalRef recv;
+
+                if (s.fun == core::Names::absurd()) {
+                    if (auto cnst = ast::cast_tree<ast::ConstantLit>(s.recv)) {
+                        if (cnst->symbol == core::Symbols::T()) {
+                            if (s.hasKwArgs()) {
+                                if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                                    e.setHeader("`{}` does not accept keyword arguments", "T.absurd");
+                                }
+                                ret = current;
+                                return;
+                            }
+
+                            if (s.numPosArgs() != 1) {
+                                if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                                    e.setHeader("`{}` expects exactly one argument but got `{}`", "T.absurd",
+                                                s.numPosArgs());
+                                }
+                                ret = current;
+                                return;
+                            }
+
+                            auto &posArg0 = s.getPosArg(0);
+                            if (!ast::isa_tree<ast::Local>(posArg0) && !ast::isa_tree<ast::UnresolvedIdent>(posArg0)) {
+                                if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                                    // Providing a send is the most common way T.absurd is misused, so we provide a
+                                    // little extra hint in the error message in that case.
+                                    if (ast::isa_tree<ast::Send>(posArg0)) {
+                                        e.setHeader("`{}` expects to be called on a variable, not a method call",
+                                                    "T.absurd");
+                                    } else {
+                                        e.setHeader("`{}` expects to be called on a variable", "T.absurd");
+                                    }
+                                    e.addErrorLine(core::Loc(cctx.ctx.file, posArg0.loc()),
+                                                   "Assign this expression to a variable, and use it in both the "
+                                                   "conditional and the `{}` call",
+                                                   "T.absurd");
+                                }
+                                ret = current;
+                                return;
+                            }
+
+                            auto temp = cctx.newTemporary(core::Names::statTemp());
+                            current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), posArg0, current);
+                            current->exprs.emplace_back(cctx.target, s.loc, make_insn<TAbsurd>(temp));
+                            ret = current;
+                            return;
+                        }
+                        ret = current;
+                        return;
+                    }
+
+                    if (s.numPosArgs() != 1) {
+                        if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                            e.setHeader("`{}` expects exactly one argument but got `{}`", "T.absurd", s.numPosArgs());
+                        }
+                        ret = current;
+                        return;
+                    }
+
+                    auto &posArg0 = s.getPosArg(0);
+                    if (!ast::isa_tree<ast::Local>(posArg0) && !ast::isa_tree<ast::UnresolvedIdent>(posArg0)) {
+                        if (auto e = cctx.ctx.beginError(s.loc, core::errors::CFG::MalformedTAbsurd)) {
+                            // Providing a send is the most common way T.absurd is misused, so we provide a
+                            // little extra hint in the error message in that case.
+                            if (ast::isa_tree<ast::Send>(posArg0)) {
+                                e.setHeader("`{}` expects to be called on a variable, not a method call", "T.absurd");
+                            } else {
+                                e.setHeader("`{}` expects to be called on a variable", "T.absurd");
+                            }
+                            e.addErrorLine(core::Loc(cctx.ctx.file, posArg0.loc()),
+                                           "Assign this expression to a variable, and use it in both the "
+                                           "conditional and the `{}` call",
+                                           "T.absurd");
+                        }
+                        ret = current;
+                        return;
+                    }
+
+                    auto temp = cctx.newTemporary(core::Names::statTemp());
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), posArg0, current);
+                    current->exprs.emplace_back(cctx.target, s.loc, make_insn<TAbsurd>(temp));
+                    ret = current;
+                    return;
+                } else if (s.fun == core::Names::attachedClass() && sendRecvIsT(s)) {
+                    s.recv = ast::MK::Magic(s.recv.loc());
+                    s.addPosArg(ast::MK::Self(s.recv.loc()));
+                } else if (s.fun == core::Names::typeParameter() && sendRecvIsT(s)) {
+                    if (auto insn = maybeMakeTypeParameterAlias(cctx, s)) {
+                        current->exprs.emplace_back(cctx.target, s.loc, move(insn));
+                        ret = current;
+                        return;
+                    }
+                }
+
+                recv = cctx.newTemporary(core::Names::statTemp());
+                current = walk(cctx.withTarget(LocalOccurrence::synthetic(recv)), s.recv, current);
+
+                InlinedVector<LocalRef, 2> args;
+                InlinedVector<core::LocOffsets, 2> argLocs;
+                const auto posEnd = s.numPosArgs();
+                for (auto argIdx = 0; argIdx < posEnd; ++argIdx) {
+                    auto &exp = s.getPosArg(argIdx);
+                    LocalRef temp = cctx.newTemporary(core::Names::statTemp());
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), exp, current);
+                    args.emplace_back(temp);
+                    argLocs.emplace_back(exp.loc());
+                }
+
+                const auto kwEnd = s.numKwArgs();
+                for (auto argIdx = 0; argIdx < kwEnd; ++argIdx) {
+                    auto &key = s.getKwKey(argIdx);
+                    auto &val = s.getKwValue(argIdx);
+                    LocalRef keyTmp = cctx.newTemporary(core::Names::hashTemp());
+                    LocalRef valTmp = cctx.newTemporary(core::Names::hashTemp());
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(keyTmp)), key, current);
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(valTmp)), val, current);
+                    args.emplace_back(keyTmp);
+                    args.emplace_back(valTmp);
+                    argLocs.emplace_back(key.loc());
+                    argLocs.emplace_back(val.loc());
+                }
+
+                if (auto *exp = s.kwSplat()) {
+                    LocalRef temp = cctx.newTemporary(core::Names::statTemp());
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(temp)), *exp, current);
+                    args.emplace_back(temp);
+                    argLocs.emplace_back(exp->loc());
+                }
+
+                if (auto *block = s.block()) {
+                    auto newRubyRegionId = ++cctx.inWhat.maxRubyRegionId;
+                    auto &blockArgs = block->args;
+                    vector<core::ParsedArg> blockArgFlags = ast::ArgParsing::parseArgs(blockArgs);
+                    vector<core::ArgInfo::ArgFlags> argFlags;
+                    for (auto &e : blockArgFlags) {
+                        argFlags.emplace_back(e.flags);
+                    }
+                    auto link = make_shared<core::SendAndBlockLink>(s.fun, move(argFlags), newRubyRegionId);
+                    auto send = make_insn<Send>(recv, s.recv.loc(), s.fun, s.funLoc, s.numPosArgs(), args,
+                                                std::move(argLocs), !!s.flags.isPrivateOk, link);
+                    LocalRef sendTemp = cctx.newTemporary(core::Names::blockPreCallTemp());
+                    auto solveConstraint = make_insn<SolveConstraint>(link, sendTemp);
+                    current->exprs.emplace_back(LocalOccurrence::synthetic(sendTemp), s.loc, move(send));
+                    LocalRef restoreSelf = cctx.newTemporary(core::Names::selfRestore());
+                    synthesizeExpr(current, restoreSelf, core::LocOffsets::none(),
+                                   make_insn<Ident>(LocalRef::selfVariable()));
+
+                    auto headerBlock = cctx.inWhat.freshBlockWithRegion(cctx.loops + 1, newRubyRegionId);
+                    // solveConstraintBlock is only entered if break is not called
+                    // in the block body.
+                    auto solveConstraintBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                    auto postBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                    auto bodyLoops = cctx.loops + 1;
+                    auto bodyBlock = cctx.inWhat.freshBlockWithRegion(bodyLoops, newRubyRegionId);
+
+                    bodyBlock->exprs.emplace_back(LocalOccurrence::synthetic(LocalRef::selfVariable()), s.loc,
+                                                  make_insn<LoadSelf>(link, LocalRef::selfVariable()));
+
+                    auto *argBlock = bodyBlock;
+                    if (!blockArgFlags.empty()) {
+                        auto argTemp = LocalOccurrence::synthetic(cctx.newTemporary(core::Names::blkArg()));
+                        bodyBlock->exprs.emplace_back(argTemp, s.block()->loc, make_insn<LoadYieldParams>(link));
+
+                        for (int i = 0; i < blockArgFlags.size(); ++i) {
+                            auto &arg = blockArgFlags[i];
+                            auto argLoc = LocalOccurrence{cctx.inWhat.enterLocal(arg.local), arg.loc};
+
+                            if (arg.flags.isRepeated) {
+                                // Mixing positional and rest args in blocks is
+                                // not currently supported, but we'll handle that in
+                                // inference.
+                                argBlock->exprs.emplace_back(argLoc, arg.loc,
+                                                             make_insn<YieldLoadArg>(i, arg.flags, argTemp));
+                                continue;
+                            }
+
+                            if (auto *opt = ast::cast_tree<ast::OptionalArg>(blockArgs[i])) {
+                                auto *presentBlock = cctx.inWhat.freshBlockWithRegion(bodyLoops, newRubyRegionId);
+                                auto *missingBlock = cctx.inWhat.freshBlockWithRegion(bodyLoops, newRubyRegionId);
+
+                                // add a test for YieldParamPresent
+                                auto present = cctx.newTemporary(core::Names::argPresent());
+                                synthesizeExpr(argBlock, present, arg.loc,
+                                               make_insn<YieldParamPresent>(static_cast<uint16_t>(i)));
+                                conditionalJump(argBlock, present, presentBlock, missingBlock, cctx.inWhat, arg.loc);
+
+                                // make a new block for the present and missing blocks to join
+                                argBlock = cctx.inWhat.freshBlockWithRegion(bodyLoops, newRubyRegionId);
+
+                                // compile the argument fetch in the present block
+                                presentBlock->exprs.emplace_back(argLoc, arg.loc,
+                                                                 make_insn<YieldLoadArg>(i, arg.flags, argTemp));
+                                unconditionalJump(presentBlock, argBlock, cctx.inWhat, arg.loc);
+
+                                // compile the default expr in `missingBlock`
+                                auto *missingLast = walk(cctx.withTarget(argLoc), opt->default_, missingBlock);
+                                unconditionalJump(missingLast, argBlock, cctx.inWhat, arg.loc);
+                            } else {
+                                argBlock->exprs.emplace_back(argLoc, arg.loc,
+                                                             make_insn<YieldLoadArg>(i, arg.flags, argTemp));
+                            }
+                        }
+                    }
+
+                    conditionalJump(headerBlock, LocalRef::blockCall(), bodyBlock, solveConstraintBlock, cctx.inWhat,
+                                    s.loc);
+
+                    unconditionalJump(current, headerBlock, cctx.inWhat, s.loc);
+
+                    LocalRef blockrv = cctx.newTemporary(core::Names::blockReturnTemp());
+                    auto blockLast = walk(cctx.withTarget(LocalOccurrence::synthetic(blockrv))
+                                              .withBlockBreakTarget(cctx.target.variable)
+                                              .withLoopScope(headerBlock, postBlock, true)
+                                              .withSendAndBlockLink(link),
+                                          s.block()->body, argBlock);
+                    if (blockLast != cctx.inWhat.deadBlock()) {
+                        LocalRef dead = cctx.newTemporary(core::Names::blockReturnTemp());
+
+                        core::LocOffsets blockReturnLoc = s.block()->loc;
+                        if (blockLast->exprs.empty() || isa_instruction<LoadSelf>(blockLast->exprs.back().value) ||
+                            isa_instruction<YieldLoadArg>(blockLast->exprs.back().value)) {
+                            auto blockEndPos = blockReturnLoc.copyEndWithZeroLength();
+                            auto endKwLoc = cctx.ctx.locAt(blockEndPos).adjustLen(cctx.ctx, -3, 3);
+                            auto endBraceLoc = cctx.ctx.locAt(blockEndPos).adjustLen(cctx.ctx, -1, 1);
+                            if (endKwLoc.source(cctx.ctx) == "end") {
+                                blockReturnLoc = endKwLoc.offsets();
+                            } else if (endBraceLoc.source(cctx.ctx) == "}") {
+                                blockReturnLoc = endBraceLoc.offsets();
+                            }
+                        } else {
+                            blockReturnLoc = blockLast->exprs.back().loc;
+                        }
+
+                        synthesizeExpr(blockLast, dead, blockReturnLoc, make_insn<BlockReturn>(link, blockrv));
+                    }
+
+                    unconditionalJump(blockLast, headerBlock, cctx.inWhat, s.loc);
+                    unconditionalJump(solveConstraintBlock, postBlock, cctx.inWhat, s.loc);
+
+                    solveConstraintBlock->exprs.emplace_back(cctx.target, s.loc, move(solveConstraint));
+                    current = postBlock;
+                    synthesizeExpr(current, LocalRef::selfVariable(), s.loc, make_insn<Ident>(restoreSelf));
+
+                    /*
+                     * This code:
+                     *
+                     *     a = while cond; break b; end
+                     *
+                     * generates this CFG:
+                     *
+                     *   ┌──▶ headerBlock ──────┐
+                     *   │      │               │
+                     *   │      │               │
+                     *   │      ▼               │
+                     *   └─ Block Body          ▼
+                     *          │    a = solveConstraintBlock
+                     *        a = b             │
+                     *          │               │
+                     *          ▼               │
+                     *      Post Block ◀───────-┘
+                     *
+                     */
+                } else {
+                    current->exprs.emplace_back(cctx.target, s.loc,
+                                                make_insn<Send>(recv, s.recv.loc(), s.fun, s.funLoc, s.numPosArgs(),
+                                                                args, std::move(argLocs), !!s.flags.isPrivateOk));
+                }
+
+                ret = current;
+            },
+
+            [&](const ast::Block &a) { Exception::raise("should never encounter a bare Block"); },
+
+            [&](ast::Next &a) {
+                LocalRef exprSym = cctx.newTemporary(core::Names::nextTemp());
+                auto afterNext = walk(cctx.withTarget(LocalOccurrence::synthetic(exprSym)), a.expr, current);
+                if (afterNext != cctx.inWhat.deadBlock() && cctx.isInsideRubyBlock) {
+                    LocalRef dead = cctx.newTemporary(core::Names::nextTemp());
+                    ENFORCE(cctx.link.get() != nullptr);
+                    afterNext->exprs.emplace_back(LocalOccurrence::synthetic(dead), a.loc,
+                                                  make_insn<BlockReturn>(cctx.link, exprSym));
+                }
+
+                if (cctx.nextScope == nullptr) {
+                    if (auto e = cctx.ctx.beginError(a.loc, core::errors::CFG::NoNextScope)) {
+                        e.setHeader("No `{}` block around `{}`", "do", "next");
+                    }
+                    // I guess just keep going into deadcode?
+                    unconditionalJump(afterNext, cctx.inWhat.deadBlock(), cctx.inWhat, a.loc);
+                } else {
+                    unconditionalJump(afterNext, cctx.nextScope, cctx.inWhat, a.loc);
+                }
+
+                ret = cctx.inWhat.deadBlock();
+            },
+
+            [&](ast::Break &a) {
+                LocalRef exprSym = cctx.newTemporary(core::Names::returnTemp());
+                auto afterBreak = walk(cctx.withTarget(LocalOccurrence::synthetic(exprSym)), a.expr, current);
+
+                // Here, since cctx.blockBreakTarget refers to something outside of the block,
+                // it will show up on the pinned variables list (with type of NilClass).
+                // Then, since we are assigning to it at a higher loop level, we throw a
+                // "changing type in loop" error.
+
+                // To get around this, we first assign to a
+                // temporary blockBreakAssign variable, and then assign blockBreakAssign to
+                // cctx.blockBreakTarget. This allows us to silence this error, if the RHS is
+                // a variable of type "blockBreakAssign". You can find the silencing code in
+                // infer/environment.cc, if you search for "== core::Names::blockBreakAssign()".
+
+                // This is a temporary hack until we change how pining works to handle this case.
+                auto blockBreakAssign = cctx.newTemporary(core::Names::blockBreakAssign());
+                afterBreak->exprs.emplace_back(LocalOccurrence::synthetic(blockBreakAssign), a.loc,
+                                               make_insn<Ident>(exprSym));
+
+                // Only emit `<blockBreak>` in a block context
+                if (!cctx.breakIsJump) {
+                    // call intrinsic for break
+                    auto magic = cctx.newTemporary(core::Names::magic());
+                    auto ignored = cctx.newTemporary(core::Names::blockBreak());
+                    synthesizeExpr(afterBreak, magic, a.loc, make_insn<Alias>(core::Symbols::Magic()));
+                    InlinedVector<LocalRef, 2> args{exprSym};
+                    InlinedVector<core::LocOffsets, 2> locs{core::LocOffsets::none()};
+                    auto isPrivateOk = false;
+
+                    // This represents the throw in the Ruby VM to the appropriate control frame.
+                    // It needs to come prior to the assignment (which shouldn't really be here,
+                    // but see above for the rationale) because the actual assignment is a) done
+                    // by the VM itself; and b) may not actually happen depending on the frames
+                    // that the break unwinds through.
+                    synthesizeExpr(afterBreak, ignored, core::LocOffsets::none(),
+                                   make_insn<Send>(magic, core::LocOffsets::none(), core::Names::blockBreak(),
+                                                   core::LocOffsets::none(), args.size(), args, std::move(locs),
+                                                   isPrivateOk));
+                }
+
+                afterBreak->exprs.emplace_back(LocalOccurrence::synthetic(cctx.blockBreakTarget), a.loc,
+                                               make_insn<Ident>(blockBreakAssign));
+
+                if (cctx.breakScope == nullptr) {
+                    if (auto e = cctx.ctx.beginError(a.loc, core::errors::CFG::NoNextScope)) {
+                        e.setHeader("No `{}` block around `{}`", "do", "break");
+                    }
+                    // I guess just keep going into deadcode?
+                    unconditionalJump(afterBreak, cctx.inWhat.deadBlock(), cctx.inWhat, a.loc);
+                } else {
+                    unconditionalJump(afterBreak, cctx.breakScope, cctx.inWhat, a.loc);
+                }
+                ret = cctx.inWhat.deadBlock();
+            },
+
+            [&](const ast::Retry &a) {
+                if (cctx.rescueScope == nullptr) {
+                    if (auto e = cctx.ctx.beginError(a.loc, core::errors::CFG::NoNextScope)) {
+                        e.setHeader("No `{}` block around `{}`", "begin", "retry");
+                    }
+                    // I guess just keep going into deadcode?
+                    unconditionalJump(current, cctx.inWhat.deadBlock(), cctx.inWhat, a.loc);
+                } else {
+                    auto magic = cctx.newTemporary(core::Names::magic());
+                    synthesizeExpr(current, magic, core::LocOffsets::none(), make_insn<Alias>(core::Symbols::Magic()));
+                    auto retryTemp = cctx.newTemporary(core::Names::retryTemp());
+                    InlinedVector<cfg::LocalRef, 2> args{};
+                    InlinedVector<core::LocOffsets, 2> argLocs{};
+                    auto isPrivateOk = false;
+                    synthesizeExpr(current, retryTemp, core::LocOffsets::none(),
+                                   make_insn<Send>(magic, what.loc(), core::Names::retry(), core::LocOffsets::none(),
+                                                   args.size(), args, std::move(argLocs), isPrivateOk));
+                    unconditionalJump(current, cctx.rescueScope, cctx.inWhat, a.loc);
+                }
+                ret = cctx.inWhat.deadBlock();
+            },
+
+            [&](ast::Rescue &a) {
+                auto bodyRubyRegionId = ++cctx.inWhat.maxRubyRegionId;
+                auto handlersRubyRegionId = bodyRubyRegionId + CFG::HANDLERS_REGION_OFFSET;
+                auto ensureRubyRegionId = bodyRubyRegionId + CFG::ENSURE_REGION_OFFSET;
+                auto elseRubyRegionId = bodyRubyRegionId + CFG::ELSE_REGION_OFFSET;
+                cctx.inWhat.maxRubyRegionId = elseRubyRegionId;
+
+                auto rescueHeaderBlock = cctx.inWhat.freshBlock(cctx.loops, current);
+                unconditionalJump(current, rescueHeaderBlock, cctx.inWhat, a.loc);
+                cctx.rescueScope = rescueHeaderBlock;
+
+                // We have a simplified view of the control flow here but in
+                // practise it has been reasonable on our codebase.
+                // We don't model that each expression in the `body` or `else` could
+                // throw, instead we model only never running anything in the
+                // body, or running the whole thing. To do this we  have a magic
+                // Unanalyzable variable at the top of the body using
+                // `exceptionValue` and one at the end of the else using
+                // `rescueEndTemp` which can jump into the rescue handlers.
+                auto rescueHandlersBlock = cctx.inWhat.freshBlockWithRegion(cctx.loops, handlersRubyRegionId);
+                auto bodyBlock = cctx.inWhat.freshBlockWithRegion(cctx.loops, bodyRubyRegionId);
+                auto exceptionValue = cctx.newTemporary(core::Names::exceptionValue());
+                // In `rescue; ...; end`, we don't want the conditional jumps' variables nor the
+                // GetCurrentException calls to look like they blame to the whole `rescue; ...; end`
+                // body. Better to just point at the `rescue` keyword.
+                //
+                // Might be better to point at exception variable like the "e" in `rescue => e`, but
+                // that involves picking one (of possibly many) rescueCases.
+                auto rescueKeywordLoc = (!a.rescueCases.empty() && (a.rescueCases.front().loc().endPos() -
+                                                                    a.rescueCases.front().loc().beginPos()) > 6)
+                                            ? core::LocOffsets{a.rescueCases.front().loc().beginPos(),
+                                                               a.rescueCases.front().loc().beginPos() + 6}
+                                            : a.loc.copyWithZeroLength();
+                synthesizeExpr(rescueHeaderBlock, exceptionValue, rescueKeywordLoc, make_insn<GetCurrentException>());
+                conditionalJump(rescueHeaderBlock, exceptionValue, rescueHandlersBlock, bodyBlock, cctx.inWhat,
+                                rescueKeywordLoc);
+
+                // cctx.loops += 1; // should formally be here but this makes us report a lot of false errors
+                bodyBlock = walk(cctx, a.body, bodyBlock);
+
+                // else is only executed if body didn't raise an exception
+                auto elseBody = cctx.inWhat.freshBlockWithRegion(cctx.loops, elseRubyRegionId);
+                synthesizeExpr(bodyBlock, exceptionValue, rescueKeywordLoc, make_insn<GetCurrentException>());
+                conditionalJump(bodyBlock, exceptionValue, rescueHandlersBlock, elseBody, cctx.inWhat,
+                                rescueKeywordLoc);
+
+                elseBody = walk(cctx, a.else_, elseBody);
+                auto ensureBody = cctx.inWhat.freshBlockWithRegion(cctx.loops, ensureRubyRegionId);
+                unconditionalJump(elseBody, ensureBody, cctx.inWhat, a.loc);
+
+                auto magic = cctx.newTemporary(core::Names::magic());
+                synthesizeExpr(current, magic, core::LocOffsets::none(), make_insn<Alias>(core::Symbols::Magic()));
+
+                for (auto &expr : a.rescueCases) {
+                    auto *rescueCase = ast::cast_tree<ast::RescueCase>(expr);
+                    auto caseBody = cctx.inWhat.freshBlockWithRegion(cctx.loops, handlersRubyRegionId);
+                    auto &exceptions = rescueCase->exceptions;
+                    auto added = false;
+                    auto *local = ast::cast_tree<ast::Local>(rescueCase->var);
+                    ENFORCE(local != nullptr, "rescue case var not a local?");
+
+                    auto localVar = cctx.inWhat.enterLocal(local->localVariable);
+                    caseBody->exprs.emplace_back(LocalOccurrence{localVar, local->loc}, rescueCase->var.loc(), make_insn<Ident>(exceptionValue));
+
+                    // We don't support typed exceptions in `ensure` yet.
+                    // We have a lot of tests that show why, but it boils down to a combination of
+                    // Sorbet's "simplified view of the control flow" for exceptions (see comment above)
+                    // and Sorbet's dead code detection.
+                    if (!ast::isa_tree<ast::EmptyTree>(a.ensure)) {
+                        auto zloc = rescueCase->var.loc().copyWithZeroLength();
+                        auto unsafe = ast::MK::Unsafe(
+                            zloc, ast::make_expression<ast::Local>(zloc, exceptionValue.data(cctx.inWhat)));
+                        ensureBody = walk(cctx.withTarget(LocalOccurrence{localVar, local->loc}), unsafe, ensureBody);
+                        //CHECK:VARUN - ^Need LocalOccurrence above?
+                    }
+
+                    // Mark the exception as handled
+                    synthesizeExpr(caseBody, exceptionValue, core::LocOffsets::none(),
+                                   make_insn<Literal>(core::Types::nilClass()));
+
+                    auto res = cctx.newTemporary(core::Names::keepForCfgTemp());
+                    auto isPrivateOk = false;
+                    auto args = {exceptionValue};
+                    auto argLocs = {what.loc()};
+                    synthesizeExpr(caseBody, res, rescueCase->loc,
+                                   make_insn<Send>(magic, rescueCase->loc, core::Names::keepForCfg(),
+                                                   core::LocOffsets::none(), args.size(), args, std::move(argLocs),
+                                                   isPrivateOk));
+
+                    if (exceptions.empty()) {
+                        // rescue without a class catches StandardError
+                        exceptions.emplace_back(
+                            ast::MK::Constant(rescueCase->var.loc(), core::Symbols::StandardError()));
+                        added = true;
+                    }
+                    for (auto &ex : exceptions) {
+                        auto loc = ex.loc();
+                        auto exceptionClass = cctx.newTemporary(core::Names::exceptionClassTemp());
+                        rescueHandlersBlock =
+                            walk(cctx.withTarget(LocalOccurrence::synthetic(exceptionClass)), ex, rescueHandlersBlock);
+
+                        auto isaCheck = cctx.newTemporary(core::Names::isaCheckTemp());
+                        InlinedVector<cfg::LocalRef, 2> args;
+                        InlinedVector<core::LocOffsets, 2> argLocs = {loc};
+                        args.emplace_back(exceptionValue);
+
+                        auto isPrivateOk = false;
+                        rescueHandlersBlock->exprs.emplace_back(
+                            LocalOccurrence::synthetic(isaCheck), loc,
+                            make_insn<Send>(exceptionClass, loc, core::Names::tripleEq(), loc.copyWithZeroLength(),
+                                            args.size(), args, std::move(argLocs), isPrivateOk));
+
+                        auto otherHandlerBlock = cctx.inWhat.freshBlockWithRegion(cctx.loops, handlersRubyRegionId);
+                        conditionalJump(rescueHandlersBlock, isaCheck, caseBody, otherHandlerBlock, cctx.inWhat, loc);
+                        rescueHandlersBlock = otherHandlerBlock;
+                    }
+                    if (added) {
+                        exceptions.pop_back();
+                    }
+
+                    caseBody = walk(cctx, rescueCase->body, caseBody);
+                    unconditionalJump(caseBody, ensureBody, cctx.inWhat, a.loc);
+                }
+
+                // This magic local remembers if none of the `rescue`s match,
+                // and if so, after the ensure runs, we should jump to dead
+                // since in Ruby the exception would propagate up the statck.
+                auto gotoDeadTemp = cctx.newTemporary(core::Names::gotoDeadTemp());
+                synthesizeExpr(rescueHandlersBlock, gotoDeadTemp, a.loc, make_insn<Literal>(core::Types::trueClass()));
+                unconditionalJump(rescueHandlersBlock, ensureBody, cctx.inWhat, a.loc);
+
+                auto throwAway = cctx.newTemporary(core::Names::throwAwayTemp());
+                ensureBody = walk(cctx.withTarget(LocalOccurrence::synthetic(throwAway)), a.ensure, ensureBody);
+                ret = cctx.inWhat.freshBlock(cctx.loops, current);
+                conditionalJump(ensureBody, gotoDeadTemp, cctx.inWhat.deadBlock(), ret, cctx.inWhat, a.loc);
+            },
+
+            [&](ast::Hash &h) { ret = walkHash(cctx, h, current, core::Names::buildHash()); },
+
+            [&](ast::Array &a) {
+                InlinedVector<LocalRef, 2> vars;
+                InlinedVector<core::LocOffsets, 2> locs;
+                for (auto &elem : a.elems) {
+                    LocalRef tmp = cctx.newTemporary(core::Names::arrayTemp());
+                    current = walk(cctx.withTarget(LocalOccurrence::synthetic(tmp)), elem, current);
+                    vars.emplace_back(tmp);
+                    locs.emplace_back(a.loc);
+                }
+                LocalRef magic = cctx.newTemporary(core::Names::magic());
+                synthesizeExpr(current, magic, core::LocOffsets::none(), make_insn<Alias>(core::Symbols::Magic()));
+                auto isPrivateOk = false;
+                current->exprs.emplace_back(cctx.target, a.loc,
+                                            make_insn<Send>(magic, a.loc, core::Names::buildArray(),
+                                                            core::LocOffsets::none(), vars.size(), vars,
+                                                            std::move(locs), isPrivateOk));
+                ret = current;
+            },
+
+            [&](ast::Cast &c) {
+                if (auto *kernelLambda = isKernelProcOrLambda(c.arg)) {
+                    kernelLambda->fun = core::Names::lambdaTLet();
+                    kernelLambda->addPosArg(move(c.typeExpr));
+                } else {
+                    // This is kind of gross, but it is the only way to ensure that the bits in the
+                    // type expression make it into the CFG for LSP to hit on their locations.
+                    LocalRef deadSym = cctx.newTemporary(core::Names::keepForIde());
+                    auto deadSymOcc = LocalOccurrence::synthetic(deadSym);
+                    current = walk(cctx.withTarget(deadSymOcc), c.typeExpr, current);
+                    // Ensure later passes don't delete the results of the typeExpr.
+                    current->exprs.emplace_back(deadSymOcc, core::LocOffsets::none(), make_insn<KeepAlive>(deadSym));
+                }
+                LocalRef tmp = cctx.newTemporary(core::Names::castTemp());
+                core::LocOffsets argLoc = c.arg.loc();
+                current = walk(cctx.withTarget(LocalOccurrence::synthetic(tmp)), c.arg, current);
+                if (c.cast == core::Names::uncheckedLet()) {
+                    current->exprs.emplace_back(cctx.target, c.loc, make_insn<Ident>(tmp));
+                } else if (c.cast == core::Names::bind() || c.cast == core::Names::syntheticBind()) {
+                    auto isSynthetic = c.cast == core::Names::syntheticBind();
+                    if (c.arg.isSelfReference()) {
+                        auto self = cctx.inWhat.enterLocal(core::LocalVariable::selfVariable());
+                        auto &inserted =
+                            current->exprs.emplace_back(LocalOccurrence::synthetic(self), c.loc,
+                                                        make_insn<Cast>(tmp, argLoc, c.type, core::Names::cast()));
+                        if (isSynthetic) {
+                            inserted.value.setSynthetic();
+                        }
+                        current->exprs.emplace_back(cctx.target, c.loc, make_insn<Ident>(self));
+
+                        if (cctx.rescueScope) {
+                            cctx.rescueScope->exprs.emplace_back(
+                                LocalOccurrence::synthetic(self), c.loc,
+                                make_insn<Cast>(tmp, argLoc, c.type, core::Names::cast()));
+                            cctx.rescueScope->exprs.emplace_back(cctx.target, c.loc, make_insn<Ident>(self));
+                        }
+                    } else {
+                        if (auto e = cctx.ctx.beginError(what.loc(), core::errors::CFG::MalformedTBind)) {
+                            e.setHeader("`{}` can only be used with `{}`", "T.bind", "self");
+                        }
+                    }
+                } else {
+                    current->exprs.emplace_back(cctx.target, c.loc, make_insn<Cast>(tmp, argLoc, c.type, c.cast));
+                }
+                if (c.cast == core::Names::let()) {
+                    cctx.inWhat.minLoops[cctx.target.variable.id()] = CFG::MIN_LOOP_LET;
+                }
+
+                ret = current;
+            },
+
+            [&](ast::RuntimeMethodDefinition &rmd) {
+                current->exprs.emplace_back(
+                    cctx.target, rmd.loc.copyWithZeroLength(),
+                    make_insn<Literal>(core::make_type<core::NamedLiteralType>(core::Symbols::Symbol(), rmd.name)));
+                ret = current;
+            },
+
+            [&](const ast::EmptyTree &n) { ret = current; },
+
+            [&](const ast::ClassDef &c) { Exception::raise("Should have been removed by FlattenWalk"); },
+            [&](const ast::MethodDef &c) { Exception::raise("Should have been removed by FlattenWalk"); },
+
+            [&](const ast::ExpressionPtr &n) {
+                if (n == nullptr) {
+                    Exception::raise("Tried to convert `nullptr` to CFG in ctx.file=\"{}\"",
+                                     cctx.ctx.file.data(cctx.ctx).path());
+                } else {
+                    Exception::raise("Unimplemented AST Node: {}", what.nodeName());
+                }
+            });
+
+        // For, Rescue,
+        // Symbol, Array,
+        ENFORCE(ret != nullptr, "CFG builder ret unset");
+        return ret;
+    } catch (SorbetException &) {
+        Exception::failInFuzzer();
+        if (auto e = cctx.ctx.beginError(what.loc(), core::errors::Internal::InternalError)) {
+            e.setHeader("Failed to convert tree to CFG (backtrace is above )");
+        }
+        throw;
+    }
+}
+
+LocalRef CFGContext::newTemporary(core::NameRef name) {
+    return inWhat.enterLocal(core::LocalVariable{name, ++temporaryCounter});
+}
+
+LocalOccurrence CFGContext::newTemporaryOccurrence(core::NameRef name) {
+    return LocalOccurrence::synthetic(newTemporary(name));
+}
+} // namespace sorbet::cfg

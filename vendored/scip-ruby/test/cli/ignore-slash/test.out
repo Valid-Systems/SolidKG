@@ -1,0 +1,12 @@
+bar.rb:4: Expected `Integer` but found `String("bar.rb")` for argument `arg0` https://srb.help/7002
+     4 |1 + "bar.rb"
+            ^^^^^^^^
+  Expected `Integer` for argument `arg0` of method `Integer#+`:
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/integer.rbi#LCENSORED:
+      NN |        arg0: Integer,
+                  ^^^^
+  Got `String("bar.rb")` originating from:
+    bar.rb:4:
+     4 |1 + "bar.rb"
+            ^^^^^^^^
+Errors: 1

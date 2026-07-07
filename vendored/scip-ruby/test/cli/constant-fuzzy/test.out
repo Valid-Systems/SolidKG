@@ -1,0 +1,55 @@
+test/cli/constant-fuzzy/constant-fuzzy.rb:3: Unable to resolve constant `Yieldr` https://srb.help/5002
+     3 |Yieldr.foo(Intege, Int)
+        ^^^^^^
+  Did you mean `Enumerator::Yielder`? Use `-a` to autocorrect
+    test/cli/constant-fuzzy/constant-fuzzy.rb:3: Replace with `Enumerator::Yielder`
+     3 |Yieldr.foo(Intege, Int)
+        ^^^^^^
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/enumerator.rbi#LCENSORED: `Enumerator::Yielder` defined here
+      NN |class Enumerator::Yielder < Object
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  Did you mean `File`? Use `-a` to autocorrect
+    test/cli/constant-fuzzy/constant-fuzzy.rb:3: Replace with `File`
+     3 |Yieldr.foo(Intege, Int)
+        ^^^^^^
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/file.rbi#LCENSORED: `File` defined here
+    NN |class File < IO
+        ^^^^^^^^^^^^^^^
+  Did you mean `Dir`? Use `-a` to autocorrect
+    test/cli/constant-fuzzy/constant-fuzzy.rb:3: Replace with `Dir`
+     3 |Yieldr.foo(Intege, Int)
+        ^^^^^^
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/dir.rbi#LCENSORED: `Dir` defined here
+    NN |class Dir < Object
+        ^^^^^^^^^^^^^^^^^^
+
+test/cli/constant-fuzzy/constant-fuzzy.rb:3: Unable to resolve constant `Intege` https://srb.help/5002
+     3 |Yieldr.foo(Intege, Int)
+                   ^^^^^^
+  Did you mean `Integer`? Use `-a` to autocorrect
+    test/cli/constant-fuzzy/constant-fuzzy.rb:3: Replace with `Integer`
+     3 |Yieldr.foo(Intege, Int)
+                   ^^^^^^
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/integer.rbi#LCENSORED: `Integer` defined here
+    NN |class Integer < Numeric
+        ^^^^^^^^^^^^^^^^^^^^^^^
+
+test/cli/constant-fuzzy/constant-fuzzy.rb:3: Unable to resolve constant `Int` https://srb.help/5002
+     3 |Yieldr.foo(Intege, Int)
+                           ^^^
+  Did you mean `Integer`? Use `-a` to autocorrect
+    test/cli/constant-fuzzy/constant-fuzzy.rb:3: Replace with `Integer`
+     3 |Yieldr.foo(Intege, Int)
+                           ^^^
+
+test/cli/constant-fuzzy/constant-fuzzy.rb:7: Unable to resolve constant `Constant` https://srb.help/5002
+     7 |module A::B; Constant; end
+                     ^^^^^^^^
+  Did you mean `A::Constant`? Use `-a` to autocorrect
+    test/cli/constant-fuzzy/constant-fuzzy.rb:7: Replace with `A::Constant`
+     7 |module A::B; Constant; end
+                     ^^^^^^^^
+    test/cli/constant-fuzzy/constant-fuzzy.rb:5: `A::Constant` defined here
+     5 |module A; Constant = 1; end;
+                  ^^^^^^^^
+Errors: 4

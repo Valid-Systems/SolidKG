@@ -1,0 +1,125 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C Test><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+    end
+
+    def a<<todo method>>(&<blk>)
+      @a
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:a, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>)).returns(<emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+    end
+
+    def a=<<todo method>>(a, &<blk>)
+      @a = <cast:let>(a, <todo sym>, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+    end
+
+    def b<<todo method>>(&<blk>)
+      @b
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+    end
+
+    def c<<todo method>>(&<blk>)
+      @c
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:b, <emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>)).returns(<emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+    end
+
+    def b=<<todo method>>(b, &<blk>)
+      @b = <cast:let>(b, <todo sym>, <emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:c, <emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>)).returns(<emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+    end
+
+    def c=<<todo method>>(c, &<blk>)
+      @c = <cast:let>(c, <todo sym>, <emptyTree>::<C T>.nilable(<emptyTree>::<C Integer>))
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def d<<todo method>>(&<blk>)
+      @d
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def e<<todo method>>(&<blk>)
+      @e
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def f<<todo method>>(&<blk>)
+      @f
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:g, <emptyTree>::<C String>).returns(<emptyTree>::<C String>)
+    end
+
+    def g=<<todo method>>(g, &<blk>)
+      @g = g
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:h, <emptyTree>::<C String>).returns(<emptyTree>::<C String>)
+    end
+
+    def h=<<todo method>>(h, &<blk>)
+      @h = h
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.params(:i, <emptyTree>::<C String>).params(:h, <emptyTree>::<C String>).returns(<emptyTree>::<C String>)
+    end
+
+    def i=<<todo method>>(i, &<blk>)
+      @i = i
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of a>
+
+    <runtime method definition of a=>
+
+    <runtime method definition of b>
+
+    <runtime method definition of c>
+
+    <runtime method definition of b=>
+
+    <runtime method definition of c=>
+
+    <runtime method definition of d>
+
+    <runtime method definition of e>
+
+    <runtime method definition of f>
+
+    <runtime method definition of g=>
+
+    <runtime method definition of h=>
+
+    <runtime method definition of i=>
+  end
+end

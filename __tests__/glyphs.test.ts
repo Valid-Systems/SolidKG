@@ -1,0 +1,189 @@
+/**
+ * Glyph fallback / Unicode-support detection.
+ *
+ * Pinned because the matrix is small and the consequence of regression
+ * is highly visible: terminal output on Windows can mojibake when UTF-8
+ * glyphs are written through raw or redirected streams (see #168). The
+ * detection + ASCII fallback is the contract that prevents this.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  supportsUnicode,
+  getGlyphs,
+  UNICODE_GLYPHS,
+  ASCII_GLYPHS,
+  _resetGlyphsCache,
+} from '../src/ui/glyphs';
+
+function withEnv(patch: Record<string, string | undefined>, fn: () => void): void {
+  const saved: Record<string, string | undefined> = {};
+  const savedPlatform = process.platform;
+  for (const key of Object.keys(patch)) {
+    saved[key] = process.env[key];
+    if (patch[key] === undefined) delete process.env[key];
+    else process.env[key] = patch[key];
+  }
+  _resetGlyphsCache();
+  try {
+    fn();
+  } finally {
+    for (const key of Object.keys(saved)) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+    Object.defineProperty(process, 'platform', { value: savedPlatform });
+    _resetGlyphsCache();
+  }
+}
+
+function setPlatform(value: NodeJS.Platform): void {
+  Object.defineProperty(process, 'platform', { value });
+}
+
+describe('supportsUnicode', () => {
+  let originalPlatform: NodeJS.Platform;
+
+  beforeEach(() => {
+    originalPlatform = process.platform;
+    _resetGlyphsCache();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+    _resetGlyphsCache();
+  });
+
+  it('returns false on Windows by default (mojibake-prone consoles)', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined, TERM: undefined }, () => {
+      setPlatform('win32');
+      expect(supportsUnicode()).toBe(false);
+    });
+  });
+
+  it('returns true on macOS by default', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined, TERM: undefined }, () => {
+      setPlatform('darwin');
+      expect(supportsUnicode()).toBe(true);
+    });
+  });
+
+  it('returns true on Linux by default', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined, TERM: undefined }, () => {
+      setPlatform('linux');
+      expect(supportsUnicode()).toBe(true);
+    });
+  });
+
+  it('returns false on Linux kernel console (TERM=linux)', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined, TERM: 'linux' }, () => {
+      setPlatform('linux');
+      expect(supportsUnicode()).toBe(false);
+    });
+  });
+
+  it('respects SOLIDKG_UNICODE=1 on Windows (opt-in escape hatch)', () => {
+    withEnv({ SOLIDKG_UNICODE: '1', SOLIDKG_ASCII: undefined }, () => {
+      setPlatform('win32');
+      expect(supportsUnicode()).toBe(true);
+    });
+  });
+
+  it('respects SOLIDKG_ASCII=1 on macOS (opt-out escape hatch)', () => {
+    withEnv({ SOLIDKG_ASCII: '1', SOLIDKG_UNICODE: undefined }, () => {
+      setPlatform('darwin');
+      expect(supportsUnicode()).toBe(false);
+    });
+  });
+
+  it('SOLIDKG_ASCII takes precedence over SOLIDKG_UNICODE', () => {
+    withEnv({ SOLIDKG_ASCII: '1', SOLIDKG_UNICODE: '1' }, () => {
+      setPlatform('darwin');
+      expect(supportsUnicode()).toBe(false);
+    });
+  });
+});
+
+describe('getGlyphs', () => {
+  let originalPlatform: NodeJS.Platform;
+
+  beforeEach(() => {
+    originalPlatform = process.platform;
+    _resetGlyphsCache();
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+    _resetGlyphsCache();
+  });
+
+  it('returns ASCII glyphs on Windows', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined }, () => {
+      setPlatform('win32');
+      const g = getGlyphs();
+      expect(g).toBe(ASCII_GLYPHS);
+      expect(g.ok).toBe('[OK]');
+      expect(g.rail).toBe('|');
+      expect(g.phaseDone).toBe('*');
+      expect(g.dash).toBe('-');
+    });
+  });
+
+  it('returns Unicode glyphs on macOS', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined }, () => {
+      setPlatform('darwin');
+      const g = getGlyphs();
+      expect(g).toBe(UNICODE_GLYPHS);
+      expect(g.ok).toBe('✓');
+      expect(g.rail).toBe('│');
+      expect(g.phaseDone).toBe('◆');
+      expect(g.dash).toBe('—');
+    });
+  });
+
+  it('caches the result so repeated calls return the same object', () => {
+    withEnv({ SOLIDKG_ASCII: undefined, SOLIDKG_UNICODE: undefined }, () => {
+      setPlatform('darwin');
+      expect(getGlyphs()).toBe(getGlyphs());
+    });
+  });
+});
+
+describe('Glyph sets', () => {
+  it('ASCII and Unicode sets cover the same keys', () => {
+    expect(Object.keys(ASCII_GLYPHS).sort()).toEqual(Object.keys(UNICODE_GLYPHS).sort());
+  });
+
+  it('ASCII glyphs are all 7-bit ASCII', () => {
+    for (const [key, value] of Object.entries(ASCII_GLYPHS)) {
+      const flat = Array.isArray(value) ? value.join('') : value;
+      for (let i = 0; i < flat.length; i++) {
+        const codepoint = flat.charCodeAt(i);
+        expect(codepoint, `ASCII_GLYPHS.${key} contains non-ASCII char U+${codepoint.toString(16).toUpperCase().padStart(4, '0')}`).toBeLessThan(128);
+      }
+    }
+  });
+
+  it('keeps static glyph spinner sets symmetrical without testing Ink animation frames', () => {
+    expect(ASCII_GLYPHS.spinner.length).toBe(UNICODE_GLYPHS.spinner.length);
+  });
+
+  it('uses one vertical-line family per tree/rail mode', () => {
+    expect(ASCII_GLYPHS.rail).toBe('|');
+    expect(ASCII_GLYPHS.treePipe).toBe('|   ');
+    expect(ASCII_GLYPHS.treeBranch).toBe('+-- ');
+    expect(ASCII_GLYPHS.treeLast).toBe('`-- ');
+
+    expect(UNICODE_GLYPHS.rail).toBe('│');
+    expect(UNICODE_GLYPHS.treePipe).toBe('│   ');
+    expect(UNICODE_GLYPHS.treeBranch).toBe('├── ');
+    expect(UNICODE_GLYPHS.treeLast).toBe('└── ');
+
+    const asciiTree = [ASCII_GLYPHS.rail, ASCII_GLYPHS.treePipe, ASCII_GLYPHS.treeBranch, ASCII_GLYPHS.treeLast].join('');
+    const unicodeTree = [UNICODE_GLYPHS.rail, UNICODE_GLYPHS.treePipe, UNICODE_GLYPHS.treeBranch, UNICODE_GLYPHS.treeLast].join('');
+
+    expect(asciiTree).not.toMatch(/[│┃├└─]/u);
+    expect(unicodeTree).not.toContain('|');
+    expect(unicodeTree).not.toContain('┃');
+  });
+});

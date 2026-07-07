@@ -1,0 +1,9 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  -11
+
+  x = 10
+
+  x.~()
+
+  1.000000.~()
+end

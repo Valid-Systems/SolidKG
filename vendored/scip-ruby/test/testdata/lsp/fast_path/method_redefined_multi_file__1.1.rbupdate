@@ -1,0 +1,8 @@
+# typed: true
+# assert-fast-path: method_redefined_multi_file__1.rb,method_redefined_multi_file__2.rb
+
+class A
+  def foo(x)
+    x
+  end
+end

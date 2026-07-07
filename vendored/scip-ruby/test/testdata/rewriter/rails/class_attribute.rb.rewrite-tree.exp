@@ -1,0 +1,393 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C GoodUsages><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def read_write_predicate<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.read_write_predicate<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def read_write_predicate=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.read_write_predicate=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def read_write_predicate?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def self.read_write_predicate?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def foo<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.foo<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def foo=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.foo=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def foo?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def self.foo?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.no_instance<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.no_instance=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def self.no_instance?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.no_instance_reader<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def no_instance_reader=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.no_instance_reader=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def self.no_instance_reader?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def no_instance_writer<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.no_instance_writer<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.no_instance_writer=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def no_instance_writer?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T::<C Boolean>)
+    end
+
+    def self.no_instance_writer?<<todo method>>(&<blk>)
+      false
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def bar<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.bar<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def bar=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.bar=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def no_predicate<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.untyped())
+    end
+
+    def self.no_predicate<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def no_predicate=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:arg0, ::T.untyped()).returns(::T.untyped())
+    end
+
+    def self.no_predicate=<<todo method>>(arg0, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.void()
+    end
+
+    def usages<<todo method>>(&<blk>)
+      begin
+        <self>.read_write_predicate()
+        <self>.read_write_predicate?()
+        <self>.read_write_predicate=(1)
+        <self>.no_instance()
+        <self>.no_instance?()
+        <self>.no_instance=(1)
+        <self>.no_instance_reader()
+        <self>.no_instance_reader?()
+        <self>.no_instance_reader=(1)
+        <self>.no_instance_writer()
+        <self>.no_instance_writer?()
+        <self>.no_instance_writer=(1)
+        <self>.no_predicate()
+        <self>.no_predicate?()
+        <self>.no_predicate=(1)
+      end
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of read_write_predicate>
+
+    <runtime method definition of self.read_write_predicate>
+
+    <runtime method definition of read_write_predicate=>
+
+    <runtime method definition of self.read_write_predicate=>
+
+    <runtime method definition of read_write_predicate?>
+
+    <runtime method definition of self.read_write_predicate?>
+
+    <runtime method definition of foo>
+
+    <runtime method definition of self.foo>
+
+    <runtime method definition of foo=>
+
+    <runtime method definition of self.foo=>
+
+    <runtime method definition of foo?>
+
+    <runtime method definition of self.foo?>
+
+    <runtime method definition of self.no_instance>
+
+    <runtime method definition of self.no_instance=>
+
+    <runtime method definition of self.no_instance?>
+
+    <runtime method definition of self.no_instance_reader>
+
+    <runtime method definition of no_instance_reader=>
+
+    <runtime method definition of self.no_instance_reader=>
+
+    <runtime method definition of self.no_instance_reader?>
+
+    <runtime method definition of no_instance_writer>
+
+    <runtime method definition of self.no_instance_writer>
+
+    <runtime method definition of self.no_instance_writer=>
+
+    <runtime method definition of no_instance_writer?>
+
+    <runtime method definition of self.no_instance_writer?>
+
+    <runtime method definition of bar>
+
+    <runtime method definition of self.bar>
+
+    <runtime method definition of bar=>
+
+    <runtime method definition of self.bar=>
+
+    <runtime method definition of no_predicate>
+
+    <runtime method definition of self.no_predicate>
+
+    <runtime method definition of no_predicate=>
+
+    <runtime method definition of self.no_predicate=>
+
+    <runtime method definition of usages>
+
+    <self>.read_write_predicate()
+
+    <self>.read_write_predicate?()
+
+    <self>.read_write_predicate=(1)
+
+    <self>.no_instance()
+
+    <self>.no_instance?()
+
+    <self>.no_instance=(1)
+
+    <self>.no_instance_reader()
+
+    <self>.no_instance_reader?()
+
+    <self>.no_instance_reader=(1)
+
+    <self>.no_instance_writer()
+
+    <self>.no_instance_writer?()
+
+    <self>.no_instance_writer=(1)
+
+    <self>.no_predicate()
+
+    <self>.no_predicate?()
+
+    <self>.no_predicate=(1)
+  end
+
+  class <emptyTree>::<C IgnoredUsages><<C <todo sym>>> < (::<todo sym>)
+    <self>.class_attribute()
+
+    <self>.class_attribute(:instance_accessor, false)
+
+    <self>.class_attribute("foo")
+  end
+
+  module <emptyTree>::<C NotAvailableInModule><<C <todo sym>>> < ()
+    <self>.class_attribute(:foo, :bar)
+  end
+end

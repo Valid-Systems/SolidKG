@@ -1,0 +1,21 @@
+# typed: strict
+# assert-fast-path: good_field_edits.rb
+class C
+  extend T::Sig
+
+  @@food = T.let(3, Integer)
+
+  sig {void}
+  def bar
+    @@quz # error: Use of undeclared variable `@@quz`
+  end
+end
+
+class D < C
+  T.reveal_type( # error: `T.untyped`
+    @@foo # error: Use of undeclared variable `@@foo`
+  )
+  T.reveal_type( # error: `Integer`
+    @@food
+  )
+end

@@ -1,0 +1,14 @@
+# typed: true
+# assert-fast-path: more_arguments.rb
+
+class Foo
+  extend T::Sig
+
+  sig {params(x: Integer).returns(Integer)}
+  def foo(x)
+    # ^ hover: ```ruby
+    # ^ hover: sig { params(x: Integer).returns(Integer) }
+    # ^ hover: def foo(x); end
+    42 + x
+  end
+end

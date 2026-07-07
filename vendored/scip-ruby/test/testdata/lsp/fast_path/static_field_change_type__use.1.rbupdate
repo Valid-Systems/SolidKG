@@ -1,0 +1,11 @@
+# typed: strict
+# exclude-from-file-update: true
+extend T::Sig
+
+sig {returns(String)}
+def foo
+  T.reveal_type(STATIC_FIELD) # error: Revealed type: `T::Hash[Symbol, T.untyped]`
+  fetched = STATIC_FIELD.fetch(:key, "default")
+  result = fetched + "suffix"
+  result
+end

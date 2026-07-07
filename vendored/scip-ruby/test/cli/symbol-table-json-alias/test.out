@@ -1,0 +1,5 @@
+   "name": {
+    "kind": "CONSTANT",
+    "name": "B"
+   },
+   "kind": "STATIC_FIELD",

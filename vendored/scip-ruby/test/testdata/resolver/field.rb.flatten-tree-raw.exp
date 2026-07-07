@@ -1,0 +1,38 @@
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    MethodDef{
+      flags = {}
+      name = <U foo><<U foo>>
+      args = [Local{
+          localVariable = <U a>
+        }, Local{
+          localVariable = <U <blk>>
+        }]
+      rhs = Assign{
+        lhs = UnresolvedIdent{
+          kind = Instance
+          name = <U @a>
+        }
+        rhs = Local{
+          localVariable = <U a>
+        }
+      }
+    }
+
+    MethodDef{
+      flags = {self}
+      name = <U <static-init>><<N <U <static-init>> $CENSORED>>
+      args = [Local{
+          localVariable = <U <blk>>
+        }]
+      rhs = <runtime method definition of foo>
+    }
+  ]
+}

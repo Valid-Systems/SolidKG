@@ -1,0 +1,127 @@
+#!/bin/bash
+
+#
+# ./bazel
+#
+# Reads the BAZEL_VERSION variable in the WORKSPACE file and executes the
+# corresponding Bazel version. Downloads and installs it if needed.
+#
+
+set -euo pipefail
+
+if [ "${LOCAL_BAZEL_OVERRIDE:-}" != "" ]; then
+  exec "$LOCAL_BAZEL_OVERRIDE" "$@"
+fi
+
+old_pwd="$PWD"
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+if [[ "$PWD" = */tools ]]; then
+  cd ..
+fi
+repo_root="$PWD"
+
+if ! [ -f WORKSPACE ]; then
+  echo >&2 "Didn't find the workspace"
+  exit 1
+fi
+
+cd "$old_pwd"
+
+BAZEL_VERSION=$(< "$repo_root/.bazelversion")
+export BAZEL_VERSION
+
+bazel_bin_loc="${bazel_bin_loc:-$HOME/.bazel_binaries}"
+bazel_exec_path="$bazel_bin_loc/$BAZEL_VERSION/bin/bazel-real"
+
+if [ -f "$bazel_exec_path" ]; then
+  exec "$bazel_exec_path" "$@"
+fi
+
+# ----- slow path -----
+
+echo >&2 "No cached Bazel v$BAZEL_VERSION found, installing..."
+
+kernel_name="$(uname -s | tr 'A-Z' 'a-z')"
+processor_name="$(uname -m)"
+
+bazel_installer_platform="${kernel_name}-${processor_name}"
+case "$bazel_installer_platform" in
+  linux-x86_64) ;;
+  linux-aarch64)
+    bazel_installer_platform="linux-arm64"
+    ;;
+  darwin-x86_64) ;;
+  darwin-arm64)
+    # Pseudo Apple Silicon support by forcing x86_64 (Rosetta) for now
+    # bazel_installer_platform="darwin-x86_64"
+    ;;
+  *)
+    echo >&2 "Building on $bazel_installer_platform is not implemented"
+    exit 1
+    ;;
+esac
+
+workspace_contents=$(< "$repo_root/WORKSPACE")
+
+bazel_installer_platform_var="$(echo "$bazel_installer_platform" | tr 'a-z-' 'A-Z_')"
+bazel_installer_sha_variable="BAZEL_INSTALLER_VERSION_${bazel_installer_platform_var}_SHA"
+bazel_installer_sha_regex="$bazel_installer_sha_variable = \"([^\"]+)\""
+if [[ $workspace_contents =~ $bazel_installer_sha_regex ]]; then
+  export expected_sha="${BASH_REMATCH[1]}"
+else
+  echo >&2 "$0: Failed to extract Bazel version from WORKSPACE"
+  exit 1
+fi
+
+BUILD_DIR="$(mktemp -d)"
+export BUILD_DIR
+mkdir -p "$BUILD_DIR"
+
+(
+  set -euo pipefail
+  cd "$BUILD_DIR"
+  echo "$PWD"
+
+  check_sha () {
+    if [ "$actual_sha" != "$expected_sha" ]; then
+      echo >&2 "Installer checksum mismatch:"
+      echo >&2 "  Expected: $expected_sha"
+      echo >&2 "  Actual:   $actual_sha"
+      echo >&2 "To accept this mismatch, update $bazel_installer_sha_variable in the WORKSPACE file and re-run."
+      exit 1
+    fi
+  }
+  BAZEL_REMOTE_SOURCE="${BAZEL_REMOTE_SOURCE:-https://github.com/bazelbuild/bazel/releases/download}"
+
+  # Bazel for linux-arm64 doesn't have a binary installer
+  if [ "$bazel_installer_platform" == "linux-arm64" ]; then
+    bazel_name="bazel-${BAZEL_VERSION}-linux-arm64"
+    BAZEL_PATH="${BAZEL_PATH:-$BAZEL_REMOTE_SOURCE/${BAZEL_VERSION}/${bazel_name}}"
+
+    curl -O -L "$BAZEL_PATH"
+
+    actual_sha="$(shasum -a 256 "$bazel_name" | awk '{print $1}')"
+    check_sha
+
+    mkdir -p "$bazel_bin_loc/${BAZEL_VERSION}/bin"
+    cp "$bazel_name" "$bazel_bin_loc/${BAZEL_VERSION}/bin/bazel-real"
+    chmod +x "$bazel_bin_loc/${BAZEL_VERSION}/bin/bazel-real"
+  else
+    installer_name="bazel-${BAZEL_VERSION}-installer-${bazel_installer_platform}.sh"
+    BAZEL_INSTALLER_PATH="${BAZEL_INSTALLER_PATH:-$BAZEL_REMOTE_SOURCE/${BAZEL_VERSION}/$installer_name}"
+
+    curl -O -L "$BAZEL_INSTALLER_PATH"
+
+    actual_sha="$(shasum -a 256 "$installer_name" | awk '{print $1}')"
+    check_sha
+
+    chmod +x "$installer_name"
+    mkdir -p "$bazel_bin_loc"
+    "./${installer_name}" --base="${bazel_bin_loc}/${BAZEL_VERSION}" --bin="${bazel_bin_loc}/${BAZEL_VERSION}/bin_t"
+  fi
+
+)
+rm -rf "$BUILD_DIR"
+
+exec "$bazel_exec_path" "$@"

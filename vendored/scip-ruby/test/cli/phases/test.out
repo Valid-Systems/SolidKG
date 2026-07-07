@@ -1,0 +1,294 @@
+--- parse-tree start ---
+Integer {
+  val = "1"
+}
+--- parse-tree end ---
+--- parse-tree-json start ---
+{
+  "type" : "Integer",
+  "val" : "1"
+}
+--- parse-tree-json end ---
+--- desugar-tree start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  1
+end
+--- desugar-tree end ---
+--- desugar-tree-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    Literal{ value = 1 }
+  ]
+}
+--- desugar-tree-raw end ---
+--- rewrite-tree start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  1
+end
+--- rewrite-tree end ---
+--- rewrite-tree-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    Literal{ value = 1 }
+  ]
+}
+--- rewrite-tree-raw end ---
+--- index-tree start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  1
+end
+--- index-tree end ---
+--- index-tree-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    Literal{ value = 1 }
+  ]
+}
+--- index-tree-raw end ---
+--- name-tree start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  1
+end
+--- name-tree end ---
+--- name-tree-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    Literal{ value = 1 }
+  ]
+}
+--- name-tree-raw end ---
+--- resolve-tree start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  1
+end
+--- resolve-tree end ---
+--- resolve-tree-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    Literal{ value = 1 }
+  ]
+}
+--- resolve-tree-raw end ---
+--- flatten-tree start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  def self.<static-init><<static-init>$CENSORED>(<blk>)
+    1
+  end
+end
+--- flatten-tree end ---
+--- flatten-tree-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    MethodDef{
+      flags = {self}
+      name = <U <static-init>><<N <U <static-init>> $CENSORED>>
+      args = [Local{
+          localVariable = <U <blk>>
+        }]
+      rhs = Literal{ value = 1 }
+    }
+  ]
+}
+--- flatten-tree-raw end ---
+--- ast start ---
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  def self.<static-init><<static-init>$CENSORED>(<blk>)
+    1
+  end
+end
+--- ast end ---
+--- ast-raw start ---
+ClassDef{
+  kind = class
+  name = EmptyTree
+  symbol = <C <U <root>>>
+  ancestors = [ConstantLit{
+      symbol = (class ::<todo sym>)
+      orig = nullptr
+    }]
+  rhs = [
+    MethodDef{
+      flags = {self}
+      name = <U <static-init>><<N <U <static-init>> $CENSORED>>
+      args = [Local{
+          localVariable = <U <blk>>
+        }]
+      rhs = Literal{ value = 1 }
+    }
+  ]
+}
+--- ast-raw end ---
+--- cfg start ---
+digraph "-e" {
+subgraph "cluster_::<Class:<root>>#<static-init>" {
+    label = "::<Class:<root>>#<static-init>";
+    color = blue;
+
+    "bb::<Class:<root>>#<static-init>_0" [
+        shape = cds;
+        color = black;
+        label = "block[id=0, rubyRegionId=0]()\l<self>: T.class_of(<root>) = cast(<self>: NilClass, T.class_of(<root>));\l<returnMethodTemp>$2: Integer(1) = 1\l<finalReturn>: T.noreturn = return <returnMethodTemp>$2: Integer(1)\l<unconditional>\l"
+    ];
+
+    "bb::<Class:<root>>#<static-init>_0" -> "bb::<Class:<root>>#<static-init>_1" [style="bold"];
+    "bb::<Class:<root>>#<static-init>_1" [
+        shape = parallelogram;
+        color = black;
+        label = "block[id=1, rubyRegionId=0]()\l<unconditional>\l"
+    ];
+
+    "bb::<Class:<root>>#<static-init>_1" -> "bb::<Class:<root>>#<static-init>_1" [style="bold"];
+}
+
+}
+
+--- cfg end ---
+--- cfg-raw start ---
+digraph "-e" {
+  graph [fontname = "Courier"];
+  node [fontname = "Courier"];
+  edge [fontname = "Courier"];
+subgraph "cluster_::<Class:<root>>#<static-init>" {
+    label = "::<Class:<root>>#<static-init>";
+    color = blue;
+
+    "bb::<Class:<root>>#<static-init>_0" [
+        shape = cds;
+        color = black;
+        label = "block[id=0]()\lBinding {\l&nbsp;bind = VariableUseSite {\l&nbsp;&nbsp;variable = <U <self>>,\l&nbsp;&nbsp;type = T.class_of(<root>),\l&nbsp;},\l&nbsp;value = Cast {\l&nbsp;&nbsp;cast = T.cast,\l&nbsp;&nbsp;value = VariableUseSite {\l&nbsp;&nbsp;&nbsp;variable = <U <self>>,\l&nbsp;&nbsp;&nbsp;type = NilClass,\l&nbsp;&nbsp;},\l&nbsp;&nbsp;type = T.class_of(<root>),\l&nbsp;},\l}\lBinding {\l&nbsp;bind = VariableUseSite {\l&nbsp;&nbsp;variable = <U <returnMethodTemp>>$2,\l&nbsp;&nbsp;type = Integer(1),\l&nbsp;},\l&nbsp;value = Literal { value = Integer(1) },\l}\lBinding {\l&nbsp;bind = VariableUseSite {\l&nbsp;&nbsp;variable = <U <finalReturn>>,\l&nbsp;&nbsp;type = T.noreturn,\l&nbsp;},\l&nbsp;value = Return {\l&nbsp;&nbsp;what = VariableUseSite {\l&nbsp;&nbsp;&nbsp;variable = <U <returnMethodTemp>>$2,\l&nbsp;&nbsp;&nbsp;type = Integer(1),\l&nbsp;&nbsp;},\l&nbsp;},\l}\lVariableUseSite { variable = <U <unconditional>> }\l"
+    ];
+
+    "bb::<Class:<root>>#<static-init>_0" -> "bb::<Class:<root>>#<static-init>_1" [style="bold"];
+    "bb::<Class:<root>>#<static-init>_1" [
+        shape = parallelogram;
+        color = black;
+        label = "block[id=1]()\lVariableUseSite { variable = <U <unconditional>> }\l"
+    ];
+
+    "bb::<Class:<root>>#<static-init>_1" -> "bb::<Class:<root>>#<static-init>_1" [style="bold"];
+}
+
+}
+
+--- cfg-raw end ---
+--- cfg-text start ---
+method ::<Class:<root>>#<static-init> {
+
+bb0[rubyRegionId=0, firstDead=3]():
+    <self>: T.class_of(<root>) = cast(<self>: NilClass, T.class_of(<root>));
+    <returnMethodTemp>$2: Integer(1) = 1
+    <finalReturn>: T.noreturn = return <returnMethodTemp>$2: Integer(1)
+    <unconditional> -> bb1
+
+# backedges
+# - bb0(rubyRegionId=0)
+bb1[rubyRegionId=0, firstDead=-1]():
+    <unconditional> -> bb1
+
+}
+
+--- cfg-text end ---
+--- symbol-table start ---
+class ::<root> < ::Object ()
+  class ::<Class:<root>>[<AttachedClass>] < ::<Class:Object> ()
+    method ::<Class:<root>>#<static-init> (<blk>) @ -e:1
+      argument <blk><block> @ Loc {file=-e start=??? end=???}
+
+--- symbol-table end ---
+--- symbol-table-raw start ---
+class <C <U <root>>> < <C <U Object>> ()
+  class <S <C <U <root>>> $1>[<C <U <AttachedClass>>>] < <S <C <U Object>> $1> ()
+    method <S <C <U <root>>> $1>#<N <U <static-init>> $CENSORED> (<blk>) @ Loc {file=-e start=1:1 end=1:2}
+      argument <blk><block> @ Loc {file=-e start=??? end=???}
+
+--- symbol-table-raw end ---
+--- checking diff ---
+1,15d0
+1,19d0
+1,5d0
+< 
+< 
+< 
+< 
+<           localVariable = <U <blk>>
+<         }]
+<       args = [Local{
+<       flags = {self}
+<       name = <U <static-init>><<N <U <static-init>> $CENSORED>>
+<       orig = nullptr
+<       rhs = Literal{ value = 1 }
+<       symbol = (class ::<todo sym>)
+<     1
+<     <finalReturn>: T.noreturn = return <returnMethodTemp>$2: Integer(1)
+<     <returnMethodTemp>$2: Integer(1) = 1
+<     <self>: T.class_of(<root>) = cast(<self>: NilClass, T.class_of(<root>));
+<     <unconditional> -> bb1
+<     <unconditional> -> bb1
+<     MethodDef{
+<     }
+<     }]
+<   ]
+<   ancestors = [ConstantLit{
+<   def self.<static-init><<static-init>$CENSORED>(<blk>)
+<   end
+<   kind = class
+<   name = EmptyTree
+<   rhs = [
+<   symbol = <C <U <root>>>
+< # - bb0(rubyRegionId=0)
+< # backedges
+< ClassDef{
+< bb0[rubyRegionId=0, firstDead=3]():
+< bb1[rubyRegionId=0, firstDead=-1]():
+< class <emptyTree><<C <root>>> < (::<todo sym>)
+< end
+< method ::<Class:<root>>#<static-init> {
+< }
+< }
+diff -r out/ast fileout/ast
+diff -r out/ast-raw fileout/ast-raw
+diff -r out/cfg-text fileout/cfg-text
+--- checking crashes ---
+--- checking crashes end ---

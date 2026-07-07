@@ -1,0 +1,5 @@
+# frozen_string_literal: true
+
+task :test do
+  Dir.glob('./test/**/*.rb').reject {|f| f =~ /^\.\/test\/snapshot/}.each(&method(:require))
+end

@@ -1,0 +1,69 @@
+# Loosely based off .sorbet-buildkite/pipeline.yaml
+
+common-cache-settings: &common-cache-settings
+  backend: s3
+  s3:
+    bucket: sourcegraph_buildkite_cache
+    endpoint: https://storage.googleapis.com
+    profile: buildkite
+    region: us-central1
+  tarball: {}
+  compress: true
+  compress-program: pigz
+  max: 7
+
+ruby-cache: &ruby-cache
+  id: ruby-cache
+  key: "ruby-cache-{{ checksum .tool-versions }}"
+  restore-keys:
+    - "ruby-cache-{{ checksum .tool-versions }}"
+    - "ruby-cache-"
+  paths:
+    - /root/.asdf/installs/ruby/2.7.0
+  <<: *common-cache-settings
+
+bazel-repo-cache: &bazel-repo-cache
+  id: bazel-repos
+  key: "bazel-repos-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
+  restore-keys:
+    - "bazel-repos-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-repos-{{ env.BUILDKITE_BRANCH }}-"
+    - "bazel-repos-"
+  paths:
+    - /usr/local/var/bazelcache/repos
+  <<: *common-cache-settings
+
+bazel-build-cache: &bazel-build-cache
+  id: bazel-build
+  key: "bazel-build-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
+  restore-keys:
+    - "bazel-build-{{ env.BUILDKITE_BRANCH }}-{{ env.BUILDKITE_COMMIT }}"
+    - "bazel-build-{{ env.BUILDKITE_BRANCH }}-"
+    - "bazel-build-"
+  paths:
+    - /usr/local/var/bazelcache/build
+  <<: *common-cache-settings
+
+steps:
+  - label: ":linux: test-indexer.sh"
+    command: .buildkite/test-indexer.sh
+    artifact_paths:
+      - "_out_/profile*.json"
+      - "_out_/*.log"
+    agents:
+      queue: stateless
+    env:
+      AWS_CONFIG_FILE: /buildkite/.aws/config
+      AWS_SHARED_CREDENTIALS_FILE: /buildkite/.aws/credentials
+    plugins:
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *ruby-cache
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-repo-cache
+    - https://github.com/sourcegraph/cache-buildkite-plugin.git#master: *bazel-build-cache
+
+  - wait: ~
+
+# Success Phase - Allow the PR to be merged
+  - label: "All tests and builds succeeded"
+    command: .buildkite/all-succeeded.sh
+
+  - wait: ~

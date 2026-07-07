@@ -1,0 +1,29 @@
+name: 'formatting'
+
+on:
+  push:
+    branches:
+      - main
+      - scip
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    name: check
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: jdx/mise-action@v2.4.4
+        with:
+          version: 2025.8.10
+
+      - run: npm install
+
+      - run: npm install
+        working-directory: packages/pyright-scip
+
+      - name: Check prettier formatting
+        run: npm run check:prettier
+        working-directory: packages/pyright-scip

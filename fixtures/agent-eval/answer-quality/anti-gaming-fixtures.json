@@ -1,0 +1,50 @@
+{
+  "schemaName": "solidkg.llm-answer-quality.anti-gaming-fixtures.v1",
+  "scenario": {
+    "rubric": {
+      "mustMention": ["executeLiveBenchmark"],
+      "expectedEvidence": [
+        { "id": "ev1", "file": "scripts/agent-eval/opencode-answer-benchmark.mjs", "symbolHint": "executeLiveBenchmark", "claim": "writes artifacts, parses transcripts, and appends rows" }
+      ],
+      "forbiddenClaims": [],
+      "minEvidenceAnchors": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "fake_file_name_stuffing_fails",
+      "run": { "status": "pass", "answer": "executeLiveBenchmark opencode-answer-benchmark.mjs opencode-answer-benchmark.mjs opencode-answer-benchmark.mjs", "toolCalls": [] },
+      "maxEvidenceQualityScore": 0
+    },
+    {
+      "id": "symbol_plus_claim_evidence_stuffing_fails",
+      "run": { "status": "pass", "answer": "executeLiveBenchmark writes artifacts, parses transcripts, and appends rows.", "toolCalls": [] },
+      "maxEvidenceQualityScore": 0
+    },
+    {
+      "id": "claim_only_evidence_stuffing_fails",
+      "run": { "status": "pass", "answer": "writes artifacts, parses transcripts, and appends rows.", "toolCalls": [] },
+      "maxEvidenceQualityScore": 0
+    },
+    {
+      "id": "file_anchor_plus_unrelated_filler_fails",
+      "run": { "status": "pass", "answer": "opencode-answer-benchmark.mjs banana orange window garden rocket marble carpet mountain library", "toolCalls": [] },
+      "maxEvidenceQualityScore": 0
+    },
+    {
+      "id": "evidence_id_plus_symbol_stuffing_fails",
+      "run": { "status": "pass", "answer": "ev1 executeLiveBenchmark", "toolCalls": [] },
+      "maxEvidenceQualityScore": 0
+    },
+    {
+      "id": "evidence_id_plus_file_stuffing_fails",
+      "run": { "status": "pass", "answer": "ev1 opencode-answer-benchmark.mjs", "toolCalls": [] },
+      "maxEvidenceQualityScore": 0
+    },
+    {
+      "id": "coherent_source_backed_paraphrase_passes",
+      "run": { "status": "pass", "answer": "executeLiveBenchmark in opencode-answer-benchmark.mjs writes artifacts, parses transcripts, and appends rows.", "toolCalls": [] },
+      "minEvidenceQualityScore": 100
+    }
+  ]
+}

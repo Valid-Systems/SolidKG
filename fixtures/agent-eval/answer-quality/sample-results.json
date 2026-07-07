@@ -1,0 +1,227 @@
+{
+  "schemaName": "solidkg.llm-answer-quality.results.v1",
+  "reportSchemaName": "solidkg.llm-answer-quality.report.v1",
+  "profile": "calibration",
+  "seed": "answer-quality-wave1",
+  "maxRuns": 5,
+  "maxEstimatedCostUsd": 1,
+  "estimatedCostUsd": 0,
+  "confirmLive": false,
+  "transcriptCapability": {
+    "status": "not_checked",
+    "reason": "wave1_offline_contract_only"
+  },
+  "plannedRunOrder": [
+    "ky-architecture_flow:r1:solidkg",
+    "ky-architecture_flow:r1:grep_read",
+    "ky-architecture_flow:r1:tilth",
+    "ky-architecture_flow:r1:cartog",
+    "ky-architecture_flow:r1:sverklo"
+  ],
+  "runs": [
+    {
+      "blockId": "ky-architecture_flow:r1",
+      "scenarioId": "ky-architecture_flow",
+      "repeat": 1,
+      "armId": "solidkg",
+      "status": "pass",
+      "reliabilityStatus": "pass",
+      "setupStartedAt": "2026-06-05T00:00:00.000Z",
+      "setupEndedAt": "2026-06-05T00:00:01.200Z",
+      "setupDurationMs": 1200,
+      "queryStartedAt": "2026-06-05T00:00:01.200Z",
+      "queryEndedAt": "2026-06-05T00:00:02.000Z",
+      "queryDurationMs": 800,
+      "costUsd": 0.02,
+      "answer": "Describe the primary cross-file flow in order. Name the core dispatch or orchestration symbol. The flow centers on source/core/Ky.ts dispatch, then evidence in source/core/normalize.ts execute. ky-architecture_flow-ev1 shows ky architecture flow evidence 1, and ky-architecture_flow-ev2 shows ky architecture flow evidence 2.",
+      "toolCalls": [
+        {
+          "tool": "solidkg_trace"
+        },
+        {
+          "tool": "read"
+        }
+      ],
+      "readCount": 1,
+      "grepCount": 0,
+      "bashCount": 0,
+      "solidkgToolCalls": 1,
+      "peerWrapperCalls": 0,
+      "fallbackLoopCount": 1,
+      "judge": {
+        "status": "pass",
+        "secondaryScore": 94,
+        "comments": "Secondary fixture score."
+      }
+    },
+    {
+      "blockId": "ky-architecture_flow:r1",
+      "scenarioId": "ky-architecture_flow",
+      "repeat": 1,
+      "armId": "grep_read",
+      "status": "pass",
+      "reliabilityStatus": "pass",
+      "setupStartedAt": null,
+      "setupEndedAt": null,
+      "setupDurationMs": 0,
+      "queryStartedAt": "2026-06-05T00:00:00.000Z",
+      "queryEndedAt": "2026-06-05T00:00:01.400Z",
+      "queryDurationMs": 1400,
+      "costUsd": 0.025,
+      "answer": "Describe the primary cross-file flow in order. The answer names source/core/Ky.ts dispatch but misses the second evidence anchor.",
+      "toolCalls": [
+        {
+          "tool": "rg"
+        },
+        {
+          "tool": "read"
+        },
+        {
+          "tool": "read"
+        }
+      ],
+      "readCount": 2,
+      "grepCount": 1,
+      "bashCount": 0,
+      "solidkgToolCalls": 0,
+      "peerWrapperCalls": 0,
+      "fallbackLoopCount": 0
+    },
+    {
+      "blockId": "ky-architecture_flow:r1",
+      "scenarioId": "ky-architecture_flow",
+      "repeat": 1,
+      "armId": "tilth",
+      "status": "pass",
+      "reliabilityStatus": "pass",
+      "setupStartedAt": "2026-06-05T00:00:00.000Z",
+      "setupEndedAt": "2026-06-05T00:00:00.100Z",
+      "setupDurationMs": 100,
+      "queryStartedAt": "2026-06-05T00:00:00.100Z",
+      "queryEndedAt": "2026-06-05T00:00:01.000Z",
+      "queryDurationMs": 900,
+      "costUsd": 0.021,
+      "answer": "Describe the primary cross-file flow in order. Name the core dispatch or orchestration symbol. Evidence: source/core/Ky.ts dispatch and source/core/normalize.ts execute.",
+      "toolCalls": [
+        {
+          "tool": "tilth_wrapper"
+        }
+      ],
+      "readCount": 0,
+      "grepCount": 0,
+      "bashCount": 0,
+      "solidkgToolCalls": 0,
+      "peerWrapperCalls": 1,
+      "fallbackLoopCount": 0,
+      "judge": {
+        "status": "pass",
+        "secondaryScore": 90,
+        "comments": "Secondary fixture score."
+      }
+    },
+    {
+      "blockId": "ky-architecture_flow:r1",
+      "scenarioId": "ky-architecture_flow",
+      "repeat": 1,
+      "armId": "cartog",
+      "status": "setup_failed",
+      "reliabilityStatus": "setup_failed",
+      "setupStartedAt": "2026-06-05T00:00:00.000Z",
+      "setupEndedAt": "2026-06-05T00:00:00.600Z",
+      "setupDurationMs": 600,
+      "queryStartedAt": null,
+      "queryEndedAt": null,
+      "queryDurationMs": 0,
+      "costUsd": 0,
+      "answer": "",
+      "toolCalls": [],
+      "reason": "cartog_setup_unavailable"
+    },
+    {
+      "blockId": "ky-architecture_flow:r1",
+      "scenarioId": "ky-architecture_flow",
+      "repeat": 1,
+      "armId": "sverklo",
+      "status": "unsupported",
+      "reliabilityStatus": "unsupported",
+      "setupStartedAt": null,
+      "setupEndedAt": null,
+      "setupDurationMs": 0,
+      "queryStartedAt": null,
+      "queryEndedAt": null,
+      "queryDurationMs": 0,
+      "costUsd": 0,
+      "answer": "",
+      "toolCalls": [],
+      "reason": "scenario_query_not_supported"
+    }
+  ],
+  "arms": [
+    {
+      "id": "solidkg",
+      "allowedTools": [
+        "solidkg_mcp",
+        "read",
+        "rg",
+        "grep"
+      ],
+      "disallowedTools": [
+        "tilth_wrapper",
+        "cartog_wrapper",
+        "sverklo_wrapper"
+      ],
+      "instructionSurface": "solidkg arm policy for offline fixture validation."
+    },
+    {
+      "id": "grep_read",
+      "allowedTools": [
+        "read",
+        "rg",
+        "grep"
+      ],
+      "disallowedTools": [
+        "solidkg_mcp"
+      ],
+      "instructionSurface": "grep_read arm policy for offline fixture validation."
+    },
+    {
+      "id": "tilth",
+      "allowedTools": [
+        "tilth_wrapper",
+        "read",
+        "rg",
+        "grep"
+      ],
+      "disallowedTools": [
+        "solidkg_mcp"
+      ],
+      "instructionSurface": "tilth arm policy for offline fixture validation."
+    },
+    {
+      "id": "cartog",
+      "allowedTools": [
+        "cartog_wrapper",
+        "read",
+        "rg",
+        "grep"
+      ],
+      "disallowedTools": [
+        "solidkg_mcp"
+      ],
+      "instructionSurface": "cartog arm policy for offline fixture validation."
+    },
+    {
+      "id": "sverklo",
+      "allowedTools": [
+        "sverklo_wrapper",
+        "read",
+        "rg",
+        "grep"
+      ],
+      "disallowedTools": [
+        "solidkg_mcp"
+      ],
+      "instructionSurface": "sverklo arm policy for offline fixture validation."
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  module ::Constants<<C Constants>> < ()
+    ::Constants::MAX_NUM_ADDITIONAL_DEVBOXES = 200
+  end
+
+  module ::Routes::Helpers<<C Helpers>> < ()
+    ::Routes::Helpers::MAX_NUM_ADDITIONAL_DEVBOXES = ::Constants::MAX_NUM_ADDITIONAL_DEVBOXES
+  end
+
+  module ::Routes::WillCollapseOut<<C WillCollapseOut>> < ()
+    ::Routes::WillCollapseOut::Helpers = ::Routes::Helpers
+  end
+
+  ::Routes::Helpers::MAX_NUM_ADDITIONAL_DEVBOXES
+end

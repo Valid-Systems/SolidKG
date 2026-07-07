@@ -1,0 +1,230 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C TestDSLBuilder><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:opt_string, <emptyTree>::<C String>).returns(::NilClass)
+    end
+
+    def self.opt_string<<todo method>>(opt_string, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(<emptyTree>::<C String>))
+    end
+
+    def self.get_opt_string<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(<emptyTree>::<C String>))
+    end
+
+    def opt_string<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:opt_int_defaulted, <emptyTree>::<C Integer>).returns(::NilClass)
+    end
+
+    def self.opt_int_defaulted<<todo method>>(opt_int_defaulted, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def self.get_opt_int_defaulted<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C Integer>)
+    end
+
+    def opt_int_defaulted<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:req_string, <emptyTree>::<C String>).returns(::NilClass)
+    end
+
+    def self.req_string<<todo method>>(req_string, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def self.get_req_string<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def req_string<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:implied_string, <emptyTree>::<C String>).returns(::NilClass)
+    end
+
+    def self.implied_string<<todo method>>(implied_string = ::T.unsafe(nil), &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def self.get_implied_string<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def implied_string<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:no_getter, <emptyTree>::<C String>).returns(::NilClass)
+    end
+
+    def self.no_getter<<todo method>>(no_getter, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(<emptyTree>::<C String>))
+    end
+
+    def self.get_no_setter<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(<emptyTree>::<C String>))
+    end
+
+    def no_setter<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:class_of, <emptyTree>::<C T>.class_of(<emptyTree>::<C Integer>)).returns(::NilClass)
+    end
+
+    def self.class_of<<todo method>>(class_of, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(<emptyTree>::<C T>.class_of(<emptyTree>::<C Integer>)))
+    end
+
+    def self.get_class_of<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(<emptyTree>::<C T>.class_of(<emptyTree>::<C Integer>)))
+    end
+
+    def class_of<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:root_const, ::<root>::<C Integer>).returns(::NilClass)
+    end
+
+    def self.root_const<<todo method>>(root_const, &<blk>)
+      <emptyTree>
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(::<root>::<C Integer>))
+    end
+
+    def self.get_root_const<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(::T.nilable(::<root>::<C Integer>))
+    end
+
+    def root_const<<todo method>>(&<blk>)
+      ::T.unsafe(::Kernel).raise("Sorbet rewriter pass partially unimplemented")
+    end
+
+    ::T.unsafe(<self>).dsl_optional(:opt_string, <emptyTree>::<C String>)
+
+    ::T.unsafe(<self>).dsl_optional(:opt_int_defaulted, <emptyTree>::<C Integer>, :default, 0)
+
+    ::T.unsafe(<self>).dsl_required(:req_string, <emptyTree>::<C String>)
+
+    ::T.unsafe(<self>).dsl_required(:implied_string, <emptyTree>::<C String>, :implied, "foo")
+
+    ::T.unsafe(<self>).dsl_optional(:no_getter, <emptyTree>::<C String>, :skip_getter, true)
+
+    ::T.unsafe(<self>).dsl_optional(:no_setter, <emptyTree>::<C String>, :skip_setter, true)
+
+    ::T.unsafe(<self>).dsl_optional(:no_getter_or_setter, <emptyTree>::<C String>, :skip_getter, true, :skip_setter, true)
+
+    ::T.unsafe(<self>).dsl_optional(:class_of, <emptyTree>::<C T>.class_of(<emptyTree>::<C Integer>))
+
+    ::T.unsafe(<self>).dsl_optional(:root_const, ::<root>::<C Integer>)
+  end
+
+  class <emptyTree>::<C TestChild><<C <todo sym>>> < (<emptyTree>::<C TestDSLBuilder>)
+    def test_instance_methods<<todo method>>(&<blk>)
+      begin
+        <cast:assert_type!>(<self>.opt_string(), <todo sym>, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+        <cast:assert_type!>(<self>.opt_int_defaulted(), <todo sym>, <emptyTree>::<C Integer>)
+        <cast:assert_type!>(<self>.req_string(), <todo sym>, <emptyTree>::<C String>)
+        <self>.no_getter()
+      end
+    end
+
+    <self>.opt_string("hi")
+
+    <self>.get_opt_string()
+
+    <self>.opt_string()
+
+    <self>.opt_string(:nope)
+
+    <self>.opt_string(nil)
+
+    <self>.opt_int_defaulted(17)
+
+    <self>.implied_string()
+
+    <self>.no_getter("I\'m setting the value")
+
+    <self>.get_no_getter()
+
+    <self>.class_of(<emptyTree>::<C Integer>)
+
+    <cast:assert_type!>(<self>.get_opt_string(), <todo sym>, <emptyTree>::<C T>.nilable(<emptyTree>::<C String>))
+
+    <cast:assert_type!>(<self>.get_opt_string(), <todo sym>, <emptyTree>::<C String>)
+
+    <cast:assert_type!>(<self>.get_opt_int_defaulted(), <todo sym>, <emptyTree>::<C Integer>)
+
+    <cast:assert_type!>(<self>.get_req_string(), <todo sym>, <emptyTree>::<C String>)
+
+    <runtime method definition of test_instance_methods>
+  end
+end

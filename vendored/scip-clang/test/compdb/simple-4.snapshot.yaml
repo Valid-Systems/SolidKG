@@ -1,0 +1,20 @@
+---
+- command:
+    - arg1
+    - arg2
+    - '-X=arg3'
+  filePath:        f1
+  directory:       d1
+- command:
+    - arg1
+    - arg2
+    - '-X="arg3"'
+  filePath:        f2
+  directory:       d2
+- command:
+    - '-Y=dq"dq'
+    - '-Z=blah'
+    - '-W=ww'
+  filePath:        f3
+  directory:       d3
+...

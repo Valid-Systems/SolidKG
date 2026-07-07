@@ -1,0 +1,12 @@
+test/cli/escaping/escaping.rb:10: Expected `Integer` but found `String("\n")` for argument `a` https://srb.help/7002
+    10 |'
+    11 |'
+  Expected `Integer` for argument `a` of method `Object#foo`:
+    test/cli/escaping/escaping.rb:4:
+     4 |sig{params(a: Integer).void}
+                   ^
+  Got `String("\n")` originating from:
+    test/cli/escaping/escaping.rb:10:
+    10 |'
+    11 |'
+Errors: 1

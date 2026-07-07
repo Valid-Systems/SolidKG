@@ -1,0 +1,115 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      <emptyTree>
+    end
+  end
+  class ::TestAttr<<C TestAttr>> < (::<todo sym>)
+    def initialize(<blk>)
+      begin
+        @v1 = <cast:let>(0, Integer, ::Integer)
+        @v2 = <cast:let>("", String, ::String)
+        @v6 = <cast:let>("", String, ::String)
+        @strv7 = <cast:let>(0.000000, Float, ::Float)
+        @strv8 = <cast:let>(0.000000, Float, ::Float)
+        @strv9 = <cast:let>(0.000000, Float, ::Float)
+      end
+    end
+
+    def v1(<blk>)
+      @v1
+    end
+
+    def v1=(v1, <blk>)
+      @v1 = v1
+    end
+
+    def v2(<blk>)
+      @v2
+    end
+
+    def v2=(v2, <blk>)
+      @v2 = v2
+    end
+
+    def v3(<blk>)
+      @v3
+    end
+
+    def v4=(v4, <blk>)
+      @v4 = v4
+    end
+
+    def v5=(v5, <blk>)
+      @v5 = v5
+    end
+
+    def strv7(<blk>)
+      @strv7
+    end
+
+    def strv8=(strv8, <blk>)
+      @strv8 = strv8
+    end
+
+    def strv9(<blk>)
+      @strv9
+    end
+
+    def strv9=(strv9, <blk>)
+      @strv9 = strv9
+    end
+
+    def self.<static-init>(<blk>)
+      begin
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.void()
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.returns(::Integer)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:v1, ::Integer).returns(::Integer)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.returns(::String)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:v2, ::String).returns(::String)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.returns(::String)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.returns(::Float)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:strv8, ::Float).returns(::Float)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.returns(::Float)
+        end
+        ::Sorbet::Private::Static.sig(<self>) do ||
+          <self>.params(:strv9, ::Float).returns(::Float)
+        end
+        <self>.extend(::T::Sig)
+        <runtime method definition of initialize>
+        <runtime method definition of v1>
+        <runtime method definition of v1=>
+        <runtime method definition of v2>
+        <runtime method definition of v2=>
+        <runtime method definition of v3>
+        <runtime method definition of v4=>
+        <runtime method definition of v5=>
+        <runtime method definition of strv7>
+        <runtime method definition of strv8=>
+        <runtime method definition of strv9>
+        <runtime method definition of strv9=>
+        <emptyTree>
+      end
+    end
+  end
+  <emptyTree>
+end

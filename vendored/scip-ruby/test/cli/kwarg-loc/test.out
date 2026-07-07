@@ -1,0 +1,24 @@
+kwarg-loc.rb:20: Expected `Integer` but found `String("1")` for argument `d` https://srb.help/7002
+    20 |  d: "1",
+             ^^^
+  Expected `Integer` for argument `d` of method `Object#foo`:
+    kwarg-loc.rb:8:
+     8 |    d: Integer,
+            ^
+  Got `String("1")` originating from:
+    kwarg-loc.rb:20:
+    20 |  d: "1",
+             ^^^
+
+kwarg-loc.rb:42: Expected `Integer` but found `String("1")` for argument `d` https://srb.help/7002
+    42 |  "1",
+          ^^^
+  Expected `Integer` for argument `d` of method `Object#bar`:
+    kwarg-loc.rb:30:
+    30 |    d: Integer,
+            ^
+  Got `String("1")` originating from:
+    kwarg-loc.rb:42:
+    42 |  "1",
+          ^^^
+Errors: 2

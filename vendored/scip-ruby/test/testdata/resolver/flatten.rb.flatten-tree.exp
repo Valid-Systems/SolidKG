@@ -1,0 +1,63 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      begin
+        ::A.new().foo()
+        ::A.foo()
+        ::A.new().food()
+        ::A.food()
+        ::A.new().foos()
+        ::A.foos()
+        ::A.sfoo()
+        ::A.new().sfoo()
+        ::A.new().sfood()
+        ::A.sfood()
+        ::A.sfoos()
+        ::A.new().sfoos()
+        <emptyTree>
+      end
+    end
+  end
+  class ::A<<C A>> < (::<todo sym>)
+    def foo(<blk>)
+      begin
+        <runtime method definition of food>
+        <runtime method definition of self.foos>
+      end
+    end
+
+    def food(<blk>)
+      <emptyTree>
+    end
+
+    def foos(<blk>)
+      <emptyTree>
+    end
+
+    def self.sfoo(<blk>)
+      begin
+        <runtime method definition of sfood>
+        <runtime method definition of self.sfoos>
+      end
+    end
+
+    def sfood(<blk>)
+      <emptyTree>
+    end
+
+    def self.sfoos(<blk>)
+      <emptyTree>
+    end
+
+    def self.<static-init>(<blk>)
+      begin
+        <runtime method definition of foo>
+        <runtime method definition of self.sfoo>
+        <emptyTree>
+      end
+    end
+  end
+  <emptyTree>
+end

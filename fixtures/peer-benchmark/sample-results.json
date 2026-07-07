@@ -1,0 +1,966 @@
+{
+  "schemaName": "solidkg.peer-structural-benchmark.results.v1",
+  "repo": {
+    "name": "solidkg",
+    "path": "D:/Apps/Programming_Tools/solidkg",
+    "revision": "fixture"
+  },
+  "generatedAt": "2026-06-04T00:00:00Z",
+  "notes": [
+    "Fixture models a fair 10-scenario x 4-peer structural benchmark without launching peer tools."
+  ],
+  "peers": [
+    {
+      "id": "solidkg",
+      "name": "SolidKG",
+      "scope": "local deterministic AST/SCIP code graph CLI and MCP",
+      "commands": [
+        "fair matrix fixture"
+      ],
+      "cleanupNotes": []
+    },
+    {
+      "id": "tilth",
+      "name": "Tilth",
+      "scope": "local structural code reader and MCP",
+      "commands": [
+        "fair matrix fixture"
+      ],
+      "cleanupNotes": []
+    },
+    {
+      "id": "cartog",
+      "name": "Cartog",
+      "scope": "local SQLite code graph CLI and MCP",
+      "commands": [
+        "fair matrix fixture"
+      ],
+      "cleanupNotes": [
+        "Temporary DB can be removed after benchmark."
+      ]
+    },
+    {
+      "id": "sverklo",
+      "name": "Sverklo",
+      "scope": "local-first repo memory MCP with symbol graph and proof command",
+      "commands": [
+        "fair matrix fixture"
+      ],
+      "cleanupNotes": [
+        "Sverklo may cache model and index data under the user profile; do not delete blindly."
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "symbol-source-getNodeText",
+      "title": "Find getNodeText definition and source",
+      "kind": "symbol_source",
+      "expected": {
+        "symbols": [
+          "getNodeText"
+        ],
+        "files": [
+          "src/extraction/tree-sitter-helpers.ts"
+        ]
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 45,
+          "outputBytes": 1448,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts"
+          ],
+          "referenceCount": 2,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Definition surfaced with file and signature."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 900,
+          "outputBytes": 2394,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts"
+          ],
+          "referenceCount": 33,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Text output included definition and source context."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 20,
+          "outputBytes": 920,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "JSON search surfaced the symbol node."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1100,
+          "outputBytes": 4080,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts"
+          ],
+          "referenceCount": 155,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output selected getNodeText and references."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "symbol-source-SolidKG",
+      "title": "Find SolidKG class definition and source",
+      "kind": "symbol_source",
+      "expected": {
+        "symbols": [
+          "SolidKG"
+        ],
+        "files": [
+          "src/index.ts"
+        ]
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 46,
+          "outputBytes": 1424,
+          "foundSymbols": [
+            "SolidKG"
+          ],
+          "foundFiles": [
+            "src/index.ts"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Class surfaced with file."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 901,
+          "outputBytes": 1944,
+          "foundSymbols": [
+            "SolidKG"
+          ],
+          "foundFiles": [
+            "src/index.ts"
+          ],
+          "referenceCount": 8,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Text output included class context."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 21,
+          "outputBytes": 920,
+          "foundSymbols": [
+            "SolidKG"
+          ],
+          "foundFiles": [
+            "src/index.ts"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "JSON search surfaced the class node."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1101,
+          "outputBytes": 1920,
+          "foundSymbols": [
+            "SolidKG"
+          ],
+          "foundFiles": [
+            "src/index.ts"
+          ],
+          "referenceCount": 20,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included SolidKG."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "symbol-source-ToolHandler",
+      "title": "Find ToolHandler class definition and source",
+      "kind": "symbol_source",
+      "expected": {
+        "symbols": [
+          "ToolHandler"
+        ],
+        "files": [
+          "src/mcp/tools.ts"
+        ]
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 47,
+          "outputBytes": 1424,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Class surfaced with file."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 902,
+          "outputBytes": 1926,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 7,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Text output included class context."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 22,
+          "outputBytes": 920,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "JSON search surfaced the class node."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1102,
+          "outputBytes": 1840,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 15,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included ToolHandler."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "symbol-source-writeArtifacts",
+      "title": "Find benchmark artifact writer",
+      "kind": "symbol_source",
+      "expected": {
+        "symbols": [
+          "writeArtifacts"
+        ],
+        "files": [
+          "scripts/agent-eval/peer-structural-benchmark.mjs"
+        ]
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 48,
+          "outputBytes": 1424,
+          "foundSymbols": [
+            "writeArtifacts"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Function surfaced with file."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 903,
+          "outputBytes": 1872,
+          "foundSymbols": [
+            "writeArtifacts"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 4,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Text output included function context."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 23,
+          "outputBytes": 920,
+          "foundSymbols": [
+            "writeArtifacts"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "JSON search surfaced the function node."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1103,
+          "outputBytes": 1680,
+          "foundSymbols": [
+            "writeArtifacts"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 5,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included writeArtifacts."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "callers-findRelevantContext",
+      "title": "Find callers of findRelevantContext",
+      "kind": "caller_reference",
+      "expected": {
+        "symbols": [
+          "findRelevantContext"
+        ],
+        "files": [
+          "src/context/index.ts",
+          "src/index.ts",
+          "__tests__/evaluation/runner.ts"
+        ],
+        "comparableReferences": false
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 49,
+          "outputBytes": 1424,
+          "foundSymbols": [],
+          "foundFiles": [
+            "src/context/index.ts"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Direct caller query surfaced only the context implementation, preserving the known gap."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 904,
+          "outputBytes": 1908,
+          "foundSymbols": [
+            "findRelevantContext"
+          ],
+          "foundFiles": [
+            "src/context/index.ts",
+            "src/index.ts",
+            "__tests__/evaluation/runner.ts"
+          ],
+          "referenceCount": 6,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Caller mode returned expected caller files."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 24,
+          "outputBytes": 940,
+          "foundSymbols": [
+            "findRelevantContext"
+          ],
+          "foundFiles": [
+            "src/context/index.ts",
+            "src/index.ts"
+          ],
+          "referenceCount": 2,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Refs surfaced partial caller evidence."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1104,
+          "outputBytes": 1760,
+          "foundSymbols": [
+            "findRelevantContext"
+          ],
+          "foundFiles": [
+            "src/context/index.ts",
+            "src/index.ts"
+          ],
+          "referenceCount": 10,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included context files but not all caller evidence."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "callers-getNodeText",
+      "title": "Find callers of getNodeText",
+      "kind": "caller_reference",
+      "expected": {
+        "symbols": [
+          "getNodeText"
+        ],
+        "files": [
+          "src/extraction/tree-sitter-helpers.ts",
+          "src/extraction/languages/typescript.ts",
+          "src/extraction/tree-sitter.ts"
+        ],
+        "comparableReferences": false
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 50,
+          "outputBytes": 2360,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts"
+          ],
+          "referenceCount": 40,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Caller query surfaced language extractor users."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 905,
+          "outputBytes": 2556,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts",
+            "src/extraction/tree-sitter.ts"
+          ],
+          "referenceCount": 42,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Caller mode returned broad usages."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 25,
+          "outputBytes": 6440,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts",
+            "src/extraction/tree-sitter.ts"
+          ],
+          "referenceCount": 277,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Refs surfaced broad getNodeText edges."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1105,
+          "outputBytes": 2160,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts"
+          ],
+          "referenceCount": 35,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included getNodeText usage evidence."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "callers-buildReport",
+      "title": "Find callers of buildReport",
+      "kind": "caller_reference",
+      "expected": {
+        "symbols": [
+          "buildReport"
+        ],
+        "files": [
+          "scripts/agent-eval/peer-structural-benchmark.mjs"
+        ],
+        "comparableReferences": false
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 51,
+          "outputBytes": 1424,
+          "foundSymbols": [
+            "buildReport"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Caller query surfaced the report assembly path."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 906,
+          "outputBytes": 1836,
+          "foundSymbols": [
+            "buildReport"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 2,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Caller mode found report call sites."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 26,
+          "outputBytes": 920,
+          "foundSymbols": [
+            "buildReport"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 1,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Refs surfaced report usage."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1106,
+          "outputBytes": 1664,
+          "foundSymbols": [
+            "buildReport"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 4,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included buildReport."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "impact-getNodeText",
+      "title": "Find blast radius for changing getNodeText",
+      "kind": "impact_radius",
+      "expected": {
+        "symbols": [
+          "getNodeText"
+        ],
+        "files": [
+          "src/extraction/tree-sitter-helpers.ts",
+          "src/extraction/languages/typescript.ts"
+        ],
+        "comparableReferences": false
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 52,
+          "outputBytes": 5432,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts"
+          ],
+          "referenceCount": 168,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Impact traversal reported affected nodes."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 907,
+          "outputBytes": 2160,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts"
+          ],
+          "referenceCount": 20,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Dependency mode surfaced affected files."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 27,
+          "outputBytes": 6440,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts"
+          ],
+          "referenceCount": 277,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Impact edge output surfaced affected files."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1107,
+          "outputBytes": 2560,
+          "foundSymbols": [
+            "getNodeText"
+          ],
+          "foundFiles": [
+            "src/extraction/tree-sitter-helpers.ts",
+            "src/extraction/languages/typescript.ts"
+          ],
+          "referenceCount": 60,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included impact-relevant getNodeText files."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "impact-buildReport",
+      "title": "Find blast radius for changing buildReport",
+      "kind": "impact_radius",
+      "expected": {
+        "symbols": [
+          "buildReport",
+          "renderMarkdown",
+          "renderHtml"
+        ],
+        "files": [
+          "scripts/agent-eval/peer-structural-benchmark.mjs"
+        ],
+        "comparableReferences": false
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 53,
+          "outputBytes": 1496,
+          "foundSymbols": [
+            "buildReport",
+            "renderMarkdown",
+            "renderHtml"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 4,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Impact traversal stayed within the benchmark runner."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 908,
+          "outputBytes": 1908,
+          "foundSymbols": [
+            "buildReport",
+            "renderMarkdown"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 6,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Dependency mode surfaced report renderer relationship."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 28,
+          "outputBytes": 1060,
+          "foundSymbols": [
+            "buildReport",
+            "renderMarkdown",
+            "renderHtml"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 8,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Impact edge output surfaced benchmark runner functions."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1108,
+          "outputBytes": 1728,
+          "foundSymbols": [
+            "buildReport",
+            "renderMarkdown",
+            "renderHtml"
+          ],
+          "foundFiles": [
+            "scripts/agent-eval/peer-structural-benchmark.mjs"
+          ],
+          "referenceCount": 8,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included benchmark renderers."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "impact-ToolHandler",
+      "title": "Find blast radius for changing ToolHandler",
+      "kind": "impact_radius",
+      "expected": {
+        "symbols": [
+          "ToolHandler"
+        ],
+        "files": [
+          "src/mcp/tools.ts"
+        ],
+        "comparableReferences": false
+      },
+      "runs": [
+        {
+          "peerId": "solidkg",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 54,
+          "outputBytes": 1472,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 3,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Impact traversal surfaced MCP tool handling."
+          ]
+        },
+        {
+          "peerId": "tilth",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 909,
+          "outputBytes": 1890,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 5,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Dependency mode surfaced MCP tool file."
+          ]
+        },
+        {
+          "peerId": "cartog",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 29,
+          "outputBytes": 1080,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 9,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Impact edge output surfaced MCP tool file."
+          ]
+        },
+        {
+          "peerId": "sverklo",
+          "status": "pass",
+          "queryCount": 1,
+          "durationMs": 1109,
+          "outputBytes": 1696,
+          "foundSymbols": [
+            "ToolHandler"
+          ],
+          "foundFiles": [
+            "src/mcp/tools.ts"
+          ],
+          "referenceCount": 6,
+          "sourceFidelity": "exact",
+          "notes": [
+            "Proof output included ToolHandler."
+          ]
+        }
+      ]
+    }
+  ],
+  "cleanup": {
+    "safeToRemove": [
+      "D:/tmp/opencode/cg-peer-bench/cartog-solidkg.db"
+    ],
+    "doNotRemoveAutomatically": [
+      "C:/Users/Me/.sverklo"
+    ]
+  }
+}

@@ -1,0 +1,171 @@
+test/cli/errors/errors.rb:5: Unable to resolve constant `MyConstantWithTypo` https://srb.help/5002
+     .. |    MyConstantWithTypo
+            ^^^^^^^^^^^^^^^^^^
+  Did you mean `BasicError::MyConstantWithNoTypo`? Use `-a` to autocorrect
+    test/cli/errors/errors.rb:5: Replace with `BasicError::MyConstantWithNoTypo`
+     .. |    MyConstantWithTypo
+            ^^^^^^^^^^^^^^^^^^
+    test/cli/errors/errors.rb:3: `BasicError::MyConstantWithNoTypo` defined here
+     .. |  MyConstantWithNoTypo = nil
+          ^^^^^^^^^^^^^^^^^^^^
+
+test/cli/errors/errors.rb:15: Expected `T.any(T::Class[T.anything], Exception, String)` but found `Integer` for argument `arg0` https://srb.help/7002
+    .. |    raise arg # raise is defined by stdlib
+                  ^^^
+  Expected `T.any(T::Class[T.anything], Exception, String)` for argument `arg0` of method `Kernel#raise (overload.1)`:
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED:
+      NN |        arg0: T.any(T::Class[T.anything], Exception, String),
+                  ^^^^
+  Got `Integer` originating from:
+    test/cli/errors/errors.rb:13:
+    .. |  def foo(arg)
+                  ^^^
+
+test/cli/errors/errors.rb:19: Expected `Integer` but found `String("foo")` for argument `arg` https://srb.help/7002
+    .. |    foo("foo")
+                ^^^^^
+  Expected `Integer` for argument `arg` of method `ComplexError#foo`:
+    test/cli/errors/errors.rb:12:
+    .. |  sig {params(arg: Integer).returns(NilClass)}
+                      ^^^
+  Got `String("foo")` originating from:
+    test/cli/errors/errors.rb:19:
+    .. |    foo("foo")
+                ^^^^^
+
+test/cli/errors/errors.rb:33: Expected `Integer` but found `T.nilable(Integer)` for argument `a` https://srb.help/7002
+    .. |    bar(a)
+                ^
+  Expected `Integer` for argument `a` of method `ErrorLines#bar`:
+    test/cli/errors/errors.rb:36:
+    .. |  sig {params(a: Integer).returns(Integer)}
+                      ^
+  Got `T.nilable(Integer)` originating from:
+    test/cli/errors/errors.rb:29:
+    .. |          nil
+                  ^^^
+    test/cli/errors/errors.rb:31:
+    .. |          2
+                  ^
+    test/cli/errors/errors.rb:26: Possibly uninitialized (`NilClass`) in:
+    .. |  def main(foo)
+          ^^^^^^^^^^^^^
+  Autocorrect: Use `-a` to autocorrect
+    test/cli/errors/errors.rb:33: Replace with `T.must(a)`
+    .. |    bar(a)
+                ^
+Errors: 4
+test/cli/errors/errors.rb:5: Unable to resolve constant `MyConstantWithTypo` https://srb.help/5002
+     .. |    MyConstantWithTypo
+            ^^^^^^^^^^^^^^^^^^
+  Did you mean `BasicError::MyConstantWithNoTypo`? Use `-a` to autocorrect
+    test/cli/errors/errors.rb:5: Replace with `BasicError::MyConstantWithNoTypo`
+     .. |    MyConstantWithTypo
+            ^^^^^^^^^^^^^^^^^^
+    test/cli/errors/errors.rb:3: `BasicError::MyConstantWithNoTypo` defined here
+     .. |  MyConstantWithNoTypo = nil
+          ^^^^^^^^^^^^^^^^^^^^
+
+test/cli/errors/errors.rb:15: Expected `T.any(T::Class[T.anything], Exception, String)` but found `Integer` for argument `arg0` https://srb.help/7002
+    .. |    raise arg # raise is defined by stdlib
+                  ^^^
+  Expected `T.any(T::Class[T.anything], Exception, String)` for argument `arg0` of method `Kernel#raise (overload.1)`:
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED:
+      NN |        arg0: T.any(T::Class[T.anything], Exception, String),
+                  ^^^^
+  Got `Integer` originating from:
+    test/cli/errors/errors.rb:13:
+    .. |  def foo(arg)
+                  ^^^
+
+test/cli/errors/errors.rb:19: Expected `Integer` but found `String("foo")` for argument `arg` https://srb.help/7002
+    .. |    foo("foo")
+                ^^^^^
+  Expected `Integer` for argument `arg` of method `ComplexError#foo`:
+    test/cli/errors/errors.rb:12:
+    .. |  sig {params(arg: Integer).returns(NilClass)}
+                      ^^^
+  Got `String("foo")` originating from:
+    test/cli/errors/errors.rb:19:
+    .. |    foo("foo")
+                ^^^^^
+
+test/cli/errors/errors.rb:33: Expected `Integer` but found `T.nilable(Integer)` for argument `a` https://srb.help/7002
+    .. |    bar(a)
+                ^
+  Expected `Integer` for argument `a` of method `ErrorLines#bar`:
+    test/cli/errors/errors.rb:36:
+    .. |  sig {params(a: Integer).returns(Integer)}
+                      ^
+  Got `T.nilable(Integer)` originating from:
+    test/cli/errors/errors.rb:29:
+    .. |          nil
+                  ^^^
+    test/cli/errors/errors.rb:31:
+    .. |          2
+                  ^
+    test/cli/errors/errors.rb:26: Possibly uninitialized (`NilClass`) in:
+    .. |  def main(foo)
+          ^^^^^^^^^^^^^
+  Autocorrect: Use `-a` to autocorrect
+    test/cli/errors/errors.rb:33: Replace with `T.must(a)`
+    .. |    bar(a)
+                ^
+Errors: 4
+test/cli/errors/errors.rb:5: Unable to resolve constant `MyConstantWithTypo` https://srb.help/5002
+     .. |    MyConstantWithTypo
+            ^^^^^^^^^^^^^^^^^^
+  Did you mean `BasicError::MyConstantWithNoTypo`? Use `-a` to autocorrect
+    test/cli/errors/errors.rb:5: Replace with `BasicError::MyConstantWithNoTypo`
+     .. |    MyConstantWithTypo
+            ^^^^^^^^^^^^^^^^^^
+    test/cli/errors/errors.rb:3: `BasicError::MyConstantWithNoTypo` defined here
+     .. |  MyConstantWithNoTypo = nil
+          ^^^^^^^^^^^^^^^^^^^^
+
+test/cli/errors/errors.rb:15: Expected `T.any(T::Class[T.anything], Exception, String)` but found `Integer` for argument `arg0` https://srb.help/7002
+    .. |    raise arg # raise is defined by stdlib
+                  ^^^
+  Expected `T.any(T::Class[T.anything], Exception, String)` for argument `arg0` of method `Kernel#raise (overload.1)`:
+    https://github.com/sorbet/sorbet/tree/master/rbi/core/kernel.rbi#LCENSORED:
+      NN |        arg0: T.any(T::Class[T.anything], Exception, String),
+                  ^^^^
+  Got `Integer` originating from:
+    test/cli/errors/errors.rb:13:
+    .. |  def foo(arg)
+                  ^^^
+
+test/cli/errors/errors.rb:19: Expected `Integer` but found `String("foo")` for argument `arg` https://srb.help/7002
+    .. |    foo("foo")
+                ^^^^^
+  Expected `Integer` for argument `arg` of method `ComplexError#foo`:
+    test/cli/errors/errors.rb:12:
+    .. |  sig {params(arg: Integer).returns(NilClass)}
+                      ^^^
+  Got `String("foo")` originating from:
+    test/cli/errors/errors.rb:19:
+    .. |    foo("foo")
+                ^^^^^
+
+test/cli/errors/errors.rb:33: Expected `Integer` but found `T.nilable(Integer)` for argument `a` https://srb.help/7002
+    .. |    bar(a)
+                ^
+  Expected `Integer` for argument `a` of method `ErrorLines#bar`:
+    test/cli/errors/errors.rb:36:
+    .. |  sig {params(a: Integer).returns(Integer)}
+                      ^
+  Got `T.nilable(Integer)` originating from:
+    test/cli/errors/errors.rb:29:
+    .. |          nil
+                  ^^^
+    test/cli/errors/errors.rb:31:
+    .. |          2
+                  ^
+    test/cli/errors/errors.rb:26: Possibly uninitialized (`NilClass`) in:
+    .. |  def main(foo)
+          ^^^^^^^^^^^^^
+  Autocorrect: Use `-a` to autocorrect
+    test/cli/errors/errors.rb:33: Replace with `T.must(a)`
+    .. |    bar(a)
+                ^
+Errors: 4

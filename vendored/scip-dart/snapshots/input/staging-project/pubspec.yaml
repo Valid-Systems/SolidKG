@@ -1,0 +1,10 @@
+name: dart_test
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=2.19.0 <3.0.0'
+
+
+dependencies:
+  pubspec_lock_parse: ^2.0.2

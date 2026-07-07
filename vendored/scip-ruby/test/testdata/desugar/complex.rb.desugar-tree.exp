@@ -1,0 +1,71 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C MyBasicClass><<C <todo sym>>> < (<emptyTree>::<C BasicObject>)
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <self>.sig() do ||
+      <self>.params(:x, <emptyTree>::<C Complex>).void()
+    end
+
+    def foo<<todo method>>(x, &<blk>)
+      <emptyTree>::<C Kernel>.puts(x)
+    end
+
+    <self>.sig() do ||
+      <self>.returns(<emptyTree>::<C Complex>)
+    end
+
+    def bar<<todo method>>(&<blk>)
+      ::Kernel.Complex(0, "11")
+    end
+
+    <self>.sig() do ||
+      <self>.void()
+    end
+
+    def baz<<todo method>>(&<blk>)
+      <emptyTree>::<C Kernel>.puts(::Kernel.Complex(0, "2"))
+    end
+  end
+
+  class <emptyTree>::<C MyKernelClass><<C <todo sym>>> < (::<todo sym>)
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <self>.sig() do ||
+      <self>.params(:x, <emptyTree>::<C Complex>).void()
+    end
+
+    def foo<<todo method>>(x, &<blk>)
+      <self>.puts(x)
+    end
+  end
+
+  bc = <emptyTree>::<C MyBasicClass>.new()
+
+  bc.foo(::Kernel.Complex(0, "1"))
+
+  bc.foo(::Kernel.Complex(0, "1").-@())
+
+  bc.foo(<self>.Complex(0, 1))
+
+  bc.foo(<self>.Complex(0, 1).-@())
+
+  bc.foo(<self>.Complex(0, -1))
+
+  bc.foo(-1)
+
+  <emptyTree>::<C MyBasicClass>.new().bar()
+
+  kc = <emptyTree>::<C MyKernelClass>.new()
+
+  kc.foo(::Kernel.Complex(0, "1"))
+
+  kc.foo(::Kernel.Complex(0, "1").-@())
+
+  kc.foo(<self>.Complex(0, 1))
+
+  kc.foo(<self>.Complex(0, 1).-@())
+
+  kc.foo(<self>.Complex(0, -1))
+
+  kc.foo(-1)
+end

@@ -1,0 +1,7 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  ::<Magic>.defined?("Foo", "Bar")
+
+  ::<Magic>.defined?()
+
+  ::<Magic>.defined?()
+end

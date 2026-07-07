@@ -1,0 +1,16 @@
+# typed: true
+# assert-fast-path: method_change_argument_kind.rb
+
+class A extend T::Sig
+  sig {params(x: Integer).returns(String)}
+  def bar(x:)
+    x.to_s
+  end
+end
+
+A.new.bar
+#        ^ error: Missing required keyword argument `x` for method `A#bar`
+A.new.bar(0)
+#         ^ error: Missing required keyword argument `x` for method `A#bar`
+#         ^ error: Too many positional arguments provided for method `A#bar`. Expected: `0`, got: `1`
+A.new.bar(x: 0)

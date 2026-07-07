@@ -1,0 +1,120 @@
+{
+  "schemaName": "solidkg.llm-answer-quality.calibration-fixtures.v1",
+  "cases": [
+    {
+      "id": "solidkg_harness_manual_alignment",
+      "scenario": {
+        "rubric": {
+          "mustMention": [
+            "executeLiveBenchmark",
+            "parseOpenCodeTranscriptText",
+            "scoreResults"
+          ],
+          "expectedEvidence": [
+            {
+              "id": "ev1",
+              "file": "scripts/agent-eval/opencode-answer-benchmark.mjs",
+              "symbolHint": "executeLiveBenchmark",
+              "claim": "runs OpenCode, writes run artifacts, parses transcripts, and appends run rows"
+            },
+            {
+              "id": "ev2",
+              "file": "scripts/agent-eval/parse-opencode-transcript.mjs",
+              "symbolHint": "parseOpenCodeTranscriptText",
+              "claim": "normalizes OpenCode JSONL into final answers, tool calls, and metrics"
+            },
+            {
+              "id": "ev3",
+              "file": "scripts/agent-eval/score-answer-quality.mjs",
+              "symbolHint": "scoreResults",
+              "claim": "converts parsed run rows into deterministic quality scores"
+            }
+          ],
+          "forbiddenClaims": [],
+          "minEvidenceAnchors": 2
+        }
+      },
+      "runs": [
+        {
+          "id": "solidkg",
+          "expectedBand": [
+            75,
+            82
+          ],
+          "run": {
+            "status": "pass",
+            "answer": "executeLiveBenchmark in opencode-answer-benchmark.mjs runs OpenCode, writes run artifacts, parses transcripts, and appends run rows. parseOpenCodeTranscriptText in parse-opencode-transcript.mjs normalizes OpenCode JSONL into final answers, tool calls, and metrics. scoreResults in score-answer-quality.mjs converts parsed run rows into deterministic quality scores.",
+            "solidkgToolCalls": 34,
+            "toolCalls": [
+              {
+                "tool": "solidkg_solidkg_context"
+              }
+            ]
+          }
+        },
+        {
+          "id": "cartog",
+          "expectedBand": [
+            74,
+            80
+          ],
+          "run": {
+            "status": "pass",
+            "answer": "opencode-answer-benchmark.mjs runs OpenCode, writes run artifacts, parses transcripts, and appends run rows. parse-opencode-transcript.mjs normalizes OpenCode JSONL into final answers, tool calls, and metrics. score-answer-quality.mjs converts parsed run rows into deterministic quality scores.",
+            "readCount": 9,
+            "grepCount": 1,
+            "toolCalls": [
+              {
+                "tool": "cartog_wrapper"
+              },
+              {
+                "tool": "read"
+              }
+            ]
+          }
+        },
+        {
+          "id": "grep_read",
+          "expectedBand": [
+            68,
+            75
+          ],
+          "run": {
+            "status": "pass",
+            "answer": "opencode-answer-benchmark.mjs runs OpenCode, writes run artifacts, parses transcripts, and appends run rows. parse-opencode-transcript.mjs normalizes OpenCode JSONL into final answers, tool calls, and metrics. score-answer-quality.mjs converts parsed run rows into deterministic quality scores.",
+            "readCount": 15,
+            "grepCount": 6,
+            "toolCalls": [
+              {
+                "tool": "read"
+              },
+              {
+                "tool": "bash",
+                "input": {
+                  "command": "rg score scripts/agent-eval"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expectedComparisons": [
+        [
+          "solidkg",
+          ">",
+          "grep_read"
+        ],
+        [
+          "cartog",
+          ">",
+          "grep_read"
+        ],
+        [
+          "solidkg",
+          ">=",
+          "cartog"
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+nested/nested.rb:5: File belongs to package `Root::Nested` but defines a constant that does not match this namespace https://srb.help/3713
+     5 |module Wrong
+               ^^^^^
+    nested/__package.rb:3: Enclosing package declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.rb:40: This file must only define behavior in enclosing package `Root::Nested` https://srb.help/3713
+    40 |  sig {returns(NilClass)}
+          ^^^^^^^^^^^^^^^^^^^^^^^
+    nested/nested.rb:36: Defining behavior in `Root` instead:
+    36 |module Root
+               ^^^^
+    nested/__package.rb:3: Enclosing package `Root::Nested` declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Package `Root` declared here
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.rb:41: This file must only define behavior in enclosing package `Root::Nested` https://srb.help/3713
+    41 |  def self.method
+          ^^^^^^^^^^^^^^^
+    nested/nested.rb:36: Defining behavior in `Root` instead:
+    36 |module Root
+               ^^^^
+    nested/__package.rb:3: Enclosing package `Root::Nested` declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Package `Root` declared here
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.rb:37: This file must only define behavior in enclosing package `Root::Nested` https://srb.help/3713
+    37 |  extend T::Sig
+          ^^^^^^^^^^^^^
+    nested/nested.rb:36: Defining behavior in `Root` instead:
+    36 |module Root
+               ^^^^
+    nested/__package.rb:3: Enclosing package `Root::Nested` declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Package `Root` declared here
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.rb:38: File belongs to package `Root::Nested` but defines a constant that does not match this namespace https://srb.help/3713
+    38 |  NOT_IN_PACKAGE = T.let(1, Integer)
+          ^^^^^^^^^^^^^^
+    nested/__package.rb:3: Enclosing package declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Must belong to this package, given constant name `Root::NOT_IN_PACKAGE`
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.rb:54: File belongs to package `Root::Nested` but defines a constant that does not match this namespace https://srb.help/3713
+    54 |module Root::ModNotInPackage
+               ^^^^^^^^^^^^^^^^^^^^^
+    nested/__package.rb:3: Enclosing package declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Must belong to this package, given constant name `Root::ModNotInPackage`
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.rb:57: File belongs to package `Root::Nested` but defines a constant that does not match this namespace https://srb.help/3713
+    57 |class Root::ClassNotInPackage
+              ^^^^^^^^^^^^^^^^^^^^^^^
+    nested/__package.rb:3: Enclosing package declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Must belong to this package, given constant name `Root::ClassNotInPackage`
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.test.rb:9: Tests in the `Root::Nested` package must define tests in the `Test::Root::Nested` namespace https://srb.help/3713
+     9 |  NOT_IN_MODULE = nil
+          ^^^^^^^^^^^^^
+    nested/__package.rb:3: Enclosing package declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Must belong to this package, given constant name `Test::Root::NOT_IN_MODULE`
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+
+nested/nested.test.rb:16: Tests in the `Root::Nested` package must define tests in the `Test::Root::Nested` namespace https://srb.help/3713
+    16 |module Root::Nested::ShouldBeInTestPrefix
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    nested/__package.rb:3: Enclosing package declared here
+     3 |class Root::Nested < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+critic_prefix/real.test.rb:3: Tests in the `Critic::SomePkg` package must define tests in the `Test::Critic::SomePkg` namespace https://srb.help/3713
+     3 |module Critic::SomePkg::Real
+               ^^^^^^^^^^^^^^^^^^^^^
+    critic_prefix/__package.rb:3: Enclosing package declared here
+     3 |class Critic::SomePkg < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+critic_prefix/real.test.rb:7: Tests in the `Critic::SomePkg` package must define tests in the `Test::Critic::SomePkg` namespace https://srb.help/3713
+     7 |Critic::SomePkg::RealConst = 2
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    critic_prefix/__package.rb:3: Enclosing package declared here
+     3 |class Critic::SomePkg < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+critic_prefix/real.test.rb:13: Tests in the `Critic::SomePkg` package must define tests in the `Test::Critic::SomePkg` namespace https://srb.help/3713
+    13 |SomeOtherNamespace::SomePkg::SomeConst = 4
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    critic_prefix/__package.rb:3: Enclosing package declared here
+     3 |class Critic::SomePkg < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+commands/foo_command.rb:4: File belongs to package `Root::Commands::Foo` but defines a constant that does not match this namespace https://srb.help/3713
+     4 |  class Baz::Ban; end
+                ^^^^^^^^
+    commands/__package.rb:3: Enclosing package declared here
+     3 |class Root::Commands::Foo < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    __package.rb:3: Must belong to this package, given constant name `Root::Commands::Baz::Ban`
+     3 |class Root < PackageSpec
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+Errors: 13

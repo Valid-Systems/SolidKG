@@ -1,0 +1,18 @@
+If {
+  condition = And {
+    left = Send {
+      receiver = NULL
+      method = <U a>
+      args = [
+      ]
+    }
+    right = Send {
+      receiver = NULL
+      method = <U a>
+      args = [
+      ]
+    }
+  }
+  then_ = NULL
+  else_ = NULL
+}

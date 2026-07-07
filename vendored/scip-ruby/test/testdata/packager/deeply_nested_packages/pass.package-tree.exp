@@ -1,0 +1,55 @@
+# -- test/testdata/packager/deeply_nested_packages/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C Package><<C <todo sym>>> < (::PackageSpec)
+    <self>.import(::<PackageSpecRegistry>::<C Package>::<C Subpackage>)
+
+    <self>.export(::<root>::<C Package>::<C PackageClass>)
+
+    <self>.export(::<root>::<C Package>::<C InnerClass>)
+  end
+end
+# -- test/testdata/packager/deeply_nested_packages/subdirectory/subpackage/__package.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class ::<PackageSpecRegistry>::<C Package>::<C Subpackage><<C <todo sym>>> < (::PackageSpec)
+    <self>.import(::<PackageSpecRegistry>::<C Package>)
+
+    <self>.export(::<root>::<C Package>::<C Subpackage>::<C SubpackageClass>)
+  end
+end
+# -- test/testdata/packager/deeply_nested_packages/mainpackage.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C Package>::<C PackageClass><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C Package>::<C Subpackage>::<C SubpackageClass>)
+    end
+
+    def self.subpkg_class<<todo method>>(&<blk>)
+      <emptyTree>::<C Package>::<C Subpackage>::<C SubpackageClass>.new()
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of self.subpkg_class>
+  end
+end
+# -- test/testdata/packager/deeply_nested_packages/subdirectory/inner_class.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C Package>::<C InnerClass><<C <todo sym>>> < (::<todo sym>)
+  end
+end
+# -- test/testdata/packager/deeply_nested_packages/subdirectory/subpackage/subpackage.rb --
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C Package>::<C Subpackage>::<C SubpackageClass><<C <todo sym>>> < (::<todo sym>)
+    ::Sorbet::Private::Static.sig(<self>) do ||
+      <self>.returns(<emptyTree>::<C Package>::<C PackageClass>)
+    end
+
+    def self.package_class<<todo method>>(&<blk>)
+      return <emptyTree>::<C Package>::<C PackageClass>.new()
+    end
+
+    <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+    <runtime method definition of self.package_class>
+  end
+end

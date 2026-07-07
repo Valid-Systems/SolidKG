@@ -1,0 +1,690 @@
+Begin {
+  stmts = [
+    Alias {
+      from = Symbol {
+        val = <U afoo>
+      }
+      to = Symbol {
+        val = <U bar>
+      }
+    }
+    Assign {
+      lhs = IVarLhs {
+        name = <U @iv>
+      }
+      rhs = Integer {
+        val = "1"
+      }
+    }
+    Assign {
+      lhs = CVarLhs {
+        name = <U @@cv>
+      }
+      rhs = Integer {
+        val = "1"
+      }
+    }
+    Assign {
+      lhs = GVarLhs {
+        name = <U $gv>
+      }
+      rhs = Integer {
+        val = "1"
+      }
+    }
+    Masgn {
+      lhs = Mlhs {
+        exprs = [
+          Send {
+            receiver = Send {
+              receiver = NULL
+              method = <U x>
+              args = [
+              ]
+            }
+            method = <U var=>
+            args = [
+            ]
+          }
+          LVarLhs {
+            name = <U y>
+          }
+        ]
+      }
+      rhs = Array {
+        elts = [
+          Nil {
+          }
+          Nil {
+          }
+        ]
+      }
+    }
+    Masgn {
+      lhs = Mlhs {
+        exprs = [
+          LVarLhs {
+            name = <U baaaar>
+          }
+          LVarLhs {
+            name = <U naaar>
+          }
+        ]
+      }
+      rhs = Send {
+        receiver = NULL
+        method = <U zaaaz>
+        args = [
+        ]
+      }
+    }
+    Assign {
+      lhs = LVarLhs {
+        name = <U xaaaaz>
+      }
+      rhs = Array {
+        elts = [
+          Send {
+            receiver = NULL
+            method = <U yayayaya>
+            args = [
+            ]
+          }
+          Send {
+            receiver = NULL
+            method = <U tutututu>
+            args = [
+            ]
+          }
+        ]
+      }
+    }
+    Kwbegin {
+      stmts = [
+      ]
+    }
+    Kwbegin {
+      stmts = [
+        Nil {
+        }
+      ]
+    }
+    Kwbegin {
+      stmts = [
+        Send {
+          receiver = NULL
+          method = <U a>
+          args = [
+          ]
+        }
+        Send {
+          receiver = NULL
+          method = <U b>
+          args = [
+          ]
+        }
+      ]
+    }
+    DefMethod {
+      name = <U bfoo>
+      args = Args {
+        args = [
+          Blockarg {
+            name = <U x>
+          }
+        ]
+      }
+      body = NULL
+    }
+    Block {
+      send = Send {
+        receiver = NULL
+        method = <U lambda>
+        args = [
+        ]
+      }
+      args = NULL
+      body = NULL
+    }
+    Case {
+      condition = Send {
+        receiver = NULL
+        method = <U x>
+        args = [
+        ]
+      }
+      whens = [
+        When {
+          patterns = [
+            LVar {
+              name = <U y>
+            }
+          ]
+          body = Integer {
+            val = "1"
+          }
+        }
+      ]
+      else_ = Send {
+        receiver = NULL
+        method = <U z>
+        args = [
+        ]
+      }
+    }
+    String {
+      val = <U x>
+    }
+    Send {
+      receiver = Integer {
+        val = "1"
+      }
+      method = <U +>
+      args = [
+        Complex {
+          value = "4"
+        }
+      ]
+    }
+    Float {
+      val = "0.5"
+    }
+    Complex {
+      value = "1.5"
+    }
+    DefS {
+      singleton = Self {
+      }
+      name = <U classmeth>
+      args = NULL
+      body = NULL
+    }
+    SClass {
+      expr = Self {
+      }
+      body = NULL
+    }
+    Or {
+      left = True {
+      }
+      right = False {
+      }
+    }
+    For {
+      vars = LVarLhs {
+        name = <U x>
+      }
+      expr = Send {
+        receiver = NULL
+        method = <U arr>
+        args = [
+        ]
+      }
+      body = NULL
+    }
+    While {
+      cond = Send {
+        receiver = Integer {
+          val = "0"
+        }
+        method = <U !=>
+        args = [
+          Integer {
+            val = "1"
+          }
+        ]
+      }
+      body = NULL
+    }
+    Send {
+      receiver = LVar {
+        name = <U x>
+      }
+      method = <U []=>
+      args = [
+        Integer {
+          val = "1"
+        }
+        Integer {
+          val = "0"
+        }
+      ]
+    }
+    Break {
+      exprs = [
+      ]
+    }
+    Break {
+      exprs = [
+        Integer {
+          val = "1"
+        }
+      ]
+    }
+    Break {
+      exprs = [
+        Integer {
+          val = "1"
+        }
+        Integer {
+          val = "2"
+        }
+      ]
+    }
+    Next {
+      exprs = [
+      ]
+    }
+    Next {
+      exprs = [
+        Integer {
+          val = "1"
+        }
+      ]
+    }
+    Next {
+      exprs = [
+        Integer {
+          val = "1"
+        }
+        Integer {
+          val = "2"
+        }
+      ]
+    }
+    Defined {
+      value = Const {
+        scope = NULL
+        name = <C <U X>>
+      }
+    }
+    ZSuper {
+    }
+    DefMethod {
+      name = <U kwfoo>
+      args = Args {
+        args = [
+          Kwarg {
+            name = <U x>
+          }
+          Kwoptarg {
+            name = <U y>
+            default_ = Integer {
+              val = "1"
+            }
+          }
+          Kwrestarg {
+            name = <U z>
+          }
+        ]
+      }
+      body = NULL
+    }
+    Hash {
+      kwargs = false
+      pairs = [
+        Kwsplat {
+          expr = LVar {
+            name = <U x>
+          }
+        }
+      ]
+    }
+    LineLiteral {
+    }
+    While {
+      cond = True {
+      }
+      body = Nil {
+      }
+    }
+    While {
+      cond = True {
+      }
+      body = Nil {
+      }
+    }
+    Until {
+      cond = True {
+      }
+      body = Nil {
+      }
+    }
+    Until {
+      cond = True {
+      }
+      body = Nil {
+      }
+    }
+    WhilePost {
+      cond = False {
+      }
+      body = Kwbegin {
+        stmts = [
+          Send {
+            receiver = NULL
+            method = <U puts>
+            args = [
+              Integer {
+                val = "1"
+              }
+            ]
+          }
+        ]
+      }
+    }
+    UntilPost {
+      cond = True {
+      }
+      body = Kwbegin {
+        stmts = [
+          Send {
+            receiver = NULL
+            method = <U puts>
+            args = [
+              Integer {
+                val = "1"
+              }
+            ]
+          }
+        ]
+      }
+    }
+    Masgn {
+      lhs = Mlhs {
+        exprs = [
+          LVarLhs {
+            name = <U a>
+          }
+          Mlhs {
+            exprs = [
+              LVarLhs {
+                name = <U x>
+              }
+            ]
+          }
+        ]
+      }
+      rhs = Integer {
+        val = "1"
+      }
+    }
+    NthRef {
+      ref = 4
+    }
+    DefMethod {
+      name = <U optfoo>
+      args = Args {
+        args = [
+          Optarg {
+            name = <U x>
+            default_ = Integer {
+              val = "1"
+            }
+          }
+          Restarg {
+            name = <U y>
+          }
+        ]
+      }
+      body = NULL
+    }
+    Hash {
+      kwargs = false
+      pairs = [
+        Pair {
+          key = LVar {
+            name = <U x>
+          }
+          value = LVar {
+            name = <U y>
+          }
+        }
+        Pair {
+          key = Symbol {
+            val = <U foo>
+          }
+          value = Integer {
+            val = "1"
+          }
+        }
+      ]
+    }
+    Preexe {
+      body = Send {
+        receiver = NULL
+        method = <U foo>
+        args = [
+        ]
+      }
+    }
+    Postexe {
+      body = Send {
+        receiver = NULL
+        method = <U bar>
+        args = [
+        ]
+      }
+    }
+    Rational {
+      val = "4"
+    }
+    Complex {
+      value = "5"
+    }
+    Kwbegin {
+      stmts = [
+        Rescue {
+          body = NULL
+          rescue = [
+            Resbody {
+              exception = Array {
+                elts = [
+                  Const {
+                    scope = NULL
+                    name = <C <U E>>
+                  }
+                ]
+              }
+              var = LVarLhs {
+                name = <U x>
+              }
+              body = Nil {
+              }
+            }
+          ]
+          else_ = NULL
+        }
+      ]
+    }
+    Masgn {
+      lhs = Mlhs {
+        exprs = [
+          SplatLhs {
+            var = LVarLhs {
+              name = <U x>
+            }
+          }
+        ]
+      }
+      rhs = Array {
+        elts = [
+          Splat {
+            var = LVar {
+              name = <U y>
+            }
+          }
+        ]
+      }
+    }
+    DSymbol {
+      nodes = [
+        String {
+          val = <U foo>
+        }
+        Begin {
+          stmts = [
+            Send {
+              receiver = NULL
+              method = <U bar>
+              args = [
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    Array {
+      elts = [
+        Symbol {
+          val = <U sym>
+        }
+      ]
+    }
+    If {
+      condition = LVar {
+        name = <U x>
+      }
+      then_ = Integer {
+        val = "1"
+      }
+      else_ = Integer {
+        val = "7"
+      }
+    }
+    Undef {
+      exprs = [
+        Symbol {
+          val = <U x>
+        }
+        Symbol {
+          val = <U y>
+        }
+      ]
+    }
+    Array {
+      elts = [
+        String {
+          val = <U a>
+        }
+        String {
+          val = <U b>
+        }
+      ]
+    }
+    Array {
+      elts = [
+        String {
+          val = <U a>
+        }
+        String {
+          val = <U b>
+        }
+      ]
+    }
+    XString {
+      nodes = [
+        String {
+          val = <U true>
+        }
+      ]
+    }
+    Block {
+      send = Send {
+        receiver = NULL
+        method = <U proc>
+        args = [
+        ]
+      }
+      args = Args {
+        args = [
+          Shadowarg {
+            name = <U x>
+          }
+        ]
+      }
+      body = NULL
+    }
+    Break {
+      exprs = [
+        Block {
+          send = Send {
+            receiver = NULL
+            method = <U cfoo>
+            args = [
+              Integer {
+                val = "1"
+              }
+            ]
+          }
+          args = NULL
+          body = NULL
+        }
+      ]
+    }
+    DefMethod {
+      name = <U sfoo>
+      args = Args {
+        args = [
+          Restarg {
+            name = <P <U *> $2>
+          }
+        ]
+      }
+      body = NULL
+    }
+    DefMethod {
+      name = <U ssfoo>
+      args = Args {
+        args = [
+          Kwrestarg {
+            name = <P <U **> $3>
+          }
+        ]
+      }
+      body = NULL
+    }
+    Module {
+      name = Const {
+        scope = NULL
+        name = <C <U Foo>>
+      }
+      body = DefMethod {
+        name = <U foo>
+        args = NULL
+        body = Block {
+          send = Send {
+            receiver = Const {
+              scope = NULL
+              name = <C <U Kernel>>
+            }
+            method = <U lambda>
+            args = [
+            ]
+          }
+          args = Args {
+            args = [
+              Arg {
+                name = <U a>
+              }
+              Arg {
+                name = <U b>
+              }
+            ]
+          }
+          body = Send {
+            receiver = LVar {
+              name = <U a>
+            }
+            method = <U +>
+            args = [
+              LVar {
+                name = <U b>
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

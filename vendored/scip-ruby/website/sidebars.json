@@ -1,0 +1,90 @@
+{
+  "core": {
+    "Getting Started": [
+      "overview",
+      "adopting",
+      "metrics",
+      "quickref",
+      "vscode",
+      "from-typescript"
+    ],
+    "Static & Runtime": [
+      "gradual",
+      "static",
+      "runtime",
+      "rbi",
+      "cli",
+      "tconfiguration"
+    ],
+    "Troubleshooting": [
+      "troubleshooting",
+      "why-type-annotations",
+      "faq",
+      "error-reference",
+      "unsupported"
+    ],
+    "Type System": [
+      "sigs",
+      "type-annotations",
+      "type-assertions",
+      "class-types",
+      "stdlib-generics",
+      "nilable-types",
+      "union-types",
+      "flow-sensitive",
+      "type-aliases",
+      "exhaustiveness",
+      "tstruct",
+      "tenum",
+      "untyped",
+      "procs",
+      "abstract",
+      "final",
+      "override-checking",
+      "sealed",
+      "class-of",
+      "self-type",
+      "noreturn",
+      "anything",
+      "attached-class",
+      "intersection-types",
+      "generics",
+      "non-forcing-constants",
+      "strong"
+    ],
+    "Editor Features": [
+      "lsp",
+      "server-status",
+      "lsp-typed-level",
+      "go-to-def",
+      "autocompletion",
+      "code-actions",
+      "outline",
+      "sig-suggestion",
+      "highlight-untyped",
+      "sorbet-uris"
+    ],
+    "Experimental Features": [
+      "tuples",
+      "shapes",
+      "overloads",
+      "requires-ancestor"
+    ]
+  },
+  "talks": {
+    "Talks": [
+      "talks/ruby-kaigi-2018",
+      "talks/strange-loop-2018",
+      "talks/ruby-kaigi-2019",
+      "talks/curry-on-2019",
+      "talks/jvm-ls-2019",
+      "talks/ruby-conf-2019",
+      "talks/ruby-conf-2021"
+    ]
+  },
+  "legal": {
+    "Legal": [
+      "legal/trademark-policy"
+    ]
+  }
+}

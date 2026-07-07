@@ -1,0 +1,99 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C A><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>
+  end
+
+  <emptyTree>
+
+  class <emptyTree>::<C B><<C <todo sym>>> < (::<todo sym>)
+    class <singleton class><<C <todo sym>>> < ()
+      def b<<todo method>>(&<blk>)
+        "b"
+      end
+    end
+  end
+
+  $c = <emptyTree>::<C Object>.new()
+
+  <emptyTree>
+
+  class <emptyTree>::<C D><<C <todo sym>>> < (::<todo sym>)
+    class <singleton class><<C <todo sym>>> < ()
+      class <singleton class><<C <todo sym>>> < ()
+        def d<<todo method>>(&<blk>)
+          "d"
+        end
+      end
+    end
+  end
+
+  class <emptyTree>::<C E><<C <todo sym>>> < (::<todo sym>)
+    class <singleton class><<C <todo sym>>> < ()
+      def wrapper<<todo method>>(&<blk>)
+        def e<<todo method>>(&<blk>)
+          "e"
+        end
+      end
+    end
+
+    <self>.wrapper()
+  end
+
+  class <emptyTree>::<C F><<C <todo sym>>> < (::<todo sym>)
+    class <singleton class><<C <todo sym>>> < ()
+      def initialize<<todo method>>(&<blk>)
+        @f = <emptyTree>::<C T>.let(0, <emptyTree>::<C Integer>)
+      end
+
+      <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+      <self>.sig() do ||
+        <self>.params(:f, <emptyTree>::<C Integer>).returns(<emptyTree>::<C Integer>)
+      end
+
+      <self>.attr_writer(:f)
+    end
+  end
+
+  class <emptyTree>::<C G><<C <todo sym>>> < (::<todo sym>)
+    def wrapper<<todo method>>(&<blk>)
+      begin
+        class <singleton class><<C <todo sym>>> < ()
+          def inner<<todo method>>(&<blk>)
+            <emptyTree>::<C T>.reveal_type(<self>)
+          end
+        end
+        <self>.inner()
+      end
+    end
+
+    def self.g<<todo method>>(&<blk>)
+      "g"
+    end
+  end
+
+  class <emptyTree>::<C H><<C <todo sym>>> < (::<todo sym>)
+    class <singleton class><<C <todo sym>>> < ()
+      class <emptyTree>::<C H2><<C <todo sym>>> < (::<todo sym>)
+        def self.h<<todo method>>(&<blk>)
+          "h"
+        end
+      end
+    end
+  end
+
+  def main<<todo method>>(&<blk>)
+    begin
+      <self>.puts(<emptyTree>::<C A>.a())
+      <self>.puts(<emptyTree>::<C B>.b())
+      <self>.puts($c.c())
+      <self>.puts(<emptyTree>::<C D>.singleton_class().d())
+      <self>.puts(<emptyTree>::<C E>.e())
+      <self>.puts(<emptyTree>::<C F>.f=(91))
+      <self>.puts(<emptyTree>::<C G>.new().wrapper())
+      <self>.puts(<emptyTree>::<C H>.singleton_class()::<C H2>.h())
+    end
+  end
+
+  <self>.main()
+end

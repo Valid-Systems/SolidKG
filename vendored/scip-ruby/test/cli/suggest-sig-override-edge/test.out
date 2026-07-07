@@ -1,0 +1,106 @@
+# typed: strict
+
+# initialize can be overridden without overridable/override
+class ParentInitialize
+  extend T::Sig
+  sig {void}
+  def initialize; end
+end
+class ChildInitialize < ParentInitialize
+  sig { void }
+  def initialize; end
+end
+
+# Weird edge cases in string parsing for adding 'overridable.'
+class ParentIsAbstract
+  # Every sig here should have `generated.overridable.` added to it.
+  extend T::Sig
+  extend T::Helpers
+
+  abstract!
+
+  sig {abstract.void}
+  def just_void; end
+
+  sig {abstract.returns(NilClass)}
+  def just_returns; end
+
+  sig {abstract.params(x: Integer).void}
+  def x_to_void(x); end
+
+  sig {abstract.params(x: Integer).returns(NilClass)}
+  def x_to_returns(x); end
+
+  sig do
+    abstract
+    .params(x: Integer)
+    .void
+  end
+  def multiline_x_to_void(x); end
+
+  sig do
+    abstract
+    .params(x: Integer)
+    .returns(NilClass)
+  end
+  def multiline_x_to_returns(x); end
+end
+class ChildNeedsOverride < ParentIsAbstract
+  sig { override.void }
+  def just_void; end
+
+  sig { override.returns(NilClass) }
+  def just_returns; end
+
+  sig { override.params(x: Integer).void }
+  def x_to_void(x); end
+
+  sig { override.params(x: Integer).returns(NilClass) }
+  def x_to_returns(x); end
+
+  sig { override.params(x: Integer).void }
+  def multiline_x_to_void(x); end
+
+  sig { override.params(x: Integer).returns(NilClass) }
+  def multiline_x_to_returns(x); end
+end
+
+# Doesn't need overridable because parent doesn't have a sig
+class DoesntNeedOverridable
+  extend T::Sig
+  # random words to trip up our hacky text search:
+  # void return sig params generated
+  sig { returns(NilClass) }
+  def nope; end
+end
+
+class ChildOfDoesntNeedOverridable < DoesntNeedOverridable
+  extend T::Sig
+  sig { returns(NilClass) }
+  def nope; end
+end
+
+
+# Doesn't need generated because parent already has overridable
+class DoesntNeedGenerated
+  extend T::Sig
+  sig {override.overridable.void}
+  def already_overridable; end
+end
+
+class ChildOfDoesntNeedGenerated < DoesntNeedGenerated
+  extend T::Sig
+  sig { override.void }
+  def already_overridable; end
+end
+
+class DSLParent
+  # avoid sigging this
+  dsl_optional :opt_string, String
+end
+
+class DSLChild < DSLParent
+  extend T::Sig
+  sig { returns(T.nilable(String)) }
+  def opt_string; end
+end

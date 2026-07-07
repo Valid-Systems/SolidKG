@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"filePath":"README.md"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"partial answer"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Grep","input":

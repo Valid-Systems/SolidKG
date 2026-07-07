@@ -1,0 +1,42 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  def testit<<todo method>>(&<blk>)
+    begin
+      s = <emptyTree>::<C SomeClass>.new()
+      wrap = <emptyTree>::<C Interface>.wrap_instance(s)
+      <emptyTree>::<C T>.reveal_type(wrap)
+      wrap.other_method()
+      wrap.some_method()
+      <emptyTree>::<C Other>.wrap_instance("hi", "there")
+      o = <emptyTree>::<C Other>
+      o.wrap_instance("hi")
+    end
+  end
+
+  module <emptyTree>::<C Interface><<C <todo sym>>> < ()
+    def some_method<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <runtime method definition of some_method>
+  end
+
+  class <emptyTree>::<C SomeClass><<C <todo sym>>> < (::<todo sym>)
+    def other_method<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    <self>.include(<emptyTree>::<C Interface>)
+
+    <runtime method definition of other_method>
+  end
+
+  class <emptyTree>::<C Other><<C <todo sym>>> < (::<todo sym>)
+    def self.wrap_instance<<todo method>>(x, y = nil, &<blk>)
+      <emptyTree>
+    end
+
+    <runtime method definition of self.wrap_instance>
+  end
+
+  <runtime method definition of testit>
+end

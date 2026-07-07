@@ -1,0 +1,64 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      ::Main.new().main()
+    end
+  end
+  class ::Main<<C Main>> < (::<todo sym>)
+    def yielder(<blk>)
+      begin
+        a = <blk>.call(1)
+        <blk>.call(a)
+      end
+    end
+
+    def blockpass(blk)
+      begin
+        a = blk.call(1)
+        blk.call(a)
+      end
+    end
+
+    def mixed(blk)
+      begin
+        a = blk.call(1)
+        blk.call(a)
+      end
+    end
+
+    def blockyield(<blk>)
+      <self>.yielder() do |i$1|
+        <blk>.call(i$1)
+      end
+    end
+
+    def main(<blk>)
+      begin
+        l = <self>.lambda() do |x$1|
+          begin
+            <self>.puts(x$1)
+            3
+          end
+        end
+        ::<Magic>.<call-with-block>(<self>, :yielder, l)
+        ::<Magic>.<call-with-block>(<self>, :blockpass, l)
+        ::<Magic>.<call-with-block>(<self>, :mixed, l)
+        ::<Magic>.<call-with-block>(<self>, :blockyield, l)
+      end
+    end
+
+    def self.<static-init>(<blk>)
+      begin
+        <runtime method definition of yielder>
+        <runtime method definition of blockpass>
+        <runtime method definition of mixed>
+        <runtime method definition of blockyield>
+        <runtime method definition of main>
+        <emptyTree>
+      end
+    end
+  end
+  <emptyTree>
+end

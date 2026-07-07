@@ -1,0 +1,36 @@
+suggest-t-let.rb:5: Changing the type of a variable in a loop is not permitted https://srb.help/7001
+     5 |  x = true
+              ^^^^
+  Existing variable has type: `FalseClass`
+  Attempting to change type to: `TrueClass`
+
+  Autocorrect: Done
+    suggest-t-let.rb:3: Replaced with `T.let(false, T::Boolean)`
+     3 |x = false
+            ^^^^^
+
+suggest-t-let.rb:10: Changing the type of a variable in a loop is not permitted https://srb.help/7001
+    10 |  y = ''
+              ^^
+  Existing variable has type: `NilClass`
+  Attempting to change type to: `String("")`
+
+  Autocorrect: Done
+    suggest-t-let.rb:8: Replaced with `T.let(nil, T.nilable(String))`
+     8 |y = nil
+            ^^^
+Errors: 2
+
+--------------------------------------------------------------------------
+
+# typed: strict
+
+x = T.let(false, T::Boolean)
+[].each do
+  x = true
+end
+
+y = T.let(nil, T.nilable(String))
+[].each do
+  y = ''
+end

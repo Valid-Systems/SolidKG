@@ -1,0 +1,660 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  <self>.require_relative("../../t")
+
+  module <emptyTree>::<C Foo><<C <todo sym>>> < ()
+    class <emptyTree>::<C Struct><<C <todo sym>>> < (::<todo sym>)
+    end
+  end
+
+  class <emptyTree>::<C NotStruct><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>::<C B> = <cast:let>(<emptyTree>::<C Foo>::<C Struct>.new(), <todo sym>, <emptyTree>::<C Foo>::<C Struct>)
+
+    var = <emptyTree>::<C Struct>.new(:foo)
+  end
+
+  class <emptyTree>::<C RealStruct><<C <todo sym>>> < (::<todo sym>)
+    class <emptyTree>::<C A$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def foo<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def foo=<<todo method>>(foo, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def bar<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:bar, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def bar=<<todo method>>(bar, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::BasicObject, :bar, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(foo = nil, bar = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of foo>
+
+      <runtime method definition of foo=>
+
+      <runtime method definition of bar>
+
+      <runtime method definition of bar=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C A><<C <todo sym>>> < (<emptyTree>::<C A$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+
+    class <emptyTree>::<C KeywordInit$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def foo<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def foo=<<todo method>>(foo, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def bar<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:bar, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def bar=<<todo method>>(bar, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::BasicObject, :bar, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(foo: = nil, bar: = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of foo>
+
+      <runtime method definition of foo=>
+
+      <runtime method definition of bar>
+
+      <runtime method definition of bar=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C KeywordInit><<C <todo sym>>> < (<emptyTree>::<C KeywordInit$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+  end
+
+  class <emptyTree>::<C RealStructDesugar><<C <todo sym>>> < (::<todo sym>)
+    class <emptyTree>::<C A><<C <todo sym>>> < (<emptyTree>::<C Struct>)
+      def foo<<todo method>>(&<blk>)
+        <emptyTree>
+      end
+
+      def bar<<todo method>>(&<blk>)
+        <emptyTree>
+      end
+
+      def foo=<<todo method>>(arg0, &<blk>)
+        arg0
+      end
+
+      def bar=<<todo method>>(arg0, &<blk>)
+        arg0
+      end
+
+      ::Sorbet::Private::Static.sig(<self>) do ||
+        <self>.params(:foo, <emptyTree>::<C BasicObject>, :bar, <emptyTree>::<C BasicObject>).returns(<emptyTree>::<C A>)
+      end
+
+      def self.new<<todo method>>(foo = nil, bar = nil, &<blk>)
+        <cast:cast>(nil, <todo sym>, <emptyTree>::<C A>)
+      end
+
+      <self>.extend(<emptyTree>::<C T>::<C Sig>)
+
+      <runtime method definition of foo>
+
+      <runtime method definition of bar>
+
+      <runtime method definition of foo=>
+
+      <runtime method definition of bar=>
+
+      <runtime method definition of self.new>
+    end
+  end
+
+  class <emptyTree>::<C TwoStructs><<C <todo sym>>> < (::<todo sym>)
+    class <emptyTree>::<C A$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def foo<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def foo=<<todo method>>(foo, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(foo = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of foo>
+
+      <runtime method definition of foo=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C A><<C <todo sym>>> < (<emptyTree>::<C A$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+
+    class <emptyTree>::<C B$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def foo<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def foo=<<todo method>>(foo, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(foo = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of foo>
+
+      <runtime method definition of foo=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C B><<C <todo sym>>> < (<emptyTree>::<C B$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+  end
+
+  class <emptyTree>::<C AccidentallyStruct><<C <todo sym>>> < (::<todo sym>)
+    class <emptyTree>::<C Struct><<C <todo sym>>> < (::<todo sym>)
+    end
+
+    class <emptyTree>::<C A$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def foo<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def foo=<<todo method>>(foo, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def bar<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:bar, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def bar=<<todo method>>(bar, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo, ::BasicObject, :bar, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(foo = nil, bar = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of foo>
+
+      <runtime method definition of foo=>
+
+      <runtime method definition of bar>
+
+      <runtime method definition of bar=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C A><<C <todo sym>>> < (<emptyTree>::<C A$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+  end
+
+  class <emptyTree>::<C InvalidMember><<C <todo sym>>> < (::<todo sym>)
+    class <emptyTree>::<C A$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def foo=<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo=, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def foo==<<todo method>>(foo=, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:foo=, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(foo= = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of foo=>
+
+      <runtime method definition of foo==>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C A><<C <todo sym>>> < (<emptyTree>::<C A$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+  end
+
+  class <emptyTree>::<C MixinStruct><<C <todo sym>>> < (::<todo sym>)
+    module <emptyTree>::<C MyMixin><<C <todo sym>>> < ()
+      def foo<<todo method>>(&<blk>)
+        <emptyTree>
+      end
+
+      <runtime method definition of foo>
+    end
+
+    class <emptyTree>::<C MyStruct$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def x<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:x, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def x=<<todo method>>(x, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:x, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(x = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of x>
+
+      <runtime method definition of x=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C MyStruct><<C <todo sym>>> < (<emptyTree>::<C MyStruct$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <self>.include(<emptyTree>::<C MyMixin>)
+
+      <self>.new().x()
+
+      <self>.new().foo()
+    end
+
+    class <emptyTree>::<C MyKeywordInitStruct$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def x<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:x, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def x=<<todo method>>(x, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:x, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(x: = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of x>
+
+      <runtime method definition of x=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C MyKeywordInitStruct><<C <todo sym>>> < (<emptyTree>::<C MyKeywordInitStruct$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <self>.include(<emptyTree>::<C MyMixin>)
+
+      <self>.new().x()
+
+      <self>.new().foo()
+
+      <self>.new(1, 2)
+
+      <self>.new(:giberish, 1)
+    end
+
+    <emptyTree>::<C MyKeywordInitStruct>.new(1, 2)
+
+    <emptyTree>::<C MyKeywordInitStruct>.new(:giberish, 1)
+
+    <emptyTree>::<C MyStruct>.new().x()
+
+    <emptyTree>::<C MyStruct>.new().foo()
+  end
+
+  class <emptyTree>::<C BadUsages><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>::<C A> = <cast:<assume type>>(<emptyTree>::<C Struct>.new(), <todo sym>, <emptyTree>::<C Struct>)
+
+    <emptyTree>::<C B> = <cast:<assume type>>(<emptyTree>::<C Struct>.new(:giberish, 1), <todo sym>, <emptyTree>::<C Struct>)
+
+    <emptyTree>::<C C> = <cast:<assume type>>(<emptyTree>::<C Struct>.new(:keyword_init, true), <todo sym>, <emptyTree>::<C Struct>)
+
+    local = true
+
+    <emptyTree>::<C D> = <cast:<assume type>>(<emptyTree>::<C Struct>.new(:keyword_init, local), <todo sym>, <emptyTree>::<C Struct>)
+
+    <emptyTree>::<C E> = <cast:<assume type>>(<emptyTree>::<C Struct>.new(:a, :keyword_init, local), <todo sym>, <emptyTree>::<C Struct>)
+  end
+
+  class <emptyTree>::<C Main><<C <todo sym>>> < (::<todo sym>)
+    def main<<todo method>>(&<blk>)
+      begin
+        a = <emptyTree>::<C Struct>.new(:foo)
+        <cast:assert_type!>(a, <todo sym>, <emptyTree>::<C Struct>)
+        <cast:assert_type!>(a.new(), <todo sym>, <emptyTree>::<C Struct>)
+        <cast:assert_type!>(a.new(2), <todo sym>, <emptyTree>::<C Struct>)
+        <cast:assert_type!>(<emptyTree>::<C RealStruct>::<C A>.new(2, 3), <todo sym>, <emptyTree>::<C RealStruct>::<C A>)
+        <cast:assert_type!>(<emptyTree>::<C RealStruct>::<C A>.new(2), <todo sym>, <emptyTree>::<C RealStruct>::<C A>)
+        <cast:assert_type!>(<emptyTree>::<C RealStruct>::<C KeywordInit>.new(), <todo sym>, <emptyTree>::<C RealStruct>::<C KeywordInit>)
+        <cast:assert_type!>(<emptyTree>::<C RealStruct>::<C KeywordInit>.new(:foo, 1), <todo sym>, <emptyTree>::<C RealStruct>::<C KeywordInit>)
+        <cast:assert_type!>(<emptyTree>::<C RealStruct>::<C KeywordInit>.new(:foo, 2, :bar, 3), <todo sym>, <emptyTree>::<C RealStruct>::<C KeywordInit>)
+        <emptyTree>::<C RealStruct>::<C KeywordInit>.new(1, 2)
+        <cast:assert_type!>(<emptyTree>::<C RealStructDesugar>::<C A>.new(2, 3), <todo sym>, <emptyTree>::<C RealStructDesugar>::<C A>)
+      end
+    end
+
+    <runtime method definition of main>
+  end
+
+  <self>.puts(<emptyTree>::<C Main>.new().main())
+
+  class <emptyTree>::<C FullyQualifiedStructUsages><<C <todo sym>>> < (::<todo sym>)
+    class <emptyTree>::<C Foo$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def a<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:a, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def a=<<todo method>>(a, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:a, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(a = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of a>
+
+      <runtime method definition of a=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C Foo><<C <todo sym>>> < (<emptyTree>::<C Foo$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+
+    class <emptyTree>::<C Bar$1><<C <todo sym>>> < (::<root>::<C Struct>)
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.returns(::T.untyped())
+      end
+
+      def a<<todo method>>(&<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:a, ::T.untyped()).returns(::T.untyped())
+      end
+
+      def a=<<todo method>>(a, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+        <self>.params(:a, ::BasicObject).void()
+      end
+
+      def initialize<<todo method>>(a = nil, &<blk>)
+        ::Kernel.raise("Sorbet rewriter pass partially unimplemented")
+      end
+
+      <runtime method definition of a>
+
+      <runtime method definition of a=>
+
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+
+      <runtime method definition of initialize>
+    end
+
+    class <emptyTree>::<C Bar><<C <todo sym>>> < (<emptyTree>::<C Bar$1>)
+      <emptyTree>::<C Elem> = <self>.type_member() do ||
+        {:fixed => ::T.untyped()}
+      end
+    end
+
+    <emptyTree>::<C Baz> = <cast:<assume type>>(::<root>::<C Foo>::<C Struct>.new(), <todo sym>, ::<root>::<C Foo>::<C Struct>)
+
+    <emptyTree>::<C Foo>.new().a()
+
+    <emptyTree>::<C Bar>.new().a()
+  end
+
+  class <emptyTree>::<C Immutable><<C <todo sym>>> < (<emptyTree>::<C T>::<C ImmutableStruct>)
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.params(:b, <emptyTree>::<C String>).void()
+    end
+
+    def initialize<<todo method>>(b:, &<blk>)
+      begin
+        @b = <cast:let>(b, <todo sym>, <emptyTree>::<C String>)
+        nil
+      end
+    end
+
+    ::Sorbet::Private::Static.sig(::T::Sig::WithoutRuntime) do ||
+      <self>.returns(<emptyTree>::<C String>)
+    end
+
+    def b<<todo method>>(&<blk>)
+      @b
+    end
+
+    <runtime method definition of initialize>
+
+    <self>.prop(:a, <emptyTree>::<C Integer>)
+
+    <self>.const(:b, <emptyTree>::<C String>, :without_accessors, true)
+
+    <runtime method definition of b>
+  end
+
+  class <emptyTree>::<C ImmutableTest><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>::<C Immutable>.new(:a, 1, :b, "foo")
+
+    obj = <emptyTree>::<C Immutable>.new(:b, "foo")
+
+    obj.b=("bar")
+  end
+end

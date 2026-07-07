@@ -1,0 +1,45 @@
+begin
+  class <emptyTree><<C <root>>> < (::<todo sym>)
+    <emptyTree>
+
+    def self.<static-init><<static-init>$CENSORED>(<blk>)
+      <emptyTree>
+    end
+  end
+  class ::TestCasts<<C TestCasts>> < (::<todo sym>)
+    def untyped(<blk>)
+      <emptyTree>
+    end
+
+    def test_casts(<blk>)
+      begin
+        t = <cast:assert_type!>(<self>.untyped(), Integer, ::Integer)
+        t.+(4)
+        t1 = <cast:assert_type!>("hi", Integer, ::Integer)
+        t1.+(1)
+        s = <cast:cast>(<self>.untyped(), String, ::String)
+        s.+("hi")
+        s = <cast:cast>(6, String, ::String)
+        s.+("hi")
+        s.+(3)
+        s = <cast:cast>(6, Integer, ::Integer)
+        s = <cast:cast>(6, T.untyped, ::T.untyped())
+        s = <cast:cast>(6, Integer, 7)
+        s.+("hi")
+        s.+(3)
+        f = <cast:cast>(6.000000, Float, 7.000000)
+        str = <cast:cast>("x", String, "y")
+        sym = <cast:cast>(:x, Symbol, :y)
+      end
+    end
+
+    def self.<static-init>(<blk>)
+      begin
+        <runtime method definition of untyped>
+        <runtime method definition of test_casts>
+        <emptyTree>
+      end
+    end
+  end
+  <emptyTree>
+end

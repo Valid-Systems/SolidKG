@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"filePath":"README.md"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Probe final answer."}]}}
+{"type":"result","duration_ms":1200,"total_cost_usd":0.001}

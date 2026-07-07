@@ -1,0 +1,37 @@
+# Paths that still overlap CodeGraph enough to require upstream release triage.
+# Keep this conservative: broad for high-risk mirrored surfaces, explicit for docs/release boundaries.
+
+src/mcp/**
+src/installer/**
+src/extraction/**
+src/resolution/**
+src/hypergraph/**
+src/graph/**
+src/context/**
+src/search/**
+src/sync/**
+src/db/**
+src/bin/**
+src/ui/**
+src/types.ts
+src/index.ts
+
+__tests__/**
+
+.github/workflows/release.yml
+scripts/build-bundle.sh
+scripts/pack-npm.sh
+scripts/npm-shim.js
+scripts/install.sh
+scripts/install.ps1
+package.json
+package-lock.json
+pnpm-lock.yaml
+
+README.md
+AGENTS.md
+.cursor/rules/solidkg.mdc
+site/src/content/docs/reference/mcp-server.md
+docs/design/**
+docs/benchmarks/**
+docs/maintenance/**

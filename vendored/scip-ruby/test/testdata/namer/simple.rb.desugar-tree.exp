@@ -1,0 +1,53 @@
+class <emptyTree><<C <root>>> < (::<todo sym>)
+  class <emptyTree>::<C NormalClass><<C <todo sym>>> < (::<todo sym>)
+    def normal_method<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    def self.normal_static_method<<todo method>>(&<blk>)
+      <emptyTree>
+    end
+
+    class <emptyTree>::<C InnerClass><<C <todo sym>>> < (::<todo sym>)
+      <emptyTree>
+    end
+
+    module <emptyTree>::<C InnerModule><<C <todo sym>>> < ()
+      <emptyTree>
+    end
+  end
+
+  module <emptyTree>::<C ANamespace><<C <todo sym>>> < ()
+    class <emptyTree>::<C ObviousChild><<C <todo sym>>> < (::<todo sym>)
+      <emptyTree>
+    end
+  end
+
+  class <emptyTree>::<C ANamespace>::<C ClassInNamespace><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>
+  end
+
+  class <emptyTree>::<C Parent><<C <todo sym>>> < (::<todo sym>)
+    <emptyTree>
+  end
+
+  module <emptyTree>::<C Mixin><<C <todo sym>>> < ()
+    <emptyTree>
+  end
+
+  module <emptyTree>::<C OtherMixin><<C <todo sym>>> < ()
+    <emptyTree>
+  end
+
+  class <emptyTree>::<C Child><<C <todo sym>>> < (<emptyTree>::<C Parent>)
+    <self>.include(<emptyTree>::<C Mixin>)
+
+    <self>.include(3)
+
+    <self>.include(<emptyTree>::<C Mixin>) do ||
+      <emptyTree>
+    end
+
+    <self>.whatever().include(<emptyTree>::<C OtherMixin>)
+  end
+end
