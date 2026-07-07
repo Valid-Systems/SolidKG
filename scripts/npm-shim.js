@@ -104,7 +104,10 @@ async function selfHealBundle() {
   // Already downloaded by a previous run? Use it even when downloads are
   // disabled — SOLIDKG_NO_DOWNLOAD blocks fetching, not a cached bundle.
   var cached = launcherIn(dest);
-  if (cached) return cached;
+  if (cached) {
+    pruneCachedBundles(bundlesDir, target + '-' + version);
+    return cached;
+  }
 
   var asset = 'solidkg-' + target + (isWindows ? '.zip' : '.tar.gz');
 
@@ -154,8 +157,25 @@ async function selfHealBundle() {
 
   var ready = launcherIn(dest);
   if (!ready) fail('downloaded bundle is missing its launcher under ' + dest + '.');
+  pruneCachedBundles(bundlesDir, target + '-' + version);
   process.stderr.write('solidkg: bundle ready.\n');
   return ready;
+}
+
+function pruneCachedBundles(bundlesDir, keepName) {
+  var entries;
+  try {
+    entries = fs.readdirSync(bundlesDir, { withFileTypes: true });
+  } catch (e) {
+    return;
+  }
+  var prefix = target + '-';
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    if (!entry.isDirectory()) continue;
+    if (entry.name === keepName || entry.name.indexOf(prefix) !== 0) continue;
+    rmrf(path.join(bundlesDir, entry.name));
+  }
 }
 
 function readVersion() {

@@ -127,10 +127,11 @@ describe.skipIf(isWindows || !hasCommand('sh') || !hasCommand('tar') || !hasComm
     tempDirs = [];
   });
 
-  async function runShellInstaller(sumsBody: string | null) {
+  async function runShellInstaller(sumsBody: string | null, setup?: (installDir: string) => void) {
     const installDir = mkTmp('sh-install');
     const binDir = mkTmp('sh-bin');
     tempDirs.push(installDir, binDir);
+    setup?.(installDir);
     server.setSums(sumsBody);
     const result = await runProcess('sh', [shellInstaller], {
       SOLIDKG_VERSION: version,
@@ -147,6 +148,17 @@ describe.skipIf(isWindows || !hasCommand('sh') || !hasCommand('tar') || !hasComm
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain('checksum verified');
     expect(fs.existsSync(path.join(result.installDir, 'current', 'bin', 'solidkg'))).toBe(true);
+  });
+
+  it('prunes old standalone versions after a successful install', async () => {
+    const result = await runShellInstaller(`${sha}  ${assetName}\n`, (installDir) => {
+      fs.mkdirSync(path.join(installDir, 'versions', 'v0.0.1-old'), { recursive: true });
+      fs.writeFileSync(path.join(installDir, 'versions', 'v0.0.1-old', 'marker'), 'old');
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(fs.existsSync(path.join(result.installDir, 'versions', version))).toBe(true);
+    expect(fs.existsSync(path.join(result.installDir, 'versions', 'v0.0.1-old'))).toBe(false);
   });
 
   it('fails closed on checksum mismatch', async () => {

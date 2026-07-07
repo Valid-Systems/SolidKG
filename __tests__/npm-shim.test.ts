@@ -95,6 +95,7 @@ describe.skipIf(isWindows)('npm-shim launcher', () => {
     const pkg = makePkg('1.2.3-cached');
     const cache = mkTmp('cache');
     writeLauncher(path.join(cache, 'bundles', `${target}-1.2.3-cached`, 'bin'));
+    writeLauncher(path.join(cache, 'bundles', `${target}-0.0.1-old`, 'bin'));
     const r = await runShim(pkg, ['--probe-xyz'], {
       SOLIDKG_INSTALL_DIR: cache,
       SOLIDKG_NO_DOWNLOAD: '1',
@@ -104,6 +105,8 @@ describe.skipIf(isWindows)('npm-shim launcher', () => {
     expect(r.stdout).toContain('FAKE_BUNDLE_RAN');
     expect(r.stdout).toContain('--probe-xyz');
     expect(r.stderr).toBe('');
+    expect(fs.existsSync(path.join(cache, 'bundles', `${target}-1.2.3-cached`))).toBe(true);
+    expect(fs.existsSync(path.join(cache, 'bundles', `${target}-0.0.1-old`))).toBe(false);
   });
 
   it('prints actionable guidance and exits 1 when disabled with no bundle', async () => {
@@ -220,6 +223,7 @@ describe.skipIf(!CAN_NET)('npm-shim download fallback (local HTTPS)', () => {
     sumsBody = `${fixtureSha}  ${asset}\n`;
     const pkg = makePkg('5.0.0-net');
     const cache = mkTmp('cache');
+    writeLauncher(path.join(cache, 'bundles', `${target}-4.9.9-old`, 'bin'));
     const r = await runShim(pkg, ['--probe-net'], netEnv(cache));
 
     expect(r.stderr).toContain('downloading');
@@ -228,6 +232,7 @@ describe.skipIf(!CAN_NET)('npm-shim download fallback (local HTTPS)', () => {
     expect(r.stdout).toContain('FAKE_BUNDLE_RAN');
     expect(r.stdout).toContain('--probe-net');
     expect(fs.existsSync(path.join(cache, 'bundles', `${target}-5.0.0-net`, 'bin', 'solidkg'))).toBe(true);
+    expect(fs.existsSync(path.join(cache, 'bundles', `${target}-4.9.9-old`))).toBe(false);
   }, 20000);
 
   it('aborts (exit 1) on a checksum mismatch and caches nothing', async () => {

@@ -99,6 +99,12 @@ mkdir -p "$BIN_DIR"
 ln -sf "$dest/bin/solidkg" "$BIN_DIR/solidkg"
 ln -sfn "$dest" "$INSTALL_DIR/current"
 
+for old in "$INSTALL_DIR"/versions/*; do
+  [ -e "$old" ] || continue
+  [ "$old" = "$dest" ] && continue
+  rm -rf "$old"
+done
+
 echo "Installed to $dest"
 echo "Linked     $BIN_DIR/solidkg"
 case ":$PATH:" in

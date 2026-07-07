@@ -1,7 +1,7 @@
 {
   "upstreamRepository": "colbymchenry/codegraph",
-  "lastReviewedRelease": "v1.0.1",
-  "lastReviewedAt": "2026-06-19",
-  "lastReviewedRange": "v0.9.5...v1.0.1",
-  "latestReleaseUrl": "https://github.com/colbymchenry/codegraph/releases/tag/v1.0.1"
+  "lastReviewedRelease": "v1.3.0",
+  "lastReviewedAt": "2026-07-07",
+  "lastReviewedRange": "v1.0.1...v1.3.0",
+  "latestReleaseUrl": "https://github.com/colbymchenry/codegraph/releases/tag/v1.3.0"
 }
