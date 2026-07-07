@@ -4,81 +4,84 @@
   <img width="500" alt="solidkg" src="https://github.com/user-attachments/assets/6c138932-b594-4dd2-8393-62197bc057de" />
 </p>
 
-My version of a knowledge graph for codebases, intended for serious production use. Includes hyperedges, SCIP, capability footprints, and a bunch of fine-tuning and optimizations for token efficiency.
+SolidKG is a local-first code intelligence graph for AI coding agents. It parses a project with tree-sitter, stores symbols/edges/hyperedges in SQLite, and exposes fast structural tools over CLI and MCP.
 
-Inspired by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), and [Cartog](https://github.com/jrollin/cartog).
+It is inspired by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), and [Cartog](https://github.com/jrollin/cartog).
 
-Keep in mind that static analysis has limits. Generated code, reflection-heavy code, and unusual framework conventions may still require direct source inspection.
+## Install
 
-## Code intelligence highlights
-
-- Builds a local AST-derived graph with symbols, calls, imports, framework routes, semantic hyperedges, capability footprints, and optional SCIP references.
-- Answers agent questions through existing structural tools (`trace`, `context`, `explore`, `search`, callers/callees/impact) instead of a broad source scan.
-- Bridges common dynamic-dispatch and framework boundaries such as callbacks, EventEmitter channels, React render/JSX flows, Django ORM descriptors, Swift/Objective-C, React Native, Expo modules, and many route-to-handler patterns.
-- Uses local source-body chunks and graph-ranked file allocation to improve natural-language implementation queries while keeping exact symbol/path/trace evidence higher priority.
-- Keeps embeddings, vector databases, rerankers, API calls, and telemetry disabled by default.
-
-Evidence-backed capability notes, measured benchmark results, validated repos, and known frontiers are tracked in [`docs/code-intelligence-capabilities.md`](docs/code-intelligence-capabilities.md).
-
-We have also stress-tested SolidKG on many of the largest and most important open-source codebases, including VS Code, TypeScript, React, Kubernetes, CPython, PyTorch, TensorFlow, LLVM, Rust, Go, Swift, Flutter, Angular, Next.js, Spark, Kafka, Elasticsearch, Kibana, and more. The full tested-codebase inventory is tracked in [`docs/tested-codebases.md`](docs/tested-codebases.md).
-
-## Quick Start
-
-Use Node 24 and pnpm.
+From source:
 
 ```bash
 pnpm install
 pnpm run build
-node dist/bin/solidkg.js init -i /path/to/project
-node dist/bin/solidkg.js status /path/to/project
+node dist/bin/solidkg.js --help
 ```
 
-Use `--data-dir` if the index should live outside the source tree:
+Published installs use the bundled release packages:
 
 ```bash
-node dist/bin/solidkg.js init -i --data-dir /local/solidkg-data/project-a /path/to/project
+npm install -g solidkg
+solidkg --help
 ```
 
-## CLI Commands
+The npm package is a small launcher plus per-platform bundles. Release bundles include Node 24, the compiled app, schema files, tree-sitter WASM grammars, and production dependencies.
 
-You can try the CLI after building:
+## Use on a project
 
 ```bash
-node dist/bin/solidkg.js <command> [options]
+solidkg init -i /path/to/project
+solidkg status /path/to/project
+solidkg context "how does auth work?" --path /path/to/project
 ```
 
-Common commands:
-
-| Command | Purpose |
-| --- | --- |
-| `init` | Create SolidKG data for a project. |
-| `init -i` | Initialize and index immediately. |
-| `index` | Rebuild the graph. |
-| `sync` | Update the graph after file changes. |
-| `status` | Show index health and counts. |
-| `files` | Show indexed files, including `--format overview` for a progressive repository map. |
-| `overview` | Show the indexed repository summary tree directly. |
-| `query` | Search symbols and graph nodes. |
-| `context` | Build focused context for a task. |
-| `callers` / `callees` | Traverse direct call relationships. |
-| `impact` | Estimate what a symbol change can affect. |
-| `affected` | Find tests related to changed source files. |
-| `snapshot` | Create and compare graph snapshots. |
-| `architecture` | Analyze package and layer coupling. |
-| `scip generate` / `scip import` | Generate or import SCIP reference data. |
-| `serve --mcp` | Run the MCP server over stdio for AI coding tools. |
-| `install` / `uninstall` | Configure or remove supported tool integrations. |
-| `unlock` | Clear a stale `.solidkg/` lock. |
-
-For command-specific options:
+Keep the index outside the source tree when needed:
 
 ```bash
-node dist/bin/solidkg.js <command> --help
+solidkg init -i --data-dir /local/solidkg-data/project-a /path/to/project
 ```
+
+Configure an agent:
+
+```bash
+solidkg install
+```
+
+Supported installer targets include Claude Code, Cursor, Codex CLI, opencode, Hermes Agent, Antigravity, OMP, and Kimi.
+
+## What agents get
+
+- Symbol search, callers/callees, impact, trace, focused context, and repository overview tools.
+- Semantic hyperedges for multi-symbol relationships such as routes, event channels, UI render chains, dynamic dispatch, native bridges, and type contracts.
+- Optional SCIP import/generation for compiler-grade definitions, references, implementations, and type-definition links.
+- Source-body chunk retrieval for better natural-language queries while keeping exact symbol/path/trace evidence higher priority.
+- Local-only operation by default. Embeddings, vector databases, rerankers, API calls, and telemetry are not enabled.
+
+Static analysis still has limits. Generated code, reflection-heavy systems, and unusual framework conventions may require direct source inspection.
+
+## Common commands
+
+```bash
+solidkg init -i [path]          # initialize and index
+solidkg index [path]           # rebuild the graph
+solidkg sync [path]            # update after file changes
+solidkg status [path]          # index health and counts
+solidkg files --format overview --path [path]
+solidkg overview [path]
+solidkg query "UserService" --path [path]
+solidkg context "task" --path [path]
+solidkg callers A --path [path]
+solidkg callees A --path [path]
+solidkg impact A --path [path]
+solidkg affected src/foo.ts --path [path]
+solidkg scip generate [path]
+solidkg scip import index.scip --path [path]
+solidkg serve --mcp
+```
+
+Run `solidkg <command> --help` for command-specific options.
 
 ## TypeScript API
-
-SolidKG can also be used as a library after building.
 
 ```typescript
 import SolidKG from 'solidkg';
@@ -94,71 +97,31 @@ console.log(matches.length, impact.length, overview);
 graph.close();
 ```
 
-The API covers project initialization, indexing, syncing, symbol search, graph traversal, context building, repository overview projections, snapshots, architecture reports, and SCIP import or generation.
+The library API covers initialization, indexing, syncing, symbol search, graph traversal, context building, overview projection, snapshots, architecture reports, and SCIP import/generation.
 
-Context, explore, and search results can include `source_body_chunk` ranking evidence when persisted local source-body/code-token chunks seeded or boosted a result. Exact symbol, path, trace, semantic relation, and SCIP evidence remains higher-salience than body-only matches. External embeddings, vector databases, rerankers, and hybrid retrieval providers are not enabled by default.
+## SCIP support
 
-For quick codebase orientation, use the indexed overview tree instead of scanning directories manually:
+SolidKG can import `.scip` files and link SCIP symbols back to graph nodes. It can also orchestrate SCIP generation when matching indexer commands are available.
 
-```bash
-node dist/bin/solidkg.js overview /path/to/project --max-depth 2
-node dist/bin/solidkg.js overview /path/to/project --expand src/resolution
-node dist/bin/solidkg.js files --path /path/to/project --format overview --max-depth 2
-node dist/bin/solidkg.js files --path /path/to/project --format overview --expand src/resolution
-```
+Default indexer commands:
 
-The overview is derived from `.solidkg/` facts: files, languages, symbol counts, conservative symbol anchors, and any existing architecture assignments. It is not a separate documentation file or scanner.
+| Language | Command |
+| --- | --- |
+| TypeScript/JavaScript | `scip-typescript` |
+| Go | `scip-go` |
+| Rust | `scip-rust` |
+| Python | `scip-python` |
+| C# | `scip-dotnet` |
 
-## Supported file types
+SCIP is additive: if no index exists or an indexer is missing, the AST graph still works.
 
-- ArkTS
-- Astro
-- Bash and shell scripts
-- C
-- C#
-- C++
-- Dart
-- Fortran
-- Go
-- Groovy
-- HCL/Terraform
-- Java
-- JavaScript and JSX
-- Jinja and HTML templates
-- Julia
-- Kotlin
-- Liquid
-- Lua
-- Luau
-- Nix
-- Objective-C and Objective-C++
-- Pascal/Delphi
-- PHP
-- PowerShell
-- Python
-- R
-- Razor
-- Ruby
-- Rust
-- Scala
-- SCL
-- Solidity
-- SQL
-- Svelte
-- Swift
-- SystemVerilog
-- TypeScript and TSX
-- VB.NET
-- Vue
+## Supported code
 
-## Recognized file types
+SolidKG extracts symbols for ArkTS, Astro, Bash, C/C++, C#, Dart, Fortran, Go, Groovy, HCL/Terraform, Java, JavaScript/JSX, Jinja/HTML, Julia, Kotlin, Liquid, Lua/Luau, Nix, Objective-C/C++, Pascal/Delphi, PHP, PowerShell, Python, R, Razor, Ruby, Rust, Scala, SCL, Solidity, SQL, Svelte, Swift, SystemVerilog, TypeScript/TSX, VB.NET, and Vue.
 
-These are indexed for file-level tracking or framework-specific resolvers, but do not have general symbol extraction:
+It also tracks Twig, YAML, and XML at file/framework level. Framework resolvers add routes and relationships for Express, Hono, Django, Flask, FastAPI, Rails, Laravel, Spring, Gin, Axum, ASP.NET, Vapor, React Router, SvelteKit, Vue/Nuxt, NestJS, and Drupal.
 
-- Twig
-- YAML and XML
-
-Framework-specific resolvers add routes and relationships for Express, Hono, Django, Flask, FastAPI, Rails, Laravel, Spring, Gin, Axum, ASP.NET, Vapor, React Router, SvelteKit, Vue/Nuxt, NestJS, and Drupal.
+Capability notes, benchmark summaries, validated repositories, and known frontiers live in [`docs/code-intelligence-capabilities.md`](docs/code-intelligence-capabilities.md) and [`docs/tested-codebases.md`](docs/tested-codebases.md).
 
 ## Development
 
@@ -172,42 +135,37 @@ Useful commands:
 ```bash
 pnpm run build
 pnpm test
+pnpm exec tsc
 pnpm run dev
 pnpm run clean
-pnpm exec tsc
 pnpm exec vitest run __tests__/installer-targets.test.ts
 ```
 
-`pnpm run build` compiles TypeScript, copies the SQLite schema and tree-sitter WASM assets into `dist/`, strips CLI bin comments, and marks the built CLI as executable.
+`pnpm run build` compiles TypeScript, copies `src/db/schema.sql` and tree-sitter WASM assets into `dist/`, strips CLI bin comments, and marks the built CLI executable.
 
 ## Troubleshooting
 
-If the CLI refuses to run, check Node first:
+Use Node 24 for source installs:
 
 ```bash
 node --version
 ```
 
-Use Node 24.
-
 If results look stale:
 
 ```bash
-node dist/bin/solidkg.js sync /path/to/project
-node dist/bin/solidkg.js status /path/to/project
+solidkg sync /path/to/project
+solidkg status /path/to/project
 ```
 
 If a lock file is stale:
 
 ```bash
-node dist/bin/solidkg.js unlock /path/to/project
+solidkg unlock /path/to/project
 ```
 
-On Windows network drives or SMB shares, SQLite locking can fail. Put the data directory on a local disk when indexing a network-mounted source tree.
+On Windows network drives or SMB shares, put `--data-dir` on a local disk to avoid SQLite locking issues.
 
-## License Notices
+## License notices
 
-Third-party license notices are kept in:
-
-- `docs/THIRD_PARTY_LICENSES.md`
-- `docs/third-party-licenses/`
+Third-party notices are kept in [`docs/THIRD_PARTY_LICENSES.md`](docs/THIRD_PARTY_LICENSES.md) and [`docs/third-party-licenses/`](docs/third-party-licenses/).
