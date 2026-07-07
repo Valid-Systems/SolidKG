@@ -843,14 +843,14 @@ export class ToolHandler {
     const exactSameName = results.filter((result) => result.node.name === query);
     const uncertaintyLabels: UncertaintyLabel[] = exactSameName.length > 1 ? ['ambiguous_symbol'] : [];
     const formatted = this.withAnswerPacket(
-      this.formatSearchResults(results),
+      this.formatSearchResults(query, results),
       buildNodeAnswerPacket({
         query,
         tool: 'solidkg_search',
         nodes: results.map((result) => result.node),
         uncertaintyLabels,
         rankingReasons: this.searchRankingReasonsForPacket(results),
-        suggestedNextTools: ['solidkg_node', 'solidkg_context'],
+        suggestedNextTools: this.searchSuggestedNextTools(query, results),
       })
     );
     return this.textResult(this.truncateOutput(formatted));
@@ -3533,7 +3533,7 @@ export class ToolHandler {
     return [...byKey.values()].sort((a, b) => b.weight - a.weight || a.kind.localeCompare(b.kind));
   }
 
-  private formatSearchResults(results: SearchResult[]): string {
+  private formatSearchResults(query: string, results: SearchResult[]): string {
     const lines: string[] = [`## Search Results (${results.length} found)`, ''];
 
     for (const result of results) {
@@ -3551,7 +3551,40 @@ export class ToolHandler {
       lines.push('');
     }
 
+    lines.push(...this.formatSearchGuidance(query, results));
+
     return lines.join('\n');
+  }
+
+  private formatSearchGuidance(query: string, results: readonly SearchResult[]): string[] {
+    const lines = ['### Search guidance:'];
+    const exactSameName = results.filter((result) => result.node.name === query);
+    const languages = [...new Set(results.map((result) => result.node.language))];
+    const kinds = [...new Set(results.map((result) => result.node.kind))];
+    const hasDampenedResult = results.some((result) => result.rankingReasons?.some((reason) => reason.kind === 'generated_or_test_dampening'));
+
+    if (exactSameName.length > 1) {
+      lines.push(`- Ambiguous name: ${exactSameName.length} exact "${query}" matches. Qualify before tracing or deep inspection.`);
+    }
+    if (languages.length > 1 || kinds.length > 1 || exactSameName.length > 1) {
+      const languageHint = languages[0] ? `lang:${languages[0]}` : 'lang:<language>';
+      const kindHint = kinds[0] ? `kind:${kinds[0]}` : 'kind:<kind>';
+      const pathHint = results[0]?.node.filePath.split('/').slice(0, 3).join('/') || '<path-fragment>';
+      lines.push(`- Use filters: ${languageHint} path:${pathHint} ${kindHint} name:${query}`);
+    }
+    if (hasDampenedResult) {
+      lines.push('- Test/generated results were demoted; include test/generated terms only when those files are intended.');
+    }
+    lines.push('- Next: solidkg_context for task context; solidkg_explore for grouped source; solidkg_node for one symbol; solidkg_trace for known endpoints; solidkg_impact for blast radius.');
+
+    return [...lines, ''];
+  }
+
+  private searchSuggestedNextTools(query: string, results: readonly SearchResult[]): string[] {
+    const exactSameName = results.filter((result) => result.node.name === query);
+    return exactSameName.length > 1
+      ? ['solidkg_context', 'solidkg_explore', 'solidkg_node', 'solidkg_trace', 'solidkg_impact']
+      : ['solidkg_context', 'solidkg_explore', 'solidkg_node'];
   }
 
   private formatNodeList(nodes: Node[], title: string, totalFound: number = nodes.length): string {

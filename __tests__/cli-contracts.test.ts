@@ -169,6 +169,18 @@ describe('standalone CLI JSON contracts', () => {
     expectNoTerminalFrames(result.stderr);
   });
 
+  it('renders human query scores as raw relevance scores instead of percentages', () => {
+    const result = runCli(['query', 'entry', '--path', testDir]);
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(result.stdout).toContain('Search Results for "entry"');
+    expect(result.stdout).toContain('score ');
+    expect(result.stdout).not.toMatch(/\(\d+%\)/);
+    expectNoAnsiEscapeSequences(result.stdout);
+    expectNoTerminalFrames(result.stdout);
+  });
+
   it('renders indexed repository overview through files command', () => {
     const result = runCli(['files', '--path', testDir, '--format', 'overview', '--max-depth', '2']);
     expect(result.status).toBe(0);

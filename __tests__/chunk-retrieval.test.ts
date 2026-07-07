@@ -709,6 +709,45 @@ describe('chunk-body fusion search', () => {
       expect(text).toContain('Ranking evidence:');
       expect(text).toContain('source_body_chunk');
       expect(text).toContain('fusion');
+      expect(text).toContain('Search guidance:');
+      expect(text).toContain('Next: solidkg_context');
+    } finally {
+      graph.close();
+    }
+  });
+
+  it('solidkg_search gives compact agent guidance for ambiguous mixed-surface names', async () => {
+    // Given: one symbol name appears in backend, UI, and test surfaces.
+    const projectRoot = createTempDir('search-guidance-');
+    fs.mkdirSync(path.join(projectRoot, 'airflow-core', 'src', 'airflow', 'models'), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, 'airflow-core', 'src', 'airflow', 'ui'), { recursive: true });
+    fs.mkdirSync(path.join(projectRoot, 'airflow-core', 'tests', 'unit'), { recursive: true });
+    fs.writeFileSync(path.join(projectRoot, 'airflow-core', 'src', 'airflow', 'models', 'taskinstance.py'), 'class TaskInstance:\n    pass\n');
+    fs.writeFileSync(path.join(projectRoot, 'airflow-core', 'src', 'airflow', 'ui', 'TaskInstance.tsx'), 'export function TaskInstance() { return null; }\n');
+    fs.writeFileSync(path.join(projectRoot, 'airflow-core', 'tests', 'unit', 'test_taskinstance.py'), 'class TaskInstance:\n    pass\n');
+    const graph = SolidKG.initSync(projectRoot, { config: { include: ['**/*.py', '**/*.tsx'], exclude: [] } });
+    try {
+      await graph.indexAll();
+      const handler = new ToolHandler(graph);
+
+      // When: an agent starts with the ambiguous symbol name.
+      const result = await handler.execute('solidkg_search', {
+        query: 'TaskInstance',
+        limit: 10,
+      });
+      const text = result.content[0]?.text ?? '';
+
+      // Then: the output stays compact but routes the agent to narrowing filters and follow-up tools.
+      expect(text).toContain('Search guidance:');
+      expect(text).toContain('Ambiguous name');
+      expect(text).toContain('Use filters: lang:');
+      expect(text).toContain('path:');
+      expect(text).toContain('kind:');
+      expect(text).toContain('Test/generated results were demoted');
+      expect(text).toContain('Next: solidkg_context');
+      expect(text).toContain('solidkg_explore');
+      expect(text).toContain('solidkg_node');
+      expect(text).not.toContain('solidkg_precise_refs nodeId=');
     } finally {
       graph.close();
     }

@@ -54,13 +54,13 @@ export function withDataDirSchemas(definitions: readonly ToolDefinition[]): Tool
 export const tools: ToolDefinition[] = [
   {
     name: 'solidkg_search',
-    description: 'Quick symbol search by name. Returns locations, node IDs, and linked SCIP symbols when available (no code). Use solidkg_context instead for comprehensive task context.',
+    description: 'Quick symbol search by name. Returns locations, node IDs, ranking evidence, compact follow-up guidance, and linked SCIP symbols when available (no code). Use solidkg_context instead for comprehensive task context. Supports inline filters kind:, lang:/language:, path:, and name:.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Symbol name or partial name (e.g., "auth", "signIn", "UserService")',
+          description: 'Symbol name or partial name. Supports inline filters like kind:class lang:python path:src name:TaskInstance.',
         },
         kind: {
           type: 'string',

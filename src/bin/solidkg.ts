@@ -1351,7 +1351,7 @@ program
           for (const result of results) {
             const node = result.node;
             const location = `${node.filePath}:${node.startLine}`;
-            const score = chalk.dim(`(${(result.score * 100).toFixed(0)}%)`);
+            const score = chalk.dim(`(score ${result.score.toFixed(2)})`);
 
             console.log(
               chalk.cyan(node.kind.padEnd(12)) +
