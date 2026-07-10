@@ -1065,9 +1065,11 @@ export function retryFromError(): string {
       expect(parsed.codeBlocks).toEqual([]);
       expect(parsed.answerPacket).toMatchObject({
         sufficiency: {
-          canAnswerFromReturnedContext: false,
+          canAnswerFromReturnedContext: true,
+          status: 'sufficient',
         },
         uncertaintyLabels: expect.arrayContaining(['source_partial']),
+        suggestedNextTools: [],
       });
     });
 

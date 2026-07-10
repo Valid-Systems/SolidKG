@@ -515,8 +515,8 @@ describe.skipIf(!HAS_SQLITE)('solidkg_trace truncation keeps answer packets', ()
     expect(text).toContain('### Answer Packet');
     expect(text).toContain('Binary sufficiency: sufficient');
     expect(text).toContain('Returned evidence actionability:');
-    expect(text).toContain('requires_focused_follow_up');
-    expect(text).toContain('capped_required_facts');
+    expect(text).toContain('Eligible actions: explain_returned_evidence, localize_candidate');
+    expect(text).toContain('Blockers: none');
     expect(text).toContain('Source coverage: truncated');
     expect(text).not.toContain('Suggested next SolidKG tools: solidkg_node');
     expect(text).toContain('... (output truncated)');
@@ -577,10 +577,10 @@ describe.skipIf(!HAS_SQLITE)('solidkg_trace final output cap downgrades actionab
     expect(text).toContain('### Answer Packet');
     expect(text).toContain('Binary sufficiency: sufficient');
     expect(text).toContain('Returned evidence actionability:');
-    expect(text).toContain('requires_focused_follow_up');
-    expect(text).toContain('capped_required_facts');
+    expect(text).toContain('Eligible actions: explain_returned_evidence, localize_candidate');
+    expect(text).toContain('Blockers: none');
     expect(text).toContain('Source coverage: truncated');
-    expect(text).toContain('with incomplete returned source');
+    expect(text).toContain('with bounded returned source');
     expect(text).not.toContain('Full execution path below');
     expect(text).not.toContain('Full path + every hop body');
     expect(text).toContain('... (output truncated)');

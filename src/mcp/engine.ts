@@ -14,6 +14,9 @@ import SolidKG, { findNearestSolidKGRoot } from '../index';
 import { watchDisabledReason } from '../sync';
 import { ToolHandler } from './tools';
 
+const CATCH_UP_IDLE_DELAY_MS = 10_000;
+const CATCH_UP_FALLBACK_DELAY_MS = 60_000;
+
 export interface MCPEngineOptions {
   /**
    * Whether to start the file watcher when initializing. Daemon and direct
@@ -42,6 +45,9 @@ export class MCPEngine {
   private watcherStarted = false;
   private opts: { watch: boolean; dataDir?: string };
   private closed = false;
+  private activeToolCalls = 0;
+  private catchUpStarted = false;
+  private catchUpTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(opts: MCPEngineOptions = {}) {
     this.opts = { watch: opts.watch ?? true, dataDir: opts.dataDir };
@@ -72,6 +78,19 @@ export class MCPEngine {
   /** Whether the default project's SolidKG is open. */
   hasDefaultSolidKG(): boolean {
     return this.toolHandler.hasDefaultSolidKG();
+  }
+
+  beginToolCall(): void {
+    this.activeToolCalls++;
+    if (this.catchUpTimer) {
+      clearTimeout(this.catchUpTimer);
+      this.catchUpTimer = null;
+    }
+  }
+
+  endToolCall(): void {
+    this.activeToolCalls = Math.max(0, this.activeToolCalls - 1);
+    if (this.activeToolCalls === 0) this.scheduleCatchUpSync(CATCH_UP_IDLE_DELAY_MS);
   }
 
   /**
@@ -136,6 +155,8 @@ export class MCPEngine {
   stop(): void {
     if (this.closed) return;
     this.closed = true;
+    if (this.catchUpTimer) clearTimeout(this.catchUpTimer);
+    this.catchUpTimer = null;
     this.toolHandler.closeAll();
     if (this.cg) {
       try { this.cg.close(); } catch { /* ignore */ }
@@ -146,6 +167,8 @@ export class MCPEngine {
   async stopAsync(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    if (this.catchUpTimer) clearTimeout(this.catchUpTimer);
+    this.catchUpTimer = null;
     this.toolHandler.closeAll();
     if (this.cg) {
       const cg = this.cg;
@@ -232,25 +255,40 @@ export class MCPEngine {
   }
 
   /**
-   * Reconcile the index with the current filesystem once, right after open —
-   * catches edits, adds, deletes, and `git pull`/`checkout` changes made while
-   * no watcher was running. Background, never awaited.
+   * Reconcile the index with the current filesystem once the MCP surface is
+   * idle, so startup catch-up work cannot contend with an answer-producing
+   * tool call. A fallback timer still runs it when no tools are ever called.
    */
   private catchUpSync(): void {
-    const cg = this.cg;
-    if (!cg) return;
-    void cg
-      .sync()
-      .then((result) => {
-        const changed = result.filesAdded + result.filesModified + result.filesRemoved;
-        if (changed > 0) {
-          process.stderr.write(`[SolidKG MCP] Caught up ${changed} file(s) changed since last run\n`);
-        }
-      })
-      .catch((err) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`[SolidKG MCP] Catch-up sync failed: ${msg}\n`);
-      });
+    this.scheduleCatchUpSync(CATCH_UP_FALLBACK_DELAY_MS);
+  }
+
+  private scheduleCatchUpSync(delayMs: number): void {
+    if (this.closed || this.catchUpStarted || !this.cg) return;
+    if (this.catchUpTimer) clearTimeout(this.catchUpTimer);
+    this.catchUpTimer = setTimeout(() => {
+      this.catchUpTimer = null;
+      if (this.activeToolCalls > 0) {
+        this.scheduleCatchUpSync(CATCH_UP_IDLE_DELAY_MS);
+        return;
+      }
+      const cg = this.cg;
+      if (!cg || this.closed) return;
+      this.catchUpStarted = true;
+      void cg
+        .sync()
+        .then((result) => {
+          const changed = result.filesAdded + result.filesModified + result.filesRemoved;
+          if (changed > 0) {
+            process.stderr.write(`[SolidKG MCP] Caught up ${changed} file(s) changed since last run\n`);
+          }
+        })
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          process.stderr.write(`[SolidKG MCP] Catch-up sync failed: ${msg}\n`);
+        });
+    }, delayMs);
+    this.catchUpTimer.unref?.();
   }
 }
 

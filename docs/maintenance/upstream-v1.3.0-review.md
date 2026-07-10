@@ -4,6 +4,8 @@ Reviewed range: `v1.0.1...v1.3.0`
 Reviewed on: 2026-07-07  
 Upstream: `colbymchenry/codegraph`
 
+Durable action record: `.upstream-watch/reports/v1.0.1-to-v1.3.0.md`
+
 ## Report summary
 
 `scripts/upstream-watch/report.mjs` found 262 changed upstream files and 175 manifest-matched files. The touched surfaces overlap every protected area: extraction/language coverage, resolution/dynamic dispatch, MCP/daemon behavior, installer/release packaging, tests, and docs.

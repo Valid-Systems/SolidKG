@@ -101,7 +101,9 @@ export function renderStaticScene(value: unknown) {
     expect(text).toContain('heuristic incomplete, confidence 0.55');
     expect(text).toContain('Binary sufficiency: sufficient');
     expect(text).toContain('Returned evidence actionability:');
-    expect(text).toContain('requires_focused_follow_up');
+    expect(text).toContain('Blockers: none');
+    expect(text).toContain('answer_from_returned_evidence');
+    expect(text).not.toContain('requires_focused_follow_up');
     expect(text).toContain('heuristic_edge');
     expect(text).not.toContain('safe_to_edit');
     expect(text).not.toContain('safe_to_review');

@@ -327,6 +327,25 @@ describe('Installer readiness smoke coverage', () => {
 });
 
 describe('Installer instructions template', () => {
+  it('documents the compact explore default and explicit advanced profile across public guidance', () => {
+    const guidanceSurfaces = {
+      serverInstructions: fs.readFileSync(path.join(process.cwd(), 'src', 'mcp', 'server-instructions.ts'), 'utf-8'),
+      installerTemplate: fs.readFileSync(path.join(process.cwd(), 'src', 'installer', 'instructions-template.ts'), 'utf-8'),
+      cursorRule: fs.readFileSync(path.join(process.cwd(), '.cursor', 'rules', 'solidkg.mdc'), 'utf-8'),
+      agents: fs.readFileSync(path.join(process.cwd(), 'AGENTS.md'), 'utf-8'),
+      readme: fs.readFileSync(path.join(process.cwd(), 'README.md'), 'utf-8'),
+      siteMcpDocs: fs.readFileSync(path.join(process.cwd(), 'site', 'src', 'content', 'docs', 'reference', 'mcp-server.md'), 'utf-8'),
+    };
+
+    for (const [surface, content] of Object.entries(guidanceSurfaces)) {
+      expect.soft(content, `${surface} should document the compact answer surface`).toMatch(/(?:default|compact) MCP profile[\s\S]{0,180}(?:only|one)[\s\S]{0,100}solidkg_explore/i);
+      expect.soft(content, `${surface} should document advanced-tool opt in`).toContain('SOLIDKG_MCP_TOOLS=all');
+    }
+
+    expect(guidanceSurfaces.installerTemplate).toContain('ONE call usually answers a structural question.');
+    expect(guidanceSurfaces.cursorRule).toContain('ONE call usually answers a structural question.');
+  });
+
   it('keeps package benchmark claims tied to reproducible context', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8')) as {
       description?: string;
@@ -383,22 +402,15 @@ describe('Installer instructions template', () => {
       installerTemplate: fs.readFileSync(path.join(process.cwd(), 'src', 'installer', 'instructions-template.ts'), 'utf-8'),
       agents: fs.readFileSync(path.join(process.cwd(), 'AGENTS.md'), 'utf-8'),
     };
-    const { serverInstructions, installerTemplate } = guidanceSurfaces;
-
-    expect(serverInstructions).toContain('source-completeness fields describe returned source coverage only.');
-    expect(serverInstructions).toContain('not answer/path/runtime correctness, confidence, query-quality, or global false-path guarantees.');
-    expect(serverInstructions).toContain('if status indicates omitted/truncated/unreadable/skipped source, do focused SolidKG follow-up first');
-
-    expect(installerTemplate).toContain('source-completeness fields are returned-source coverage only, not answer/path/runtime correctness, confidence, query quality, or global false-path guarantees.');
-    expect(installerTemplate).toContain('When source is omitted/truncated/unreadable/skipped, do focused SolidKG follow-up first.');
-    expect(installerTemplate).not.toContain('Claude Code');
-
     for (const [surface, content] of Object.entries(guidanceSurfaces)) {
       expect.soft(content, `${surface} should not make absolute trust claims`).not.toContain('Trust solidkg results.');
       expect.soft(content, `${surface} should not prohibit targeted re-checks`).not.toContain('Do NOT re-verify them with grep.');
+      expect.soft(content, `${surface} should define source completeness as coverage metadata`).toMatch(/source-completeness fields (?:describe|are) returned-source coverage only/i);
+      expect.soft(content, `${surface} should not force continuation for bounded peripheral coverage`).toMatch(/(?:do not|must not) (?:follow up|request another graph call) solely because (?:peripheral )?candidate coverage is partial[\s\S]{0,40}omitted[\s\S]{0,40}truncated/i);
       expect.soft(content, `${surface} should prefer graph-first lookup without overclaiming`).toContain('Prefer SolidKG over broad grep/read loops.');
-      expect.soft(content, `${surface} should tie Read fallback to explicit trust signals`).toContain('Fall back to targeted Read only when SolidKG reports stale, truncated, omitted, unreadable, ambiguous, or heuristic-only results.');
+      expect.soft(content, `${surface} should tie Read fallback to required evidence`).toMatch(/Fall back to targeted Read\s+only when the answer packet is insufficient because required source is stale[\s\S]{0,40}unreadable[\s\S]{0,40}(?:absent|missing)/i);
     }
+    expect(guidanceSurfaces.installerTemplate).not.toContain('Claude Code');
   });
 
   it('documents sufficient answer packets and node-loop avoidance consistently', () => {
@@ -411,7 +423,7 @@ describe('Installer instructions template', () => {
 
     for (const [surface, content] of Object.entries(guidanceSurfaces)) {
       expect.soft(content, `${surface} should tell agents to answer from sufficient returned context`).toContain('When an answer packet says the returned context is sufficient, answer from that context instead of drilling further.');
-      expect.soft(content, `${surface} should reserve node for one missing hop`).toContain('Use solidkg_node for one specific missing symbol or hop, not as a loop over many symbols.');
+      expect.soft(content, `${surface} should reserve node for one missing hop`).toMatch(/(?:Use )?`?solidkg_node`? (?:is )?for one specific missing symbol or hop, not (?:as )?a loop over many symbols/i);
     }
   });
 
@@ -442,7 +454,7 @@ describe('Installer instructions template', () => {
       cursorRules: fs.readFileSync(path.join(process.cwd(), '.cursor', 'rules', 'solidkg.mdc'), 'utf-8'),
       siteMcpDocs: fs.readFileSync(path.join(process.cwd(), 'site', 'src', 'content', 'docs', 'reference', 'mcp-server.md'), 'utf-8'),
     };
-    const overviewFormat = /format(?:[:=])\s*["']overview["']/;
+    const overviewFormat = /format(?:[:=])\s*(?:["']overview["']|overview)/;
     const overviewProvenance = /derived from (?:the current |the )?(?:`?\.solidkg\/?`? )?index|derived from indexed facts/i;
 
     for (const [surface, content] of Object.entries(guidanceSurfaces)) {
@@ -457,11 +469,10 @@ describe('Installer instructions template', () => {
     expect(INSTRUCTIONS_TEMPLATE).toContain('solidkg_precise_refs');
   });
 
-  it('documents provider-neutral Code Context query precision', () => {
-    expect(INSTRUCTIONS_TEMPLATE).toContain('Make Code Context queries precise');
-    expect(INSTRUCTIONS_TEMPLATE).toContain('concrete symbols, classes, methods, annotations, framework keywords');
-    expect(INSTRUCTIONS_TEMPLATE).toContain('EventPublisher');
-    expect(INSTRUCTIONS_TEMPLATE).toContain('@Async');
+  it('documents provider-neutral natural-language and precise explore input', () => {
+    expect(INSTRUCTIONS_TEMPLATE).toContain('natural-language structural question');
+    expect(INSTRUCTIONS_TEMPLATE).toContain('precise symbol/file/code terms');
+    expect(INSTRUCTIONS_TEMPLATE).not.toContain('run solidkg_search first');
     expect(INSTRUCTIONS_TEMPLATE).not.toContain('Claude Code');
   });
 
@@ -474,7 +485,7 @@ describe('Installer instructions template', () => {
   });
 
   it('tells agents not to re-read explore source', () => {
-    expect(INSTRUCTIONS_TEMPLATE).toContain('Treat returned source as already read');
+    expect(INSTRUCTIONS_TEMPLATE).toContain('Treat returned source as already Read');
   });
 });
 
@@ -764,8 +775,8 @@ describe('Installer targets — partial-state idempotency', () => {
     expect(body).toContain('<!-- SOLIDKG_START -->');
     expect(body).toContain('<!-- SOLIDKG_END -->');
     expect(body).toContain('solidkg_callers');
-    expect(body).toContain('source-completeness fields are returned-source coverage only, not answer/path/runtime correctness, confidence, query quality, or global false-path guarantees.');
-    expect(body).toContain('When source is omitted/truncated/unreadable/skipped, do focused SolidKG follow-up first.');
+    expect(body).toMatch(/Source-completeness fields are returned-source coverage only/i);
+    expect(body).toContain('Do not follow up solely because candidate coverage is partial, omitted, or truncated.');
   });
 
   it('opencode: install removes legacy CodeGraph instructions block', () => {

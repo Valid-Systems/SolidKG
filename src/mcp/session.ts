@@ -16,7 +16,7 @@ import * as path from 'path';
 import { JsonRpcRequest, JsonRpcNotification, JsonRpcTransport, ErrorCodes } from './transport';
 import { MCPEngine } from './engine';
 import { tools, type ToolResult } from './tools';
-import { SERVER_INSTRUCTIONS } from './server-instructions';
+import { getServerInstructions } from './server-instructions';
 import { SolidKGPackageVersion } from './version';
 
 /**
@@ -215,7 +215,7 @@ export class MCPSession {
       protocolVersion: PROTOCOL_VERSION,
       capabilities: { tools: {} },
       serverInfo: SERVER_INFO,
-      instructions: SERVER_INSTRUCTIONS,
+      instructions: getServerInstructions(),
     });
 
     if (explicitPath) {
@@ -260,8 +260,11 @@ export class MCPSession {
     await this.retryInitIfNeeded();
 
     const timeoutMs = toolCallTimeoutMs();
+    this.engine.beginToolCall();
+    const execution = this.engine.getToolHandler().execute(toolName, toolArgs)
+      .finally(() => this.engine.endToolCall());
     const result = await withTimeout(
-      this.engine.getToolHandler().execute(toolName, toolArgs),
+      execution,
       timeoutMs,
       () => timeoutToolResult(toolName, timeoutMs),
     );

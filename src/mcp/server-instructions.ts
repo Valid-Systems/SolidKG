@@ -16,6 +16,39 @@
  */
 export const SERVER_INSTRUCTIONS = `# SolidKG: code intelligence over an indexed knowledge graph
 
+SolidKG is a local SQLite graph of source files, symbols, relationships, and
+line-numbered source. Use it before filesystem search for structural questions.
+
+## One default tool: solidkg_explore
+
+The compact MCP profile exposes one answer-producing tool: \`solidkg_explore\`.
+It accepts either a natural-language question or precise symbol/file names and
+returns the relevant verbatim, line-numbered source grouped by file, plus call
+paths, dynamic-dispatch links, and blast-radius context where available.
+
+ONE call usually answers a structural question. Treat every returned source
+block as already Read. Call \`solidkg_explore\` again only when the question needs
+a different named symbol or file; do not re-read shown files with Read/Grep.
+
+Source-completeness fields are returned-source coverage only, not answer/path/runtime
+correctness, confidence, query quality, or global false-path guarantees.
+When the answer packet says the selected evidence is sufficient, answer from it
+even if peripheral candidates were omitted or source windows were bounded.
+Do not follow up solely because candidate coverage is partial, omitted, or
+truncated. Prefer SolidKG over broad grep/read loops. Fall back to targeted Read
+only when the answer packet is insufficient because required source is stale,
+unreadable, or absent.
+
+The raw MCP server tool names use \`solidkg_*\`; this profile exposes
+\`solidkg_explore\`. A client may display a host-specific server prefix around it;
+do not add another \`solidkg_\` prefix in calls.
+
+Set \`SOLIDKG_MCP_TOOLS=all\` on the MCP server to expose the full advanced tool
+surface for explicit trace, impact, SCIP, snapshot, and architecture workflows.
+`;
+
+export const FULL_SERVER_INSTRUCTIONS = `# SolidKG: code intelligence over an indexed knowledge graph
+
 SolidKG is a SQLite knowledge graph of every symbol, edge, and file
 in the workspace. Reads are sub-millisecond; the index lags writes by
 about a second through the file watcher. Consult it BEFORE writing or
@@ -23,14 +56,10 @@ editing code, not during.
 
 ## Answer directly — don't delegate exploration
 
-For "how does X work", architecture, trace, or where-is-X questions,
-answer DIRECTLY using 2-3 solidkg calls: \`solidkg_context\` first,
-then ONE \`solidkg_explore\` for the source of the symbols it surfaces.
-Make Code Context queries precise: include concrete symbols, classes,
-methods, annotations, framework keywords, and file or package hints when you
-have them. Prefer "EventPublisher Consumer DomainEvent StreamBridge @Async
-AiTaskExecutorService AsyncConfig" over vague natural language like "async
-queue flow" alone.
+For ordinary structural questions, call \`solidkg_explore\` with the natural-
+language question or precise symbol/file terms and answer from one sufficient
+result. Use the advanced tools below only for an explicit trace, impact, SCIP,
+snapshot, architecture, status, or one-symbol workflow.
 SolidKG IS the pre-built search index — so delegating the lookup to a
 separate file-reading sub-task/agent, or running your own grep + read
 loop, repeats work solidkg already did and costs more for the same
@@ -46,7 +75,7 @@ or permission strings; do not add another \`solidkg_\` prefix when calling tools
 
 - **"What is the symbol named X?"** → \`solidkg_search\`
 - **"What's the deal with this task / feature / area?"** -> \`solidkg_context\` (PRIMARY, composes search + node + callers + callees in one call; include concrete symbol/class/method/annotation/framework keywords in the query)
-- **"Show me several related symbols' source / survey an area."** -> \`solidkg_explore\` (ONE capped call with top-level and per-file source-coverage status; prefer over many solidkg_node/Read; use it for additional related symbols/source, not for trace hop bodies)
+- **"How does this area work? / show related production source."** -> \`solidkg_explore\` (PRIMARY answer tool for natural-language questions or precise names; one call returns ranked source and graph evidence)
 - **"How does X reach/become Y? / trace the flow / the path from X to Y"** -> \`solidkg_trace\` (ONE call returns the whole call path with each hop's body/source inlined, plus the destination symbol's outgoing callees; it already bridges dynamic-dispatch hops like callbacks, React re-render, and JSX children that grep can't follow)
 - **"What calls this?"** → \`solidkg_callers\`
 - **"What does this call?"** → \`solidkg_callees\`
@@ -63,13 +92,13 @@ or permission strings; do not add another \`solidkg_\` prefix when calling tools
 - **Flow / "how does X reach Y"**: \`solidkg_trace\` from -> to FIRST. One call returns the entire path with each hop's body/source inlined and the destination symbol's outgoing callees already included. Use a second source-oriented lookup only for additional related symbols/source, not for hop bodies. Do NOT reconstruct the path with \`solidkg_search\` + \`solidkg_callers\`, that's exactly what trace does in a single call.
 - **Code Context query precision**: when calling \`solidkg_context\`, name concrete symbols, classes, methods, annotations, and framework keywords from the task. Add likely anchors even if you are not sure all exist. This keeps the context focused and prevents vague task descriptions from drifting to unrelated symbols.
 - **Ambiguous flow endpoints**: if \`solidkg_trace\` reports multiple callable symbols for an unqualified name, retry with the qualified or path-qualified form shown in the candidates. The source-surfacing tool may omit its Flow section for duplicate unqualified names rather than show a misleading same-name path.
-- **Onboarding**: \`solidkg_context\` first. If still unclear, a focused breadth survey for more related symbols/source, then \`solidkg_node\` on specific symbols.
+- **Onboarding**: call \`solidkg_explore\` with the repository question. Use \`solidkg_files format="overview"\` only when an explicit repository map is required.
 - **Repository orientation**: call \`solidkg_files\` with \`format: "overview"\` before reading directories manually. The overview is derived from the index and stays budgeted with \`maxDepth\`, \`expandPaths\`, and \`maxEntries\`.
 - **Source completeness interpretation**: \`solidkg_context\` and \`solidkg_explore\` source-completeness fields describe returned source coverage only. They are not answer/path/runtime correctness, confidence, query-quality, or global false-path guarantees.
 - **Answer packet interpretation**: answer packets are deterministic returned-context metadata: evidence anchors, ranking reasons, binary sufficiency, suggested next SolidKG tools, and bounded uncertainty labels. Ranking reasons may include \`source_body_chunk\` when persisted source-body/code-token chunks seeded or boosted a result; exact symbol/path/trace evidence remains higher-salience than body-only evidence. When an answer packet says the returned context is sufficient, answer from that context instead of drilling further. Use them to decide whether to answer or make a focused SolidKG follow-up; they are not proof of runtime correctness.
 - **Capability footprint interpretation**: when \`solidkg_trace\` or \`solidkg_node\` includes a Capability footprint section, treat it as evidence about may-read/write/guard/emit/subscribe/send/mutate behavior, not proof of runtime execution. Coverage states (\`complete\`, \`partial\`, \`unsupported\`, \`failed\`, \`not_run\`, \`stale\`) describe capability-producer coverage for the returned files; empty assertions do not prove no capability exists.
-- **Calibrated trust**: Prefer SolidKG over broad grep/read loops. Fall back to targeted Read only when SolidKG reports stale, truncated, omitted, unreadable, ambiguous, or heuristic-only results. Insufficient returned context should also stay focused on SolidKG follow-up before any targeted Read.
-- **When source is incomplete**: if status indicates omitted/truncated/unreadable/skipped source, do focused SolidKG follow-up first (narrower \`solidkg_explore\`, qualified \`solidkg_trace\`, or targeted \`solidkg_node\`) before broad Read/Grep fallback.
+- **Calibrated trust**: source-completeness fields are coverage metadata. When the packet is sufficient, answer even if peripheral candidates were omitted or windows were bounded. Do not follow up solely because coverage is partial, omitted, or truncated.
+- **When evidence is insufficient**: use one focused advanced call only for missing required anchors, stale/unreadable required source, no results/path, or explicit endpoint ambiguity. Fall back to targeted Read only when required source is stale, unreadable, or absent.
 - **Refactor planning**: \`solidkg_search\` → \`solidkg_callers\` → \`solidkg_impact\`. The blast-radius answer comes from impact, not from walking callers manually.
 - **Refactor verification**: \`solidkg_snapshot\` action=create before the change, then action=diff after indexing/syncing to see added/removed/changed nodes, edges, hyperedges, and hyperedge members.
 - **Architecture rollup**: \`solidkg_architecture\` action=analyze with explicit layer rules when you need layers; action=get/coupling/package reuses the last analyzed report.
@@ -97,4 +126,16 @@ or permission strings; do not add another \`solidkg_\` prefix when calling tools
 - SCIP data is optional and additive; if no SCIP index file was generated or imported, precise refs sections simply won't appear.
 - No live correctness validation — that's still the TypeScript compiler / test suite / linter's job. SolidKG supplements those with structural context they don't have.
 `;
+
+export function getServerInstructions(): string {
+  const configuredTools = process.env.SOLIDKG_MCP_TOOLS?.trim();
+  if (!configuredTools) return SERVER_INSTRUCTIONS;
+  const tools = configuredTools
+    .split(',')
+    .map((tool) => tool.trim().replace(/^solidkg_/, ''))
+    .filter((tool) => tool.length > 0);
+  return tools.length === 1 && tools[0] === 'explore'
+    ? SERVER_INSTRUCTIONS
+    : FULL_SERVER_INSTRUCTIONS;
+}
 

@@ -41,4 +41,4 @@ Each accepts `--json` for machine-readable output. See the full [CLI reference](
 
 ## Hand it to your agent
 
-With a `.solidkg/` directory present and an agent configured (see [Installation](/solidkg/getting-started/installation/)), your agent uses the [MCP tools](/solidkg/reference/mcp-server/) automatically — no extra step.
+With a `.solidkg/` directory present and an agent configured (see [Installation](/solidkg/getting-started/installation/)), your agent automatically receives the compact/default [MCP profile](/solidkg/reference/mcp-server/) with one answer-producing tool, `solidkg_explore`. Set `SOLIDKG_MCP_TOOLS=all` on the server process only when you need the advanced surface.

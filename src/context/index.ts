@@ -38,7 +38,15 @@ import { buildOverviewTree, formatOverviewTree } from '../overview';
 import { logDebug } from '../errors';
 import { validatePathWithinRoot, normalizePath } from '../utils';
 import { buildSourceRoots, ExtractionOrchestratorOptions, SourceRoot } from '../extraction';
-import { isTestFile, extractSearchTerms, scorePathRelevance, getStemVariants, kindBonus, nameMatchBonus } from '../search/query-utils';
+import {
+  isTestFile,
+  extractSearchTerms,
+  selectRetrievalSearchTerms,
+  scorePathRelevance,
+  getStemVariants,
+  kindBonus,
+  nameMatchBonus,
+} from '../search/query-utils';
 import { isGeneratedFile, isGeneratedFileQuery } from '../search/path-classifiers';
 import { buildContextAnswerPacket } from '../evidence/packets';
 import { SOLIDKG_VERSION } from '../version';
@@ -906,6 +914,7 @@ export class ContextBuilder {
     const mcpToolHandlerAliases = new Set(extractMcpToolHandlerAliases(query).map(alias => alias.toLowerCase()));
     const symbolsFromQuery = extractSymbolsFromQuery(query);
     const qualifiedSymbolsFromQuery = extractQualifiedSymbolsFromQuery(query);
+    const retrievalTerms = selectRetrievalSearchTerms(query, 4);
     logDebug('Extracted symbols from query', { query, symbols: symbolsFromQuery });
 
     // Step 2: Look up exact matches for extracted symbols
@@ -1003,6 +1012,7 @@ export class ContextBuilder {
       }
     }
 
+    const qualifiedMatchIds = new Set<string>();
     if (qualifiedSymbolsFromQuery.length > 0) {
       const candidateKinds = opts.nodeKinds && opts.nodeKinds.length > 0 ? opts.nodeKinds : undefined;
       const qualifiedMatches: SearchResult[] = [];
@@ -1020,6 +1030,7 @@ export class ContextBuilder {
         for (const candidate of candidates) {
           const qualifiedScore = scoreQualifiedSymbolMatch(candidate.node, qualifiedSymbol);
           if (qualifiedScore > 0) {
+            qualifiedMatchIds.add(candidate.node.id);
             qualifiedMatches.push({
               ...candidate,
               score: candidate.score + qualifiedScore,
@@ -1053,8 +1064,8 @@ export class ContextBuilder {
       const definitionKinds: NodeKind[] = ['class', 'interface', 'struct', 'trait',
         'protocol', 'enum', 'type_alias'];
       // Expand symbols with stem variants for broader definition matching
-      const expandedSymbols = new Set(symbolsFromQuery);
-      for (const sym of symbolsFromQuery) {
+      const expandedSymbols = new Set(retrievalTerms);
+      for (const sym of retrievalTerms) {
         for (const variant of getStemVariants(sym)) {
           expandedSymbols.add(variant);
         }
@@ -1110,7 +1121,7 @@ export class ContextBuilder {
       if (mcpToolHandlerFiles.size > 0) {
         fullQueryResults = fullQueryResults.filter(result => mcpToolHandlerFiles.has(result.node.filePath));
       }
-      const searchTerms = extractSearchTerms(query);
+      const searchTerms = retrievalTerms;
       if (searchTerms.length > 0) {
         // Search each term individually to get broader coverage,
         // then boost results that match multiple terms
@@ -1292,7 +1303,7 @@ export class ContextBuilder {
       const camelNodeTerms = new Map<string, { result: SearchResult; termCount: number }>();
       const maxCamelPerTerm = Math.ceil(opts.searchLimit / 2);
 
-      for (const sym of symbolsFromQuery) {
+      for (const sym of retrievalTerms) {
         const titleCased = sym.charAt(0).toUpperCase() + sym.slice(1).toLowerCase();
         if (titleCased.length < 3) continue;
         const termKey = titleCased.toLowerCase();
@@ -1370,11 +1381,11 @@ export class ContextBuilder {
       // START with a query term (e.g., "SearchShardsRequest" starts with "Search").
       // For multi-word queries, a class matching multiple query terms in its name
       // is almost certainly relevant regardless of position.
-      if (symbolsFromQuery.length >= 2) {
+      if (retrievalTerms.length >= 2) {
         // Collect ALL LIKE results per term (reusing findNodesByNameSubstring)
         // but without the CamelCase boundary or prefix exclusion filters.
         const compoundTermMap = new Map<string, { node: Node; terms: Set<string> }>();
-        for (const sym of symbolsFromQuery) {
+        for (const sym of retrievalTerms) {
           const titleCased = sym.charAt(0).toUpperCase() + sym.slice(1).toLowerCase();
           if (titleCased.length < 3) continue;
 
@@ -1466,7 +1477,10 @@ export class ContextBuilder {
     // Final sort and truncation — all search channels (exact, text, CamelCase,
     // compound) have now contributed. Sort by score so multi-term matches from
     // later steps can outrank dampened single-term matches from earlier steps.
-    searchResults.sort((a, b) => b.score - a.score);
+    searchResults.sort((a, b) => {
+      const qualifiedDelta = Number(qualifiedMatchIds.has(b.node.id)) - Number(qualifiedMatchIds.has(a.node.id));
+      return qualifiedDelta || b.score - a.score;
+    });
     searchResults = searchResults.slice(0, opts.searchLimit * 3);
 
     searchResults = this.applyRootScopedFailClosedFilter(query, searchResults);

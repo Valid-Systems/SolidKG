@@ -33,7 +33,7 @@ import type {
 import { buildFailureAnswerPacket, buildNodeAnswerPacket, formatAnswerPacketMarkdown } from '../evidence/packets';
 import { buildGraphTraversalPacket, formatGraphTraversalPacketMarkdown, type GraphTraversalDirection, type GraphTraversalLimit, type GraphTraversalResult } from '../graph';
 import { mergeTraversalResults, relationCountsForEdges } from '../graph/traversal-results';
-import { extractSearchTerms } from '../search/query-utils';
+import { isTestFile, selectRetrievalSearchTerms } from '../search/query-utils';
 import { createHash } from 'crypto';
 import {
   constants as fsConstants,
@@ -88,6 +88,7 @@ const MAX_INPUT_LENGTH = 10_000;
  */
 const MAX_PATH_LENGTH = 4_096;
 const MAX_OVERVIEW_EXPAND_PATHS = 50;
+const DEFAULT_MCP_TOOLS = new Set(['explore']);
 
 /**
  * Node kinds that contain other symbols. For these, `solidkg_node` with
@@ -183,9 +184,29 @@ function exactExploreFileQueryTokens(query: string): Map<string, number> {
   return tokens;
 }
 
+function isNaturalLanguageExploreQuery(query: string): boolean {
+  if (/[?]/.test(query)
+    || /\b(?:how|what|why|where|when|does|this|the|through|from|into|with|and|or)\b/i.test(query)) {
+    return true;
+  }
+  const tokens = query.split(/[\s,()[\]]+/).filter(Boolean);
+  const plainWords = tokens.filter((token) => /^[a-z][a-z0-9-]{2,}$/u.test(token));
+  return tokens.length > 8 && plainWords.length >= 3;
+}
+
 function exactExploreSymbolQueryTokens(query: string): Set<string> {
   const tokens = new Set<string>();
+  const naturalLanguageQuery = isNaturalLanguageExploreQuery(query);
   for (const raw of query.split(/\s+/)) {
+    if (naturalLanguageQuery) {
+      const explicitToken = raw.replace(/^[`'"(<[{]+|[`'"\])>}.,;:?!*]+$/g, '');
+      const uppercaseCount = explicitToken.match(/[A-Z]/g)?.length ?? 0;
+      const explicitIdentifier = /[_$]/.test(explicitToken)
+        || /[a-z][A-Z]/.test(explicitToken)
+        || (uppercaseCount >= 2 && /[a-z]/.test(explicitToken))
+        || /^[A-Z]{4,}$/.test(explicitToken);
+      if (!explicitIdentifier) continue;
+    }
     const token = normalizeExplorePathToken(raw);
     if (!token) continue;
 
@@ -196,8 +217,9 @@ function exactExploreSymbolQueryTokens(query: string): Set<string> {
     if (normalized !== token && /^[a-z_$][a-z0-9_$]*$/i.test(normalized)) {
       tokens.add(normalized);
     }
+    if (naturalLanguageQuery && tokens.size >= 8) break;
   }
-  return tokens;
+  return new Set([...tokens].sort((left, right) => right.length - left.length || left.localeCompare(right)));
 }
 
 /**
@@ -372,6 +394,7 @@ export class ToolHandler {
   // once and every later tool call reuses the result — never shelling out to
   // git on the hot path. `undefined` = not computed yet; `null` = no mismatch.
   private worktreeMismatchCache: Map<string, WorktreeIndexMismatch | null> = new Map();
+  private indexedRootLabelsCache = new WeakMap<SolidKG, Set<string>>();
 
   constructor(private cg: SolidKG | null, private defaultDataDir?: string) {}
 
@@ -400,22 +423,26 @@ export class ToolHandler {
   /**
    * Optional allowlist of exposed tools, parsed from the SOLIDKG_MCP_TOOLS
    * env var (comma-separated short names, e.g. "trace,search,node,context").
-   * Unset/empty → every tool is exposed. Lets an operator (or an A/B harness)
-   * trim the tool surface without rebuilding the client config; the ablated
-   * tool is then truly absent from ListTools rather than merely denied on call.
+   * Unset/empty → the compact explore-only profile. `all` restores every tool.
+   * Lets an operator (or an A/B harness) select the surface without rebuilding
+   * the client config. Explicit custom allowlists deny omitted tools on call;
+   * the implicit compact profile only changes discovery for cached-client compatibility.
    * Matching is on the short form, so "trace" and "solidkg_trace" both work.
    */
   private toolAllowlist(): Set<string> | null {
     const raw = process.env.SOLIDKG_MCP_TOOLS;
-    if (!raw || !raw.trim()) return null;
+    if (!raw || !raw.trim()) return new Set(DEFAULT_MCP_TOOLS);
     const short = (s: string) => s.trim().replace(/^solidkg_/, '');
     const entries = raw.split(',').map(short).filter((entry) => entry.length > 0);
+    if (entries.includes('all')) return null;
     const set = new Set<string>(entries);
-    return set.size ? set : null;
+    return set.size ? set : new Set(DEFAULT_MCP_TOOLS);
   }
 
   /** Whether a tool name passes the SOLIDKG_MCP_TOOLS allowlist (if any). */
   private isToolAllowed(name: string): boolean {
+    const configuredProfile = process.env.SOLIDKG_MCP_TOOLS?.trim();
+    if (!configuredProfile) return true;
     const allow = this.toolAllowlist();
     return !allow || allow.has(name.replace(/^solidkg_/, ''));
   }
@@ -1460,7 +1487,7 @@ export class ToolHandler {
       `## Trace: ${from} → ${to}`,
       '',
       sourceCoverage !== 'complete'
-        ? `Execution path below — ${path.length} hops, with incomplete returned source for one or more bodies. Use focused follow-up before treating omitted lines as covered.`
+        ? `Execution path below — ${path.length} hops, with bounded returned source for one or more bodies. The coverage label does not mean a path hop is missing.`
         : `Full execution path below — ${path.length} hops, each with its body, plus what the destination calls. This is the complete returned flow for explanation/localization.`,
       '',
       `${path.length} hops:`,
@@ -1743,11 +1770,14 @@ export class ToolHandler {
       // resolved exactly by findAllSymbols. (The old strip mangled Class.method
       // into Class, throwing the method away.)
       const FILE_EXT = /\.(?:java|kt|kts|ts|tsx|js|jsx|mjs|cjs|cs|py|go|rb|php|swift|rs|cpp|cc|cxx|c|h|hpp|scala|lua|dart|vue|svelte)$/i;
-      const tokens = [...new Set(
+      const rawTokens = [...new Set(
         query.split(/[\s,()[\]]+/)
           .map((t) => t.replace(FILE_EXT, '').trim())
           .filter((t) => t.length >= 3 && /^[A-Za-z_$][\w$.:/$]*$/.test(t))
       )].slice(0, 16);
+      const naturalLanguageQuery = isNaturalLanguageExploreQuery(query);
+      if (naturalLanguageQuery) return '';
+      const tokens = rawTokens;
       if (tokens.length < 2) return '';
       // Pool of name SEGMENTS (Class + method from every token) used to
       // disambiguate an ambiguous SIMPLE name: keep a candidate only if its
@@ -1755,6 +1785,7 @@ export class ToolHandler {
       const segPool = new Set<string>();
       for (const t of tokens) for (const s of t.toLowerCase().split(/::|\./)) if (s) segPool.add(s);
       const named = new Map<string, Node>();
+      let unresolvedAmbiguity: { symbol: string; candidates: Node[] } | null = null;
       for (const t of tokens) {
         const cands = findAllSymbols(cg, t, { exactQualified: true }).nodes.filter((n) => CALLABLE_NODE_KINDS.has(n.kind));
         const isQualified = this.isQualifiedSymbol(t);
@@ -1762,7 +1793,12 @@ export class ToolHandler {
         let pick: Node[];
         if (!isQualified && cands.length > 1) {
           pick = cands.filter((n) => this.isAnchoredByOtherQueryToken(n, t, tokens));
-          if (pick.length !== 1) return this.formatExploreFlowAmbiguity(t, cands);
+          if (pick.length !== 1) {
+            if (!naturalLanguageQuery && unresolvedAmbiguity === null) {
+              unresolvedAmbiguity = { symbol: t, candidates: cands };
+            }
+            continue;
+          }
         } else if (isQualified || cands.length <= 3) {
           pick = cands;
         } else {
@@ -1775,7 +1811,11 @@ export class ToolHandler {
         for (const n of pick.slice(0, 6)) named.set(n.id, n);
         if (named.size > 40) break;
       }
-      if (named.size < 2) return '';
+      if (named.size < 2) {
+        return unresolvedAmbiguity
+          ? this.formatExploreFlowAmbiguity(unresolvedAmbiguity.symbol, unresolvedAmbiguity.candidates)
+          : '';
+      }
       const MAX_HOPS = 7;
       let best: Array<{ node: Node; edge: Edge | null }> | null = null;
       // BFS the full call graph (incl. synth edges) from each named seed, but
@@ -1807,7 +1847,11 @@ export class ToolHandler {
         chain.reverse();
         if (!best || chain.length > best.length) best = chain;
       }
-      if (!best || best.length < 3) return '';
+      if (!best || best.length < 3) {
+        return unresolvedAmbiguity
+          ? this.formatExploreFlowAmbiguity(unresolvedAmbiguity.symbol, unresolvedAmbiguity.candidates)
+          : '';
+      }
       const nameCounts = new Map<string, number>();
       for (const step of best) nameCounts.set(step.node.name, (nameCounts.get(step.node.name) ?? 0) + 1);
       const out = ['## Flow (call path among the symbols you queried)', ''];
@@ -1844,21 +1888,36 @@ export class ToolHandler {
     // largest-tier defaults if stats aren't available, which preserves
     // pre-#185 behavior for callers that hit the rare stats failure.
     let budget: ExploreOutputBudget;
+    let indexedFileCount = Number.POSITIVE_INFINITY;
     try {
-      budget = getExploreOutputBudget(cg.getStats().fileCount);
+      indexedFileCount = cg.getStats().fileCount;
+      budget = getExploreOutputBudget(indexedFileCount);
     } catch {
       budget = getExploreOutputBudget(Infinity);
     }
     const maxFiles = clamp((args.maxFiles as number) || budget.defaultMaxFiles, 1, 20);
+    const exactFileTokens = exactExploreFileQueryTokens(query);
+    const exactSymbolTokens = exactExploreSymbolQueryTokens(query);
+    const exactFileAnchors = [...exactFileTokens.keys()].filter((token) => !token.includes('/'));
+    const retrievalQuery = exactFileTokens.size > 0
+      ? [...exactFileAnchors, ...exactSymbolTokens].slice(0, 12).join(' ')
+      : query;
+    const maxCharsPerFile = exactSymbolTokens.size >= 4
+      ? Math.max(3_000, Math.min(
+        budget.maxCharsPerFile,
+        Math.floor(budget.maxOutputChars / Math.min(maxFiles, exactSymbolTokens.size + 2)),
+      ))
+      : budget.maxCharsPerFile;
 
     // Step 1: Find relevant context with generous parameters.
     // Use a large maxNodes budget — explore has its own 35k char output limit
     // that prevents context bloat, so more nodes just means better coverage
     // across entry points (especially for large files like Svelte components).
-    const subgraph = await cg.findRelevantContext(query, {
-      searchLimit: 8,
-      traversalDepth: 3,
-      maxNodes: 200,
+    const largeProject = indexedFileCount >= 5_000;
+    const subgraph = await cg.findRelevantContext(retrievalQuery, {
+      searchLimit: largeProject ? 6 : 8,
+      traversalDepth: largeProject ? 2 : 3,
+      maxNodes: largeProject ? 120 : 200,
       minScore: 0.2,
     });
 
@@ -1914,29 +1973,29 @@ export class ToolHandler {
     const subgraphFiles = new Set<string>();
     for (const n of subgraph.nodes.values()) subgraphFiles.add(n.filePath);
     const GLUE_NODE_CAP = 60;
-    for (const rootId of subgraph.roots) {
-      if (glueNodeIds.size >= GLUE_NODE_CAP) break;
-      let neighbors: Node[] = [];
-      try {
-        neighbors = [
-          ...cg.getCallers(rootId).map(c => c.node),
-          ...cg.getCallees(rootId).map(c => c.node),
-        ];
-      } catch {
-        continue;
-      }
-      for (const nb of neighbors) {
+    if (indexedFileCount < 5_000) {
+      for (const rootId of subgraph.roots) {
         if (glueNodeIds.size >= GLUE_NODE_CAP) break;
-        if (subgraph.nodes.has(nb.id)) continue;
-        if (!subgraphFiles.has(nb.filePath)) continue;
-        subgraph.nodes.set(nb.id, nb);
-        glueNodeIds.add(nb.id);
+        let neighbors: Node[] = [];
+        try {
+          neighbors = [
+            ...cg.getCallers(rootId).map(c => c.node),
+            ...cg.getCallees(rootId).map(c => c.node),
+          ];
+        } catch {
+          continue;
+        }
+        for (const nb of neighbors) {
+          if (glueNodeIds.size >= GLUE_NODE_CAP) break;
+          if (subgraph.nodes.has(nb.id)) continue;
+          if (!subgraphFiles.has(nb.filePath)) continue;
+          subgraph.nodes.set(nb.id, nb);
+          glueNodeIds.add(nb.id);
+        }
       }
     }
 
-    const queryTerms = query.toLowerCase().split(/\s+/).filter(t => t.length >= 3);
-    const exactFileTokens = exactExploreFileQueryTokens(query);
-    const exactSymbolTokens = exactExploreSymbolQueryTokens(query);
+    const queryTerms = selectRetrievalSearchTerms(query, 10);
     const exactSymbolOrder = new Map([...exactSymbolTokens].map((token, index) => [token, index]));
     const hasSourcePathIntent = [...exactFileTokens.keys()].some(token => token.startsWith('source/') || token.startsWith('src/'));
     const isExactFilePathIntent = (filePath: string): boolean => {
@@ -1961,7 +2020,22 @@ export class ToolHandler {
       return Math.min(...candidates.map(token => exactFileTokens.get(token) ?? Number.POSITIVE_INFINITY));
     };
 
+    const exactIndexedFilePaths = exactFileTokens.size > 0
+      ? new Map(cg.getFiles().map((file) => [normalizeExplorePathToken(file.path), file.path]))
+      : new Map<string, string>();
+    const matchedExactBasenames = new Set<string>();
     for (const token of exactFileTokens.keys()) {
+      if (token.includes('/')) {
+        const indexedPath = exactIndexedFilePaths.get(token);
+        if (!indexedPath) continue;
+        matchedExactBasenames.add(basenameOfPath(token));
+        for (const node of cg.getNodesInFile(indexedPath).slice(0, 20)) {
+          if (!subgraph.nodes.has(node.id)) subgraph.nodes.set(node.id, node);
+          if (!subgraph.roots.includes(node.id)) subgraph.roots.push(node.id);
+        }
+        continue;
+      }
+      if (matchedExactBasenames.has(token)) continue;
       for (const hit of cg.searchNodes(token, { limit: 20 })) {
         if (!isExplicitFileHit(hit.node)) continue;
         if (!subgraph.nodes.has(hit.node.id)) {
@@ -1987,11 +2061,22 @@ export class ToolHandler {
         if (!subgraph.roots.includes(node.id)) {
           subgraph.roots.push(node.id);
         }
+        if (['class', 'struct', 'interface', 'enum', 'namespace', 'protocol', 'trait', 'component'].includes(node.kind)) {
+          const members = cg.getNodesInFile(node.filePath)
+            .filter((member) => member.id !== node.id)
+            .filter((member) => member.kind !== 'import' && member.kind !== 'export')
+            .filter((member) => member.startLine >= node.startLine && member.endLine <= node.endLine)
+            .slice(0, 60);
+          for (const member of members) {
+            if (!subgraph.nodes.has(member.id)) subgraph.nodes.set(member.id, member);
+          }
+        }
       }
     }
 
     const isLowValueExploreFile = (p: string) =>
-      /\/(tests?|__tests?__|spec)\//i.test(p) ||
+      isTestFile(p) ||
+      /(?:^|\/)generated(?:\/|$)/i.test(p) ||
       /\bicons?\b/i.test(p) ||
       /\bi18n\b/i.test(p);
 
@@ -2006,10 +2091,9 @@ export class ToolHandler {
     const sourceAdjacentNodeIds = new Set<string>();
     const SOURCE_IMPORT_FILE_CAP = 20;
     if (hasSourcePathIntent) {
-      const sourceQueryTerms = new Set([
-        ...extractSearchTerms(query),
-        ...exactSymbolTokens,
-      ]);
+      const sourceQueryTerms = exactFileTokens.size > 0
+        ? new Set<string>()
+        : new Set(selectRetrievalSearchTerms(query, 4));
       for (const term of sourceQueryTerms) {
         for (const hit of cg.searchNodes(term, { limit: 30 })) {
           const node = hit.node;
@@ -2184,12 +2268,6 @@ export class ToolHandler {
       const bTier = exactExploreFileTier(b[0], b[1].nodes);
       if (aTier !== bTier) return aTier - bTier;
 
-      if (aTier >= 5) {
-        const aGraphRank = graphRankedFileScores.get(a[0]) ?? 0;
-        const bGraphRank = graphRankedFileScores.get(b[0]) ?? 0;
-        if (Math.abs(aGraphRank - bGraphRank) > 0.000001) return bGraphRank - aGraphRank;
-      }
-
       const intentScore = (filePath: string, nodes: Node[]): number => {
         const exactPath = isExactFilePathIntent(filePath);
         const exactPathOrder = exactPath
@@ -2247,6 +2325,12 @@ export class ToolHandler {
       const aLow = isLowValueExploreFile(aPath);
       const bLow = isLowValueExploreFile(bPath);
       if (aLow !== bLow) return aLow ? 1 : -1;
+
+      if (aTier >= 5) {
+        const aGraphRank = graphRankedFileScores.get(a[0]) ?? 0;
+        const bGraphRank = graphRankedFileScores.get(b[0]) ?? 0;
+        if (Math.abs(aGraphRank - bGraphRank) > 0.000001) return bGraphRank - aGraphRank;
+      }
 
       if (a[1].score !== b[1].score) return b[1].score - a[1].score;
       return b[1].nodes.length - a[1].nodes.length;
@@ -2377,7 +2461,7 @@ export class ToolHandler {
       // a round-trip and a re-read every later turn. Reserve clustering for files
       // too big to ship whole. Still bounded by the total maxOutputChars check.
       const WHOLE_FILE_MAX_LINES = 220;
-      const WHOLE_FILE_MAX_CHARS = budget.maxCharsPerFile * 3;
+      const WHOLE_FILE_MAX_CHARS = maxCharsPerFile * 3;
       if (fileLines.length <= WHOLE_FILE_MAX_LINES && fileContent.length <= WHOLE_FILE_MAX_CHARS) {
         const body = fileContent.replace(/\n+$/, '');
         let wholeSection = exploreLineNumbersEnabled() ? numberSourceLines(body, 1) : body;
@@ -2545,7 +2629,7 @@ export class ToolHandler {
         }
       }
       const prioritySliceBudget = priorityRanges.length > 0
-        ? Math.max(700, Math.floor((budget.maxCharsPerFile - Math.max(0, priorityRanges.length - 1) * GAP_MARKER.length) / priorityRanges.length))
+        ? Math.max(700, Math.floor((maxCharsPerFile - Math.max(0, priorityRanges.length - 1) * GAP_MARKER.length) / priorityRanges.length))
         : 0;
       const buildPrioritySection = (r: { start: number; end: number }): string => {
         const section = buildSection(r);
@@ -2562,8 +2646,8 @@ export class ToolHandler {
       for (const priorityRange of priorityRanges) {
         let section = buildPrioritySection(priorityRange);
         const gapLen = selectedPieces.length > 0 ? GAP_MARKER.length : 0;
-        if (projectedChars + section.length + gapLen > budget.maxCharsPerFile) {
-          const remaining = budget.maxCharsPerFile - projectedChars - gapLen;
+        if (projectedChars + section.length + gapLen > maxCharsPerFile) {
+          const remaining = maxCharsPerFile - projectedChars - gapLen;
           if (remaining < 500) continue;
           section = trimExploreSourceMiddle(section, remaining);
           fileTrimmed = true;
@@ -2615,7 +2699,7 @@ export class ToolHandler {
           projectedChars += sectionLen;
           continue;
         }
-        if (projectedChars + sectionLen > budget.maxCharsPerFile) continue;
+        if (projectedChars + sectionLen > maxCharsPerFile) continue;
         chosenIndices.add(rc.idx);
         projectedChars += sectionLen;
       }
@@ -2637,8 +2721,8 @@ export class ToolHandler {
         allSymbols.push(...piece.symbols);
       }
 
-      if (fileSection.length > budget.maxCharsPerFile) {
-        fileSection = trimExploreSourceMiddle(fileSection, budget.maxCharsPerFile);
+      if (fileSection.length > maxCharsPerFile) {
+        fileSection = trimExploreSourceMiddle(fileSection, maxCharsPerFile);
         fileTrimmed = true;
       }
       if (chosenIndices.size < clusters.length || fileTrimmed) {
@@ -2704,7 +2788,10 @@ export class ToolHandler {
     // Small projects (per budget) skip this — the relevant story already fits
     // in the source section, and a trailing pointer list is pure overhead.
     const directQueryFileGroups = new Map<string, { nodes: Node[]; score: number }>();
-    for (const term of queryTerms.slice(0, 12)) {
+    const directQueryTerms = exactFileTokens.size > 0 || exactSymbolTokens.size > 0
+      ? []
+      : selectRetrievalSearchTerms(query, 6);
+    for (const term of directQueryTerms) {
       const directHits = cg.searchNodes(term, { limit: 20 });
       for (const hit of directHits) {
         const node = hit.node;
@@ -2767,7 +2854,7 @@ export class ToolHandler {
 
         lines.push('### Not shown above — explore these names for their source');
         lines.push('');
-        lines.push('> Run another focused `solidkg_explore` (or `solidkg_node`/`solidkg_trace` for specific symbols) for these items before falling back to Read.');
+        lines.push('> These are peripheral candidates outside the selected answer scope. Follow up only if the question explicitly requires one of them.');
         lines.push('');
         for (const [filePath, group] of rankedRemainingFiles.slice(0, 10)) {
           const symbols = group.nodes.map(n => `${n.name}:${n.startLine}`).join(', ');
@@ -2787,14 +2874,9 @@ export class ToolHandler {
 
     // Add explore budget note based on project size
     if (budget.includeBudgetNote) {
-      try {
-        const stats = cg.getStats();
-        const callBudget = getExploreBudget(stats.fileCount);
-        lines.push('');
-        lines.push(`> **Explore budget: ${callBudget} calls for this project (${stats.fileCount.toLocaleString()} files indexed).** Each call covers ~6 files; if your question spans more, spend your remaining calls on the uncovered area BEFORE falling back to Read — another explore is cheaper and more complete than reading those files. Synthesize once you've used ${callBudget}.`);
-      } catch {
-        // Stats unavailable — skip budget note
-      }
+      const callBudget = getExploreBudget(indexedFileCount);
+      lines.push('');
+      lines.push(`> **Explore capacity: up to ${callBudget} calls for this project (${indexedFileCount.toLocaleString()} files indexed).** Stop when the answer packet is sufficient; use another call only for a different required symbol or file.`);
     }
 
     // Hard-cap to the adaptive budget. The per-file loop bounds the source
@@ -2834,17 +2916,20 @@ export class ToolHandler {
     const sourceCompleteness = deriveExploreSourceCompleteness(sourceSummary);
     const renderExploreOutput = (status: ExploreSourceCompleteness, summary: ExploreSourceStatusSummary): string => {
       const statusLabel = this.formatExploreSourceCompletenessLabel(status, summary);
-      const note = this.formatExploreSourceCompletenessNote(status, summary);
       const shownNodes = [...subgraph.nodes.values()].filter((node) => shownFilePaths.has(node.filePath));
-      const flowOutput = this.buildFlowFromNamedSymbols(cg, query);
+      const flowOutput = exactFileTokens.size > 0 ? '' : this.buildFlowFromNamedSymbols(cg, query);
       const uncertaintyLabels: UncertaintyLabel[] = status === 'complete' ? [] : ['source_partial'];
       if (flowOutput.startsWith('Ambiguous symbol ')) uncertaintyLabels.push('ambiguous_symbol');
       if (subgraph.edges.some((edge) => edge.provenance === 'heuristic')) uncertaintyLabels.push('heuristic_edge');
+      const canAnswer = shownNodes.length > 0
+        && summary.included + summary.partial > 0
+        && !uncertaintyLabels.includes('ambiguous_symbol');
+      const note = this.formatExploreSourceCompletenessNote(status, summary, canAnswer);
       const packet = formatAnswerPacketMarkdown(buildNodeAnswerPacket({
         query,
         tool: 'solidkg_explore',
         nodes: shownNodes,
-        canAnswerFromReturnedContext: shownNodes.length > 0 && status === 'complete' && !uncertaintyLabels.includes('ambiguous_symbol'),
+        canAnswerFromReturnedContext: canAnswer,
         uncertaintyLabels,
         rankingReasons: [
           { kind: 'entry_point', label: `${subgraph.roots.length} query root(s) surfaced`, weight: 100 },
@@ -2852,7 +2937,7 @@ export class ToolHandler {
           { kind: 'source_returned', label: `${summary.included} file(s) included with source`, weight: 90 },
           { kind: 'graph_relationship', label: `${significantEdges.length} relationship(s) included`, weight: 70 },
         ],
-        suggestedNextTools: status === 'complete' ? [] : ['solidkg_explore', 'solidkg_node'],
+        suggestedNextTools: canAnswer ? [] : ['solidkg_explore', 'solidkg_node'],
         includeReturnedEvidenceActionability: false,
       })).trimEnd();
       return (flowOutput + lines.join('\n'))
@@ -2884,9 +2969,16 @@ export class ToolHandler {
     return `partial (${parts.join(', ')})`;
   }
 
-  private formatExploreSourceCompletenessNote(status: ExploreSourceCompleteness, summary: ExploreSourceStatusSummary): string {
+  private formatExploreSourceCompletenessNote(
+    status: ExploreSourceCompleteness,
+    summary: ExploreSourceStatusSummary,
+    canAnswer: boolean,
+  ): string {
     if (status === 'complete') {
       return `> Complete source is shown for ${summary.included} file${summary.included === 1 ? '' : 's'} above. Treat those source blocks as already Read; use another focused solidkg_explore only if your question needs a different symbol or file.`;
+    }
+    if (canAnswer) {
+      return '> The source shown above covers the selected answer scope. The completeness status describes peripheral candidate coverage only; treat the shown source as already Read and answer from it.';
     }
     if (status === 'partial') {
       return '> Some relevant files were skipped or unreadable. Use the `Not shown above` list in another focused solidkg_explore call, then continue with solidkg_node/solidkg_trace for any remaining symbols before falling back to Read.';
@@ -2900,7 +2992,7 @@ export class ToolHandler {
   private truncateExploreOutputAtBoundary(text: string, maxChars: number): string {
     if (text.length <= maxChars) return text;
 
-    const marker = '... (output truncated to budget; Source completeness: truncated. The response was cut at a markdown boundary; run another solidkg_explore with specific names for omitted areas.)';
+    const marker = '... (output truncated to budget; Source completeness: truncated. The response was cut at a markdown boundary and the omitted tail remains outside the selected answer scope.)';
     const prefix = text.slice(0, maxChars);
     const completePrefix = prefix.endsWith('\n') ? prefix : prefix.slice(0, prefix.lastIndexOf('\n'));
     const lines = completePrefix.split('\n');
@@ -3435,11 +3527,14 @@ export class ToolHandler {
   }
 
   private getIndexedRootLabels(cg: SolidKG): Set<string> {
+    const cached = this.indexedRootLabelsCache.get(cg);
+    if (cached) return cached;
     const labels = new Set<string>();
     for (const file of cg.getFiles()) {
       const match = file.path.match(/^@([^/]+)\//);
       if (match?.[1]) labels.add(match[1]);
     }
+    this.indexedRootLabelsCache.set(cg, labels);
     return labels;
   }
 

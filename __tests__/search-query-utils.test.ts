@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { isGeneratedFile, isGeneratedFileQuery } from '../src/search/path-classifiers';
-import { scorePathRelevance } from '../src/search/query-utils';
+import {
+  buildSourceChunkFtsQuery,
+  scorePathRelevance,
+  selectRetrievalSearchTerms,
+} from '../src/search/query-utils';
 
 describe('search path classifiers', () => {
   it('identifies generated source paths without matching normal source', () => {
@@ -24,5 +28,16 @@ describe('search path classifiers', () => {
     expect(isGeneratedFileQuery('inspect src/api/user.pb.go')).toBe(true);
     expect(isGeneratedFileQuery('open MainForm.designer.cs')).toBe(true);
     expect(isGeneratedFileQuery('debug user.g.ts')).toBe(true);
+  });
+
+  it('bounds long natural-language retrieval queries before SQLite FTS expansion', () => {
+    const query = 'How does the VS Code extension host communicate with the main process? Trace startup and bidirectional IPC RPC between renderer workbench ExtensionHostProcessWorker ExtensionHostMain protocol MessagePort NamedPipe socket MainThreadCustomers ExtHostCustomers.';
+
+    const terms = selectRetrievalSearchTerms(query, 8);
+    const ftsQuery = buildSourceChunkFtsQuery(query);
+
+    expect(terms).toHaveLength(8);
+    expect(ftsQuery.split(' OR ')).toHaveLength(6);
+    expect(ftsQuery).not.toContain('ExtHostCustomers');
   });
 });

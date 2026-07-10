@@ -146,10 +146,15 @@ export function buildSourceChunkCodeTokenText(source: string): string {
 }
 
 export function buildSourceChunkFtsQuery(query: string): string {
-  return tokenizeCodeForSearch(query)
-    .filter((term) => !FTS_OPERATORS.has(term.toUpperCase()))
+  return selectRetrievalSearchTerms(query)
     .map((term) => `"${term.replace(/"/g, '""')}"*`)
     .join(' OR ');
+}
+
+export function selectRetrievalSearchTerms(query: string, maxTerms = 6): string[] {
+  return extractSearchTerms(query, { stems: false })
+    .filter((term) => !FTS_OPERATORS.has(term.toUpperCase()))
+    .slice(0, maxTerms);
 }
 
 /**

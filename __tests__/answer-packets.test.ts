@@ -110,6 +110,74 @@ describe('answer and evidence packets', () => {
     expect(formatAnswerPacketMarkdown(packet)).toContain('Uncertainty: bounded_no_results');
   });
 
+  it('treats intentionally omitted source as sufficient for minimal orientation', () => {
+    const entry = node('entry', 'EntryPoint', 'src/entry.ts', 1, 8);
+    const packet = buildContextAnswerPacket({
+      query: 'orient me to EntryPoint',
+      entryPoints: [entry],
+      subgraph: { nodes: new Map([[entry.id, entry]]), edges: [], roots: [entry.id] },
+      codeBlocks: [],
+      sourceCompleteness: {
+        ...sourceCompleteness,
+        status: 'omitted',
+        returnedBlocks: 0,
+        completeBlocks: 0,
+        omittedBlocks: 2,
+        followUp: {
+          reason: 'omitted',
+          guidance: 'Source was intentionally omitted for minimal orientation.',
+          solidkgFirst: ['solidkg_context', 'solidkg_explore', 'solidkg_node'],
+        },
+      },
+      semanticRelationCount: 0,
+    });
+
+    expect(packet.sufficiency).toMatchObject({
+      status: 'sufficient',
+      canAnswerFromReturnedContext: true,
+    });
+    expect(packet.uncertaintyLabels).toContain('source_partial');
+    expect(packet.suggestedNextTools).toEqual([]);
+  });
+
+  it('does not let peripheral omitted source override returned entry source', () => {
+    const entry = node('entry', 'EntryPoint', 'src/entry.ts', 1, 8);
+    const peripheral = node('peripheral', 'Peripheral', 'src/peripheral.ts', 1, 8);
+    const packet = buildContextAnswerPacket({
+      query: 'explain EntryPoint',
+      entryPoints: [entry],
+      subgraph: {
+        nodes: new Map([[entry.id, entry], [peripheral.id, peripheral]]),
+        edges: [{ source: entry.id, target: peripheral.id, kind: 'calls', line: 4 }],
+        roots: [entry.id],
+      },
+      codeBlocks: [{
+        filePath: entry.filePath,
+        startLine: entry.startLine,
+        endLine: entry.endLine,
+        language: 'typescript',
+        content: 'EntryPoint()',
+        node: entry,
+      }],
+      sourceCompleteness: {
+        ...sourceCompleteness,
+        status: 'partial',
+        returnedBlocks: 1,
+        completeBlocks: 1,
+        omittedBlocks: 1,
+        followUp: {
+          reason: 'partial',
+          guidance: 'One peripheral candidate was omitted.',
+          solidkgFirst: ['solidkg_explore', 'solidkg_node'],
+        },
+      },
+      semanticRelationCount: 0,
+    });
+
+    expect(packet.sufficiency.canAnswerFromReturnedContext).toBe(true);
+    expect(packet.suggestedNextTools).toEqual([]);
+  });
+
   it('renders returned evidence actionability additively', () => {
     const packet = buildNodeAnswerPacket({
       query: 'scoreRun',
@@ -127,20 +195,13 @@ describe('answer and evidence packets', () => {
     expect(markdown).toContain('Evidence anchors:');
   });
 
-  it('classifies hard blockers as requiring focused follow-up', () => {
+  it('classifies unresolved answer boundaries as requiring focused follow-up', () => {
     const blockedInputs = [
-      { sourceCoverage: 'partial' as const },
-      { sourceCoverage: 'omitted' as const },
-      { sourceCoverage: 'unreadable' as const },
-      { sourceCoverage: 'truncated' as const },
-      { hasHeuristicEvidence: true },
       { hasAmbiguity: true },
       { noResults: true },
       { noStaticPath: true },
-      { hasCappedRequiredFacts: true },
       { freshness: 'stale' as const },
       { hasUnsupportedMechanism: true },
-      { missingProvenance: true },
     ];
 
     for (const input of blockedInputs) {
@@ -157,16 +218,16 @@ describe('answer and evidence packets', () => {
     }
   });
 
-  it('handles unknown freshness conservatively', () => {
+  it('keeps unknown freshness as metadata when returned evidence is answerable', () => {
     const actionability = buildReturnedEvidenceActionability({
       canAnswerFromReturnedContext: true,
       sourceCoverage: 'complete',
       freshness: 'unknown',
     });
 
-    expect(actionability.eligibleActions).toEqual(['requires_focused_follow_up']);
-    expect(actionability.blockers).toContain('freshness_unknown');
-    expect(actionability.mustValidateWith).toContain('sync_or_read_stale_files_before_acting');
+    expect(actionability.eligibleActions).toEqual(['explain_returned_evidence', 'localize_candidate']);
+    expect(actionability.blockers).toEqual([]);
+    expect(actionability.mustValidateWith).not.toContain('sync_or_read_stale_files_before_acting');
   });
 
   it('never emits edit or review eligibility in the first slice', () => {
@@ -201,7 +262,48 @@ describe('answer and evidence packets', () => {
     expect(actionability.nextAction.action).toBe('answer_from_returned_evidence');
   });
 
-  it('does not derive actionability from binary sufficiency alone', () => {
+  it('keeps coverage, caps, and heuristic provenance as metadata when the returned answer is sufficient', () => {
+    const actionability = buildReturnedEvidenceActionability({
+      canAnswerFromReturnedContext: true,
+      sourceCoverage: 'truncated',
+      freshness: 'unknown',
+      capState: 'capped',
+      evidenceProvenance: ['heuristic'],
+      hasHeuristicEvidence: true,
+      hasCappedRequiredFacts: true,
+    });
+
+    expect(actionability.eligibleActions).toEqual(['explain_returned_evidence', 'localize_candidate']);
+    expect(actionability.blockers).toEqual([]);
+    expect(actionability.nextAction.action).toBe('answer_from_returned_evidence');
+    expect(actionability.sourceCoverage).toBe('truncated');
+    expect(actionability.capState).toBe('capped');
+    expect(actionability.evidenceProvenance).toEqual(['heuristic']);
+  });
+
+  it('never contradicts sufficient binary evidence with focused-follow-up actionability', () => {
+    const packet = buildNodeAnswerPacket({
+      query: 'heuristic path',
+      tool: 'solidkg_trace',
+      nodes: [node('start', 'start', 'src/a.ts', 1, 3)],
+      canAnswerFromReturnedContext: true,
+      uncertaintyLabels: ['heuristic_edge', 'source_partial'],
+      actionabilityInput: {
+        sourceCoverage: 'truncated',
+        freshness: 'unknown',
+        capState: 'capped',
+        evidenceProvenance: ['heuristic'],
+        hasCappedRequiredFacts: true,
+      },
+      includeReturnedEvidenceActionability: true,
+    });
+
+    expect(packet.sufficiency.canAnswerFromReturnedContext).toBe(true);
+    expect(packet.returnedEvidenceActionability?.eligibleActions).not.toContain('requires_focused_follow_up');
+    expect(packet.returnedEvidenceActionability?.nextAction.action).toBe('answer_from_returned_evidence');
+  });
+
+  it('keeps heuristic uncertainty as metadata when binary evidence is sufficient', () => {
     const packet = buildNodeAnswerPacket({
       query: 'heuristic path',
       tool: 'solidkg_trace',
@@ -212,8 +314,8 @@ describe('answer and evidence packets', () => {
     });
 
     expect(packet.sufficiency.canAnswerFromReturnedContext).toBe(true);
-    expect(packet.returnedEvidenceActionability?.eligibleActions).toEqual(['requires_focused_follow_up']);
-    expect(packet.returnedEvidenceActionability?.blockers).toContain('heuristic_edge');
+    expect(packet.returnedEvidenceActionability?.eligibleActions).toEqual(['explain_returned_evidence', 'localize_candidate']);
+    expect(packet.returnedEvidenceActionability?.blockers).toEqual([]);
   });
 
   it('keeps actionability additive outside packet ID compatibility fields', () => {

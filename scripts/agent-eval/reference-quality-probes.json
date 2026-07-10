@@ -1,0 +1,29 @@
+{
+  "schemaName": "solidkg.reference-quality.probes.v1",
+  "probes": [
+    {
+      "id": "airflow-dagbag-context",
+      "repoId": "apache__airflow",
+      "tool": "solidkg_context",
+      "arguments": { "task": "DagBag process_file collect_dags parse DAG files", "detailLevel": "minimal", "includeCode": false, "maxNodes": 12 },
+      "expectedFiles": ["airflow-core/src/airflow/dag_processing/dagbag.py"],
+      "expectedLanguage": "python",
+      "expectations": [
+        { "section": "### Answer Packet", "includes": "Evidence anchors" },
+        { "section": "### Entry Points", "includes": "DagBag" }
+      ]
+    },
+    {
+      "id": "azure-rest-method-context",
+      "repoId": "Azure__azure-powershell",
+      "tool": "solidkg_context",
+      "arguments": { "task": "InvokeAzRestMethodCommand ExecuteCmdlet InitializeServiceClient ValidateParameters", "detailLevel": "minimal", "includeCode": false, "maxNodes": 12 },
+      "expectedFiles": ["src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs"],
+      "expectedLanguage": "csharp",
+      "expectations": [
+        { "section": "### Answer Packet", "includes": "Binary sufficiency" },
+        { "section": "### Entry Points", "includes": "InvokeAzRestMethodCommand" }
+      ]
+    }
+  ]
+}

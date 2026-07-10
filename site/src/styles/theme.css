@@ -223,4 +223,35 @@ button[data-open-modal] {
 	.main-pane {
 		--sl-content-margin-inline: auto;
 	}
+
+	.main-pane:has(#research-inventory-page) {
+		--sl-content-width: 60rem;
+	}
+}
+
+.sl-markdown-content:has(#research-inventory-page) table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-inline: contain;
+	-webkit-overflow-scrolling: touch;
+}
+
+.sl-markdown-content:has(#research-inventory-page) :is(th, td) {
+	min-width: 9rem;
+	vertical-align: top;
+}
+
+.sl-markdown-content:has(#research-inventory-page) :is(th, td):last-child {
+	min-width: 15rem;
+}
+
+@media (max-width: 50rem) {
+	.sl-markdown-content:has(#research-inventory-page) table {
+		font-size: 0.9rem;
+	}
+
+	.sl-markdown-content:has(#research-inventory-page) details {
+		max-width: 100%;
+	}
 }

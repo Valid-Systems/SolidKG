@@ -17,7 +17,12 @@ import * as path from 'path';
 import * as os from 'os';
 import { SolidKG } from '../src';
 import { MCPSession } from '../src/mcp/session';
-import { SERVER_INSTRUCTIONS } from '../src/mcp/server-instructions';
+import type { MCPEngine } from '../src/mcp/engine';
+import {
+  FULL_SERVER_INSTRUCTIONS,
+  SERVER_INSTRUCTIONS,
+  getServerInstructions,
+} from '../src/mcp/server-instructions';
 import type { JsonRpcRequest, JsonRpcNotification, JsonRpcResponse, JsonRpcTransport, MessageHandler } from '../src/mcp/transport';
 
 const BIN = path.resolve(__dirname, '../dist/bin/solidkg.js');
@@ -188,11 +193,12 @@ describe('MCP initialize handshake (issue #172)', () => {
 });
 
 describe('MCP initialize instructions', () => {
-  it('documents provider-neutral Code Context query precision', () => {
-    expect(SERVER_INSTRUCTIONS).toContain('Make Code Context queries precise');
-    expect(SERVER_INSTRUCTIONS).toContain('concrete symbols, classes');
-    expect(SERVER_INSTRUCTIONS).toContain('annotations, framework keywords');
-    expect(SERVER_INSTRUCTIONS).toContain('EventPublisher Consumer DomainEvent StreamBridge @Async');
+  it('documents the explore-only default as a one-call source answer', () => {
+    expect(SERVER_INSTRUCTIONS).toContain('One default tool: solidkg_explore');
+    expect(SERVER_INSTRUCTIONS).toContain('verbatim, line-numbered source');
+    expect(SERVER_INSTRUCTIONS).toContain('ONE call usually answers');
+    expect(SERVER_INSTRUCTIONS).not.toContain('solidkg_context');
+    expect(SERVER_INSTRUCTIONS).not.toContain('solidkg_trace');
     expect(SERVER_INSTRUCTIONS).not.toContain('Claude Code');
   });
 
@@ -204,25 +210,43 @@ describe('MCP initialize instructions', () => {
     expect(SERVER_INSTRUCTIONS).not.toContain('solidkg_solidkg_context');
   });
 
-  it('keeps flow, precise refs, and already-read source guidance together', () => {
-    expect(SERVER_INSTRUCTIONS).toContain('solidkg_trace');
-    expect(SERVER_INSTRUCTIONS).toContain('solidkg_precise_refs');
-    expect(SERVER_INSTRUCTIONS).toContain('Treat it as already read');
+  it('keeps every advanced tool documented in the explicit full profile', () => {
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('solidkg_context');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('solidkg_trace');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('solidkg_precise_refs');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('Treat it as already read');
   });
 
   it('documents source chunk evidence and disabled hybrid defaults', () => {
-    expect(SERVER_INSTRUCTIONS).toContain('source_body_chunk');
-    expect(SERVER_INSTRUCTIONS).toContain('persisted source-body/code-token chunks');
-    expect(SERVER_INSTRUCTIONS).toContain('External dense/vector embeddings');
-    expect(SERVER_INSTRUCTIONS).toContain('not enabled by default');
-    expect(SERVER_INSTRUCTIONS).toContain('do not assume LanceDB, API keys, network calls, or telemetry are active');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('source_body_chunk');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('persisted source-body/code-token chunks');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('External dense/vector embeddings');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('not enabled by default');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('do not assume LanceDB, API keys, network calls, or telemetry are active');
   });
 
   it('documents overview repository orientation guidance', () => {
-    expect(SERVER_INSTRUCTIONS).toContain('solidkg_files');
-    expect(SERVER_INSTRUCTIONS).toContain('format: "overview"');
-    expect(SERVER_INSTRUCTIONS).toContain('Repository orientation');
-    expect(SERVER_INSTRUCTIONS).toContain('derived from the index');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('solidkg_files');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('format: "overview"');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('Repository orientation');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('derived from the index');
+  });
+
+  it('selects instructions that match the exposed tool profile', () => {
+    const original = process.env.SOLIDKG_MCP_TOOLS;
+    try {
+      delete process.env.SOLIDKG_MCP_TOOLS;
+      expect(getServerInstructions()).toBe(SERVER_INSTRUCTIONS);
+      process.env.SOLIDKG_MCP_TOOLS = 'all';
+      expect(getServerInstructions()).toBe(FULL_SERVER_INSTRUCTIONS);
+      process.env.SOLIDKG_MCP_TOOLS = 'trace,search,node';
+      expect(getServerInstructions()).toBe(FULL_SERVER_INSTRUCTIONS);
+      process.env.SOLIDKG_MCP_TOOLS = 'explore';
+      expect(getServerInstructions()).toBe(SERVER_INSTRUCTIONS);
+    } finally {
+      if (original === undefined) delete process.env.SOLIDKG_MCP_TOOLS;
+      else process.env.SOLIDKG_MCP_TOOLS = original;
+    }
   });
 });
 
@@ -293,8 +317,10 @@ describe('MCP tool call timeout', () => {
       hasDefaultSolidKG: () => true,
       getProjectPath: () => null,
       retryInitializeSync: () => {},
+      beginToolCall: () => {},
+      endToolCall: () => {},
     };
-    const session = new MCPSession(transport, engine as any);
+    const session = new MCPSession(transport, engine as unknown as MCPEngine);
     session.start();
 
     await transport.receive({

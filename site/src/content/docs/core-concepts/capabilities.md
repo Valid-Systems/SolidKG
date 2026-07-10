@@ -11,20 +11,21 @@ This page is the concise, claim-safe summary of what SolidKG can do today. It na
 |---|---:|
 | 37 language/framework flow-question cells, with SolidKG MCP vs no MCP | Reads fell `159 -> 38`, greps fell `72 -> 22`, tool calls fell `321 -> 189`, mean wall-clock `48s -> 38s`; no cell increased reads |
 | 7 README benchmark repos, median of 4 runs/arm | 46% faster wall-clock, 71% fewer tool calls, 57% fewer tokens, 35% lower cost |
+| 2026-07-10 exploratory OpenCode diagnostic, 7 repos × 3 arms × 4 repeats | CodeGraph used fewer tool calls and tokens than SolidKG in every repository median; missing raw/exact-binary provenance keeps this diagnostic, not claim-grade |
 | Source-body retrieval fixture | body-query, exact-query, generated/test demotion, no-match, and trace controls all passed at recall@5 `1.00`, MRR `1.00`, source-reference fidelity `1.00` |
 | Aider/PageRank-style explore allocation fixture | MRR `0.50 -> 1.00`, files-to-cover `2 -> 1`, chars-to-cover `490 -> 253` |
 
-The primary product metric is fewer raw `Read`/`Grep`/shell rediscovery loops and fewer total turns for structural questions. Token and cost savings are secondary outcomes once answer sufficiency holds.
+The primary product metric is fewer raw `Read`/`Grep`/shell rediscovery loops and fewer total turns for structural questions. Token outcomes vary by model and harness: they improved in the earlier Claude A/B but increased for SolidKG in the 2026 OpenCode diagnostic. Dollar cost was unavailable under the OpenAI subscription path.
 
 ## Core surface
 
 - AST-derived graph facts: symbols, files, imports, calls, references, inheritance, semantic hyperedges, and optional SCIP references.
-- Structural agent tools: `trace`, `context`, `explore`, `search`, `callers`, `callees`, `impact`, `files`, `snapshot`, and `architecture`.
+- Structural agent tools: the compact/default MCP profile exposes only answer-producing `explore`; `SOLIDKG_MCP_TOOLS=all` restores `trace`, `context`, `search`, `callers`, `callees`, `impact`, `files`, `snapshot`, and `architecture` for explicit workflows.
 - Answer packets with evidence anchors, ranking reasons, bounded uncertainty, returned-source coverage, sufficiency hints, and next-tool guidance.
 - Capability footprints for may-read/write/guard/emit/subscribe/send/mutate behavior where the capability producer has coverage.
 - Source-body chunk retrieval through local SQLite FTS5/code-token text, surfaced as `source_body_chunk` evidence in existing tools.
 - Graph-ranked file allocation for explore queries after exact file/symbol tiers.
-- Local-first defaults: no external embeddings, vector database, reranker, network call, API key, or telemetry by default.
+- Local-first defaults: indexing and graph retrieval do not enable external embeddings, vector databases, rerankers, network calls, API keys, or telemetry. An AI coding-agent host may still send returned source snippets to its configured model provider.
 
 ## Validated coverage examples
 

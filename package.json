@@ -36,7 +36,9 @@
     "eval": "npm run build && npx tsx __tests__/evaluation/runner.ts",
     "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
     "prepublishOnly": "node scripts/guard-root-publish.mjs",
-    "readiness:artifacts": "node scripts/readiness/verify-release-artifacts.mjs"
+    "readiness:artifacts": "node scripts/readiness/verify-release-artifacts.mjs",
+    "bench:reference-quality": "node scripts/agent-eval/reference-quality-sweep.mjs",
+    "test:reference-quality": "pnpm run build && vitest run __tests__/agent-eval/reference-quality-policy.test.ts __tests__/agent-eval/reference-quality-sqlite.test.ts __tests__/agent-eval/reference-quality-probes.test.ts __tests__/agent-eval/reference-quality-report.test.ts __tests__/agent-eval/reference-quality-cli.test.ts"
   },
   "keywords": [
     "code-intelligence",

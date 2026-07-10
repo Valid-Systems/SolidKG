@@ -1,6 +1,7 @@
 /**
  * SOLIDKG_MCP_TOOLS allowlist — lets an operator (or an A/B harness) trim the
- * exposed MCP tool surface without touching the client config. Inert when unset.
+ * exposed MCP tool surface without touching the client config. Unset uses the
+ * compact explore-only profile; `all` restores the complete advanced surface.
  * Filtering happens in ListTools (getTools) and is enforced again on execute().
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -21,13 +22,18 @@ describe('SOLIDKG_MCP_TOOLS allowlist', () => {
 
   const listed = () => new ToolHandler(null).getTools().map(t => t.name).sort();
 
-  it('exposes the full tool surface when unset', () => {
+  it('exposes only explore when unset', () => {
     delete process.env[ENV];
+    expect(listed()).toEqual(['solidkg_explore']);
+  });
+
+  it('restores the full advanced surface when all is requested', () => {
+    process.env[ENV] = 'all';
     const all = listed();
     expect(all).toContain('solidkg_explore');
     expect(all).toContain('solidkg_context');
     expect(all).toContain('solidkg_trace');
-    expect(all.length).toBeGreaterThanOrEqual(10);
+    expect(all.length).toBe(tools.length);
   });
 
   it('filters ListTools to the allowlisted short names', () => {
@@ -45,9 +51,9 @@ describe('SOLIDKG_MCP_TOOLS allowlist', () => {
     expect(listed()).toEqual(['solidkg_search', 'solidkg_trace']);
   });
 
-  it('treats an empty/whitespace value as unset (full surface)', () => {
+  it('treats an empty/whitespace value as the compact default', () => {
     process.env[ENV] = '   ';
-    expect(listed().length).toBeGreaterThanOrEqual(10);
+    expect(listed()).toEqual(['solidkg_explore']);
   });
 
   it('rejects a disabled tool on execute (defense in depth)', async () => {
@@ -63,6 +69,14 @@ describe('SOLIDKG_MCP_TOOLS allowlist', () => {
     // "disabled" message must NOT appear, proving the guard passed it through.
     const res = await new ToolHandler(null).execute('solidkg_search', { query: 'x' });
     expect(res.content[0].text).not.toMatch(/disabled via SOLIDKG_MCP_TOOLS/);
+  });
+
+  it('keeps hidden advanced tools callable for cached clients under the compact default', async () => {
+    delete process.env[ENV];
+    const res = await new ToolHandler(null).execute('solidkg_search', { query: 'x' });
+    expect(res.isError).toBe(true);
+    expect(res.content[0].text).not.toMatch(/disabled via SOLIDKG_MCP_TOOLS/);
+    expect(res.content[0].text).toMatch(/No SolidKG project is loaded/);
   });
 });
 
@@ -90,6 +104,7 @@ describe('MCP raw tool names', () => {
   });
 
   it('does not double-prefix raw server tool names', () => {
+    process.env[ENV] = 'all';
     const names = new ToolHandler(null).getTools().map((tool) => tool.name);
     expect(names.every((name) => name.startsWith('solidkg_'))).toBe(true);
     expect(names.some((name) => name.startsWith('solidkg_solidkg_'))).toBe(false);
@@ -126,7 +141,17 @@ describe('MCP raw tool names', () => {
     expect(filesTool?.inputSchema.properties.expandPaths.description).toContain('max 50 paths');
   });
 
+  it('describes explore as the natural-language answer surface without prerequisite tools', () => {
+    const exploreTool = tools.find((tool) => tool.name === 'solidkg_explore');
+
+    expect(exploreTool?.description).toContain('natural-language question');
+    expect(exploreTool?.description).toContain('ONE answer-producing call');
+    expect(exploreTool?.description).not.toContain('Use it after solidkg_context');
+    expect(exploreTool?.description).not.toContain('run solidkg_search first');
+  });
+
   it('keeps dataDir discoverable when dynamic stats are unavailable', () => {
+    process.env[ENV] = 'all';
     const testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solidkg-mcp-tools-schema-'));
     const cg = SolidKG.initSync(testDir);
     const statsSpy = vi.spyOn(cg, 'getStats').mockImplementation(() => {

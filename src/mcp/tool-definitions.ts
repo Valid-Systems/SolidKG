@@ -194,13 +194,13 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'solidkg_explore',
-    description: 'Returns source for SEVERAL related symbols grouped by file, plus a relationship map, in ONE capped call. This is the efficient way to inspect many related symbols at once — strongly prefer it over a series of solidkg_node or Read calls (each separate call re-reads the whole context, so 8 node calls cost far more than 1 explore). Use it after solidkg_context when you need to see the actual source of several symbols. Query with specific symbol/file/code terms, NOT natural-language sentences — run solidkg_search first to find names. Bad: "how are agent prompts loaded and passed to the CLI". Good: "renderStaticScene drawElementOnCanvas ShapeCache renderElement.ts". The code it returns is the VERBATIM live file source (byte-for-byte identical to Read), line-numbered — not a summary; treat files it shows as already Read, no need to re-open them.',
+    description: 'PRIMARY ANSWER TOOL. Give it a natural-language question or precise symbol/file/code terms. In ONE answer-producing call it returns the best production source grouped by file, relationship and flow evidence, dynamic-dispatch links, and an answer packet that says whether the selected evidence is sufficient. Returned code is verbatim live, line-numbered source — treat it as already Read and do not re-open shown files. Source-completeness labels describe candidate coverage, not answer correctness; when the packet is sufficient, answer without drilling into more tools.',
     inputSchema: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Symbol names, file names, or short code terms to explore (e.g., "AuthService loginUser session-manager", "GraphTraverser BFS impact traversal.ts"). Use solidkg_search first to find relevant names.',
+          description: 'Natural-language structural question or precise symbol/file/code terms (e.g., "How does auth work?", "AuthService loginUser session-manager", "GraphTraverser BFS impact traversal.ts").',
         },
         maxFiles: {
           type: 'number',

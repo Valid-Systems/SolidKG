@@ -1006,7 +1006,7 @@ describe('solidkg_explore completeness metadata', () => {
     expect.soft(text).toMatch(/complete source/i);
   });
 
-  it('completeness marks hard-truncated output as truncated and never complete', async () => {
+  it('keeps hard-truncated coverage truthful without forcing another tool when selected source is sufficient', async () => {
     const result = await handler.execute('solidkg_explore', {
       query: 'CompletenessTruncated '.repeat(300).trim(),
       maxFiles: 20,
@@ -1018,7 +1018,8 @@ describe('solidkg_explore completeness metadata', () => {
     expect.soft(text).not.toMatch(/source above is complete/i);
     expect.soft(text).not.toContain('Complete source for');
     expectSourceCompleteness(text, 'truncated');
-    expect(text).toContain('Suggested next SolidKG tools: solidkg_explore');
+    expect(text).toContain('Binary sufficiency: sufficient');
+    expect(text).not.toContain('Suggested next SolidKG tools:');
   });
 
   it('completeness marks not-shown files as omitted instead of globally complete', async () => {
@@ -1047,7 +1048,7 @@ describe('solidkg_explore completeness metadata', () => {
     expect(text).toContain('### Not shown above');
     expect(text).toContain('skipped.ts');
     expect(text).toContain('omitted0.ts');
-    expect(text).toContain('Source completeness: partial (1 included, 1 skipped/unreadable, 1 omitted)');
+    expect(text).toMatch(/Source completeness: partial \(1 included, 1 skipped\/unreadable, [1-9]\d* omitted\)/);
     expect.soft(text).not.toMatch(/Source completeness:\s*complete/i);
   });
 

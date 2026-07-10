@@ -119,8 +119,12 @@ export function buildContextAnswerPacket(args: {
       .map((block) => entryFromNode(block.node as Node, 'source')),
   ]);
   const hasReturnedSourceForEntry = args.entryPoints.length === 0 || args.entryPoints.some((node) => sourceNodeIds.has(node.id));
-  const completeEnough = args.sourceCompleteness.returnedBlocks > 0 && args.sourceCompleteness.omittedBlocks === 0 && args.sourceCompleteness.unreadableBlocks === 0;
-  const canAnswer = evidence.length > 0 && hasReturnedSourceForEntry && completeEnough;
+  const intentionallyOmittedSource = args.sourceCompleteness.status === 'omitted'
+    && args.sourceCompleteness.returnedBlocks === 0
+    && args.entryPoints.length > 0;
+  const requiredEvidenceReturned = intentionallyOmittedSource
+    || (args.sourceCompleteness.returnedBlocks > 0 && hasReturnedSourceForEntry);
+  const canAnswer = evidence.length > 0 && requiredEvidenceReturned;
   const uncertaintyLabels: UncertaintyLabel[] = [];
   if (!canAnswer || args.sourceCompleteness.status !== 'complete') uncertaintyLabels.push('source_partial');
   const hasHeuristicEvidence = args.subgraph.edges.some((edge) => edge.provenance === 'heuristic');
@@ -150,8 +154,10 @@ export function buildContextAnswerPacket(args: {
       status: canAnswer ? 'sufficient' : evidence.length > 0 ? 'partial' : 'insufficient',
       canAnswerFromReturnedContext: canAnswer,
       reason: canAnswer
-        ? 'Returned source and graph evidence cover the selected context.'
-        : 'Returned evidence is missing source, entry coverage, or complete source coverage.',
+        ? intentionallyOmittedSource
+          ? 'Returned graph anchors cover the requested minimal orientation; source was intentionally omitted.'
+          : 'Returned source and graph evidence cover the required selected context.'
+        : 'Returned evidence is missing required source or entry coverage.',
     },
     uncertaintyLabels,
     evidence,

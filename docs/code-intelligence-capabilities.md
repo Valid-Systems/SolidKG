@@ -10,6 +10,7 @@ Static analysis still has limits. Generated code, reflection, inherited framewor
 |---|---:|---|
 | 37 language/framework flow-question cells, with SolidKG MCP vs no MCP | Reads fell `159 -> 38` (76% fewer), greps fell `72 -> 22`, tool calls fell `321 -> 189`, mean wall-clock `48s -> 38s`; no cell increased reads | `docs/benchmarks/solidkg-ab-matrix.md` |
 | 7 README benchmark repos, median of 4 runs/arm | 46% faster wall-clock, 71% fewer tool calls, 57% fewer tokens, 35% lower cost | `docs/benchmarks/call-sequence-analysis.md` |
+| 2026-07-10 exploratory OpenCode diagnostic, 7 repos × 3 arms × 4 repeats | CodeGraph used fewer tool calls and tokens than SolidKG in all 7 repository medians; unweighted average reductions were 58.6% and 58.9%. Missing raw/exact-binary provenance keeps this diagnostic, not claim-grade. | `docs/benchmarks/opencode-head-to-head-2026-07-10.md` |
 | Large-reference stress suite | 118 local reference snapshots covering major OSS systems and language ecosystems | `docs/tested-codebases.md` |
 | Source-body retrieval fixture | body-query, exact-query, generated/test demotion, no-match, and trace controls all passed at recall@5 `1.00`, MRR `1.00`, source-reference fidelity `1.00` | `.omo/evidence/retrieval-quality-codeseek-retrieval-improvements.md` |
 | Aider/PageRank-style explore allocation fixture | MRR `0.50 -> 1.00`, files-to-cover `2 -> 1`, chars-to-cover `490 -> 253` | `.omo/evidence/retrieval-quality-codeseek-retrieval-improvements.md` |
@@ -73,6 +74,7 @@ The table records the evidence we still remember from the validation playbooks. 
 
 - `docs/benchmarks/solidkg-ab-matrix.md`
 - `docs/benchmarks/call-sequence-analysis.md`
+- `docs/benchmarks/opencode-head-to-head-2026-07-10.md`
 - `docs/tested-codebases.md`
 - `docs/design/dynamic-dispatch-coverage-playbook.md`
 - `docs/design/claims-register.md`

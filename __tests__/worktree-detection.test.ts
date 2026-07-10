@@ -96,6 +96,14 @@ describe('detectWorktreeIndexMismatch (issue #155)', () => {
     expect(gitWorktreeRoot(nonGit)).toBeNull();
   });
 
+  it.runIf(process.platform === 'win32')('does not execute a corpus-local git.exe', () => {
+    const marker = path.join(nonGit, 'marker.txt');
+    fs.copyFileSync(process.execPath, path.join(nonGit, 'git.exe'));
+    fs.writeFileSync(path.join(nonGit, 'rev-parse'), `require('fs').writeFileSync(${JSON.stringify(marker)}, 'executed')`);
+    expect(gitWorktreeRoot(nonGit)).toBeNull();
+    expect(fs.existsSync(marker)).toBe(false);
+  });
+
   it('warning names both trees and the fix', () => {
     const msg = worktreeMismatchWarning(detectWorktreeIndexMismatch(worktree, mainRepo)!);
     expect(msg).toContain(real(worktree));

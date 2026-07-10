@@ -10,10 +10,11 @@ The protocol is read-only until a maintainer explicitly chooses a follow-up patc
 
 - `.upstream-watch/state.json` records the upstream repository and the last upstream release reviewed.
 - `.upstream-watch/mirrored-paths.txt` lists local path patterns that still overlap upstream enough to require triage.
+- `.upstream-watch/reports/*.md` records the durable action report for each reviewed upstream range.
 - `scripts/upstream-watch/report.mjs` filters GitHub compare JSON through the manifest and prints a Markdown report.
 - `docs/maintenance/upstream-divergence.md` records protected local divergence areas that an upstream update must not regress.
 
-Update `lastReviewedRelease` only after a maintainer has reviewed the generated report and release notes. If the release has no relevant changes, record that decision in the task summary before updating the state file.
+Update `lastReviewedRelease` only after a maintainer has reviewed the generated report and release notes. Save a report under `.upstream-watch/reports/` for the exact reviewed range before updating the state file, even when the release has no relevant changes.
 
 ## Manual Invocation
 
@@ -51,7 +52,8 @@ When asked to review upstream updates:
 4. Read the upstream release notes for every release in the reviewed range.
 5. Inspect local files only for matched manifest paths or directly related behavior.
 6. Produce a triage report with relevant upstream changes, protected divergence areas touched, local files affected, recommended action, and risk level.
-7. Do not update `.upstream-watch/state.json` unless the maintainer explicitly confirms the release range is reviewed.
+7. Save the triage report under `.upstream-watch/reports/<base>-to-<head>.md` before any state update.
+8. Do not update `.upstream-watch/state.json` unless the maintainer explicitly confirms the release range is reviewed.
 
 If the report identifies MCP tool behavior, installer targets, extraction, resolution, release packaging, or agent instructions, run the existing protected validation gates for those surfaces before proposing code changes. Default to `investigate` or `reject-as-regression` when upstream conflicts with the divergence register.
 

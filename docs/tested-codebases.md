@@ -1,14 +1,14 @@
-# Tested codebases
+# Codebase evidence inventory
 
-This is the auditable inventory behind the README statement that SolidKG has been stress-tested on large and important open-source codebases. It combines the benchmark/eval repos documented in `docs/benchmarks/` and `docs/design/dynamic-dispatch-coverage-playbook.md` with the local reference snapshot suite under:
+This inventory separates repositories with recorded benchmark, playbook, or reference-quality evidence from directories that were merely present in an external snapshot. Presence alone is not validation or stress-test evidence.
 
 ```text
 D:\Apps\Programming_Tools\tmp\solidkg_reference_codebases\repos
 ```
 
-Directory names with `__` encode `owner/repo`. Single-name directories are local checkout names for the upstream project. The local reference suite contained 118 repository directories when this document was written; batch/log files in that folder are intentionally excluded.
+Directory names with `__` encode `owner/repo`. Single-name directories are local checkout names for the upstream project. The external snapshot contained 118 repository directories on 2026-07-10; batch/log files in that folder are intentionally excluded.
 
-Static-analysis validation is not the same as a runtime guarantee. These repos are evidence that the indexer, extractor, resolver, retrieval, and agent-facing surfaces have been exercised across large real-world codebases and framework styles.
+The reference-quality baseline found 52 indexes: 51 measurable and one empty. Only those 51 rows, plus repositories named in benchmark or playbook records, carry recorded evidence. The other directory names below are availability records only. Static-analysis measurement is not a runtime guarantee.
 
 ## Benchmark and playbook suites
 
@@ -88,7 +88,7 @@ These are the repos explicitly called out in the current benchmark and dynamic-d
 
 ## Local large-reference snapshot suite
 
-All repository directories below were present in `D:\Apps\Programming_Tools\tmp\solidkg_reference_codebases\repos` and are part of the stress-test inventory:
+All repository directories below were present in the external snapshot. Unless a repository also appears in a benchmark, playbook, or the 51-row measurable baseline, its listing does not claim it was indexed or tested:
 
 | Local directory | Project |
 |---|---|

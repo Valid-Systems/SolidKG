@@ -85,18 +85,18 @@ function collectBlockers(
   uncertaintyLabels: UncertaintyLabel[],
 ): string[] {
   const blockers = new Set<string>();
-  if (sourceCoverage === 'unknown') blockers.add('source_coverage_unknown');
-  if (SOURCE_INCOMPLETE.has(sourceCoverage)) blockers.add(`source_${sourceCoverage}`);
-  if (freshness === 'unknown') blockers.add('freshness_unknown');
+  const requiresMoreEvidence = !input.canAnswerFromReturnedContext;
+  if (requiresMoreEvidence && sourceCoverage === 'unknown') blockers.add('source_coverage_unknown');
+  if (requiresMoreEvidence && SOURCE_INCOMPLETE.has(sourceCoverage)) blockers.add(`source_${sourceCoverage}`);
+  if (requiresMoreEvidence && freshness === 'unknown') blockers.add('freshness_unknown');
   if (freshness === 'stale') blockers.add('stale_evidence');
-  if (capState === 'capped' || input.hasCappedRequiredFacts) blockers.add('capped_required_facts');
+  if (requiresMoreEvidence && (capState === 'capped' || input.hasCappedRequiredFacts)) blockers.add('capped_required_facts');
   if (input.hasAmbiguity || uncertaintyLabels.includes('ambiguous_symbol')) blockers.add('ambiguous_symbol');
   if (input.noResults || uncertaintyLabels.includes('bounded_no_results')) blockers.add('bounded_no_results');
   if (input.noStaticPath || uncertaintyLabels.includes('bounded_no_static_path')) blockers.add('bounded_no_static_path');
-  if (input.hasHeuristicEvidence || uncertaintyLabels.includes('heuristic_edge') || evidenceProvenance.includes('heuristic')) blockers.add('heuristic_edge');
   if (input.hasUnsupportedMechanism) blockers.add('unsupported_mechanism');
-  if (input.missingProvenance || evidenceProvenance.includes('unknown')) blockers.add('missing_provenance');
-  if (!input.canAnswerFromReturnedContext) blockers.add('insufficient_returned_context');
+  if (requiresMoreEvidence && (input.missingProvenance || evidenceProvenance.includes('unknown'))) blockers.add('missing_provenance');
+  if (requiresMoreEvidence) blockers.add('insufficient_returned_context');
   return [...blockers].sort((a, b) => a.localeCompare(b));
 }
 
