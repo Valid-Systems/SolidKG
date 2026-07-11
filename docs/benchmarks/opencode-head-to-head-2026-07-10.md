@@ -1,12 +1,43 @@
 # SolidKG vs CodeGraph on OpenCode — 2026-07-10
 
-This diagnostic compares SolidKG, [CodeGraph](https://github.com/colbymchenry/codegraph), and a no-graph control using the same repositories, questions, model, and tools.
+This report leads with a matched current-build comparison of SolidKG and [CodeGraph](https://github.com/colbymchenry/codegraph), then preserves the earlier three-arm diagnostic for historical context.
 
-## Bottom line
+## Matched current-build comparison
 
-**CodeGraph used 59% fewer tool calls and 59% fewer tokens than SolidKG on average. It won both measures on all seven repositories.**
+We ran OpenCode with `openai/gpt-5.6-sol` against current local builds, the same seven repositories and architecture questions, and four successful repeats per repository/product cell. Each value below is the cell median. Lower is better.
 
-Each number is the median of four runs. **Lower is better; bold marks the better result.**
+| Repository | SolidKG calls | CodeGraph calls | SolidKG tokens | CodeGraph tokens |
+|---|---:|---:|---:|---:|
+| VS Code | **1** | 3 | **25,063** | 67,542 |
+| Excalidraw | 2 | 2 | 47,471 | **46,515** |
+| Django | 2 | 2 | 47,061 | **45,625** |
+| Tokio | 2 | 2 | 48,094 | **47,935** |
+| OkHttp | **1** | 2 | **25,132** | 45,875 |
+| Gin | 1 | 1 | **22,478** | 23,965 |
+| Alamofire | 1 | 1 | **22,689** | 23,333 |
+
+| Equal-repository aggregate | SolidKG relative to CodeGraph |
+|---|---:|
+| Tool calls | 16.7% lower |
+| Tokens | 15.9% lower |
+| Read / Grep / Glob | 0 median for both products in all 7 repositories |
+
+The equal-repository aggregate averages each repository's percentage change so large repositories do not dominate the result. Tool calls include graph queries and built-in file/search actions. Tokens sum every assistant step's input, cache, reasoning, and output usage.
+
+All 56 planned runs completed and cited source files. The validity screen found every expected mechanism in 54/56 answers; the two misses were CodeGraph Gin answers. No completed run contained a recoverable tool error. Elapsed time is omitted because concurrent runs on a busy host do not support a fair speed comparison. Dollar cost is unavailable because OpenCode reports zero through the OpenAI subscription path.
+
+Run-to-run variance remained material: the median within-cell range was 41.7% of the cell median for tools and 42.4% for tokens; maximum ranges were 900.0% and 371.8%. Four-repeat medians reduce but do not eliminate this variance. The benchmark explains architecture; it does not evaluate generated patches, build success, regressions, security, or maintainability.
+
+## Pre-fix full matrix
+
+### Bottom line
+
+| Equal-repository aggregate | CodeGraph relative to pre-fix SolidKG |
+|---|---:|
+| Tool calls | 58.6% lower |
+| Tokens | 58.9% lower |
+
+Each number is the median of four runs. Lower is better; bold marks the lower result.
 
 | Repository | SolidKG tool calls | CodeGraph tool calls | SolidKG tokens | CodeGraph tokens |
 |---|---:|---:|---:|---:|
@@ -33,7 +64,7 @@ Both graph tools greatly reduced direct file discovery. SolidKG made slightly fe
 
 ## Full results
 
-Each cell is the median of four successful runs. Lower is better within each repository; bold marks the best arm. Elapsed time is omitted because concurrent runs on a busy host do not support a fair speed comparison.
+Each cell is the median of four successful runs. Lower is better within each repository; bold marks the lowest value. Elapsed time is omitted because concurrent runs on a busy host do not support a fair speed comparison.
 
 | Repository | Arm | Tools | Reads | Grep / Glob | Tokens |
 |---|---|---:|---:|---:|---:|

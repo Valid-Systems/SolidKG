@@ -19,6 +19,14 @@ solidkg index --exclude "dist/**" --exclude "generated/**" --max-file-size 2mb
 
 SolidKG already skips dependencies, build outputs, committed `vendor/` and `vendored/`, nested Git repositories, submodules, and files larger than 5 MB by default. Use `--include`, `--exclude`, `--include-vendored`, `--recurse-submodules`, and `--max-file-size` when a repository needs a different scope. Index output and `IndexResult.skippedFiles` report skipped files by reason.
 
+For a stopped or stalled index, inspect the lifecycle diagnostic in the data directory:
+
+```text
+<data-dir>/index-lifecycle.json
+```
+
+`index` and the initial index run by `init -i` atomically replace the record through a random exclusive temporary file. Phase, detail, completion, and terminal success or failure are persisted immediately. Counts during a running index are periodically checkpointed, with an intended lag of at most about two seconds, so they may reflect the latest checkpoint rather than the instant you inspect the file. Where POSIX modes apply, the file is owner-only. It can also contain absolute paths and stack traces, so treat it as sensitive before sharing. Source projection is visible as its own phase and flushes at 128 files or 32 MiB, whichever comes first. Source chunks are up to 8 KiB, with a 1,024-chunk-per-file safety cap.
+
 ## MCP hits `database is locked` or `disk I/O error`
 
 Current builds use Node's built-in `node:sqlite` in WAL mode where the filesystem supports it. Network filesystems, mapped Windows drives, and WSL mounted paths can still make SQLite locking unreliable.

@@ -20,79 +20,64 @@ SolidKG is a local-first code knowledge graph designed for structural questions 
 
 Indexing and retrieval run locally by default. External dense/vector embeddings, vector databases, rerankers, API calls, telemetry, and hybrid retrieval providers are not enabled by default. MCP clients can still send source returned by SolidKG to their configured model provider; use a local model or review that provider's data policy when source must remain on-device.
 
+## Related tools
+
+This is a feature-scope comparison, not a universal ranking. It was verified on 2026-07-11 against the linked official snapshots. "Not documented" means the reviewed official sources did not document the capability. It does not prove that a future release lacks it. The Cartog and Tilth rows below describe product scope only, not results from benchmark-corpus repositories.
+
+| Product | Documented focus and storage | Graph navigation | Dynamic dispatch | Semantic hyperedges | SCIP or compiler references | Local semantic or vector behavior |
+|---|---|---|---|---|---|---|
+| [SolidKG](#feature-map) | Per-project SQLite AST graph with ordered semantic hyperedges | Callers, callees, impact, and trace | Synthesized callback, render, and native bridges | Ordered semantic hyperedges | Optional SCIP | Local FTS and source chunks; external vectors disabled by default |
+| [CodeGraph](https://github.com/colbymchenry/codegraph/tree/ecc8b307ac2f8a7d06bff02ee513c4ea2380b2f8) | Per-project SQLite/FTS AST graph | Callers, callees, impact, and explore | Documented synthesized dispatch | Not documented | No official hyperedge or SCIP documentation found | Local FTS documented; vector behavior not documented |
+| [Sverklo](https://github.com/sverklo/sverklo/tree/3156effb9c25147edf7a310e1998f8fd18ee007f) | SQLite and sqlite-vec local semantic search, memory, import/dependency graph, and impact | Import/dependency graph and impact | No dedicated trace documentation found | Not documented | No dedicated SCIP documentation found | sqlite-vec local semantic search; offline after model download |
+| [Cartog](https://github.com/jrollin/cartog/tree/61fd98379e8240455856f167c1ce333f17297bb8) | SQLite tree-sitter graph with incremental Git, SHA, and Merkle indexing | Callers, callees, impact, and static trace | Explicitly unresolved | Not documented | No hyperedge or SCIP documentation found | Optional sqlite-vec and LSP |
+| [Tilth](https://github.com/jahala/tilth/tree/e7ef4647e0f8778491e3327e05c98260ff1b2d05) | tree-sitter and ripgrep local code reading and search | Outline, callers, one-hop callees, and file dependencies | Indirect dispatch unresolved | Not documented | No persistent graph DB, impact, hyperedge, or SCIP documentation found | Local text and structural search; vector behavior not documented |
+
 ## Measured results
 
-### SolidKG vs CodeGraph: direct diagnostic
+### SolidKG vs CodeGraph: matched OpenCode comparison
 
-We gave the same codebase questions to the same OpenCode agent (`openai/gpt-5.6-sol`) with SolidKG, CodeGraph, or no graph. Each value below is the median of four runs. **Lower is better; bold marks the better result.**
+The latest OpenAI-only comparison used OpenCode with `openai/gpt-5.6-sol`, the same seven repositories and architecture questions for both products, current local builds, and four successful repeats per repository/product cell. Lower is better.
 
-> **CodeGraph used 59% fewer tool calls and 59% fewer tokens than SolidKG on average. It won both measures on all seven repositories.**
+| Equal-repository aggregate | SolidKG relative to CodeGraph |
+|---|---:|
+| Tool calls | 16.7% lower |
+| Tokens | 15.9% lower |
+| Read / Grep / Glob | 0 median for both products in all 7 repositories |
 
-| Codebase | SolidKG tool calls | CodeGraph tool calls | SolidKG tokens | CodeGraph tokens |
+| Codebase | SolidKG calls | CodeGraph calls | SolidKG tokens | CodeGraph tokens |
 |---|---:|---:|---:|---:|
-| VS Code | 25 | **11.5** | 295k | **166k** |
-| Excalidraw | 13 | **11** | 213k | **100k** |
-| Django | 6.5 | **2** | 105k | **46k** |
-| Tokio | 4 | **2** | 107k | **47k** |
-| OkHttp | 6.5 | **2** | 105k | **45k** |
-| Gin | 6 | **2.5** | 89k | **39k** |
-| Alamofire | 17.5 | **1** | 237k | **24k** |
+| VS Code | **1** | 3 | **25,063** | 67,542 |
+| Excalidraw | 2 | 2 | 47,471 | **46,515** |
+| Django | 2 | 2 | 47,061 | **45,625** |
+| Tokio | 2 | 2 | 48,094 | **47,935** |
+| OkHttp | **1** | 2 | **25,132** | 45,875 |
+| Gin | 1 | 1 | **22,478** | 23,965 |
+| Alamofire | 1 | 1 | **22,689** | 23,333 |
 
-Tool calls are agent actions such as graph queries, file reads, and searches. Tokens measure the total model context and output processed during a run.
+Tool calls include graph queries and built-in file/search actions. Tokens sum every assistant step's input, cache, reasoning, and output usage.
 
-#### How both graph tools compared with no graph
+Scope: 56 successful runs, seven repositories × two products × four repeats. All runs cited source files; 54/56 matched every expected mechanism, and no completed run contained a recoverable tool error. Elapsed time is not compared because cells ran concurrently on a busy host. Generated-code quality and patch correctness are outside this architecture-explanation benchmark.
 
-| Average change vs no graph | Tool calls | Reads | Grep / Glob | Tokens |
-|---|---:|---:|---:|---:|
-| SolidKG | 48% fewer | 83% fewer | **94% fewer** | 12% more |
-| CodeGraph | **80% fewer** | **87% fewer** | 93% fewer | **55% fewer** |
+See [`docs/benchmarks/opencode-head-to-head-2026-07-10.md`](docs/benchmarks/opencode-head-to-head-2026-07-10.md) for repository-level medians, methodology, validity checks, variance, and the historical pre-fix matrix.
 
-These averages give each repository equal weight after taking its four-run median. A 21-answer source check found the same quality pattern for both graph tools: each had 6 passes, 1 partial answer, and no failed sampled answer. The check covered one answer per repository and arm, not all 84 answers.
+### Expanded matched corpus
 
-This diagnostic measured architecture explanations, not generated-code quality. It did not compare patch correctness, test pass rates, regressions, security, or maintainability.
+A separate July 11 local comparison added Cartog, Tilth, Azure PowerShell, and Apache Airflow. It used `openai/gpt-5.6-sol` with four repeats per repository/product cell. Lower is better.
 
-<details>
-<summary><strong>Methodology and caveats</strong></summary>
+| Equal-repository reduction for SolidKG | Result |
+|---|---:|
+| Tool calls | 34.6% |
+| Read calls | 24.0% |
+| Grep calls | 77.8% |
+| Glob calls | 100.0% |
+| Graph calls | 12.5% |
+| Tokens | 34.7% |
 
-- 84 successful runs: 7 repositories × 3 arms × 4 repeats.
-- Same fresh repository clones, pinned commits, questions, OpenCode 1.17.18 agent, `openai/gpt-5.6-sol` model, permissions, and built-in tools in every arm; only the MCP configuration changed.
-- Product builds used `@typescript/native-preview` `7.0.0-dev.20260707.2`.
-- 27 of 28 matched three-arm batches overlapped; the first Gin batch ran sequentially. Elapsed time is descriptive only and excluded from the headline.
-- OpenCode reported zero per-run cost through the OpenAI subscription path, so this benchmark makes no dollar-cost claim.
-- Run variance remained material; the table uses medians. CodeGraph nevertheless used fewer tool calls and tokens than SolidKG on every repository.
-- 19 recoverable tool-call errors occurred across 8 completed runs. All 84 runs still produced terminal answers with no top-level error.
-- This is directional diagnostic evidence, not a claim-grade or independently reproducible benchmark. Raw run logs and the exact SolidKG benchmark binary were not archived for publication.
+All 32 planned runs completed with zero tool errors and source-file citations in all 32 answers. The mechanism screen completed 31/32 checks, and a separate audit passed all eight median-representative answers. One non-representative Cartog/SolidKG run was partial because it omitted the Git-diff stage.
 
-See [`docs/benchmarks/opencode-head-to-head-2026-07-10.md`](docs/benchmarks/opencode-head-to-head-2026-07-10.md) for pinned revisions, per-arm medians, direct deltas, and the correctness audit.
+Cartog and Tilth used recorded pinned commits. Azure PowerShell and Apache Airflow were unversioned local snapshots, so this is not an independent-reproduction or claim-grade result for those rows. The 3.3% wall-clock reduction is omitted here because concurrent subscription-host timing is descriptive rather than a controlled speed measure.
 
-</details>
-
-### Prior Claude A/B benchmark
-
-A separate earlier benchmark tested the same seven codebases with Claude Code, comparing SolidKG only against an empty-MCP control. Those results describe that earlier model and harness; they are not directly comparable to the exploratory OpenCode diagnostic above.
-
-> **Average result: 71% fewer tool calls · 46% faster · 57% fewer tokens · 35% lower cost.**
-
-In that earlier Claude harness, SolidKG reached useful answers with fewer discovery calls, accompanied by lower token use and cost. Those savings are historical observations from that model and harness; token savings did not reproduce in the exploratory OpenCode diagnostic above.
-
-| Codebase       | Language / scale        | Time, with → without | Tool calls, with → without | Tokens saved | Cost saved |
-| -------------- | ----------------------- | -------------------: | -------------------------: | -----------: | ---------: |
-| **VS Code**    | TypeScript · ~10k files |        1m10s → 2m26s |                     8 → 55 |          78% |        26% |
-| **Excalidraw** | TypeScript · ~640 files |          48s → 2m58s |                     3 → 79 |          90% |        52% |
-| **Django**     | Python · ~3k files      |        1m19s → 1m38s |                     9 → 19 |          36% |        12% |
-| **Tokio**      | Rust · ~790 files       |           53s → 3m2s |                     4 → 53 |          86% |        82% |
-| **OkHttp**     | Java · ~645 files       |           42s → 1m1s |                     6 → 11 |          13% |         2% |
-| **Gin**        | Go · ~110 files         |           44s → 1m0s |                     6 → 10 |          34% |        21% |
-| **Alamofire**  | Swift · ~110 files      |        1m17s → 2m27s |                    12 → 69 |          64% |        47% |
-
-<details>
-<summary><strong>Methodology and reproducibility</strong></summary>
-
-Each arm ran headlessly with the same query and built-in tools. The SolidKG arm exposed only SolidKG's MCP server; the control used an empty MCP configuration. Wall-clock time and cost are cumulative. Tokens are the sum of per-turn assistant usage, not the final turn's usage object. Per-run variance is real, so the table reports medians rather than a single run.
-
-Reproduce with `scripts/agent-eval/bench-readme.sh`; see [`docs/benchmarks/call-sequence-analysis.md`](docs/benchmarks/call-sequence-analysis.md#current-build-withwithout-ab--the-7-readme-repos-2026-05-24) for queries, raw medians, interpretation, and measurement caveats.
-
-</details>
+See [`docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md`](docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md) and its [versioned compact evidence JSON](docs/benchmarks/evidence/opencode-expanded-2026-07-11.json) for repository medians, ranges, provenance, answer checks, and scope limits.
 
 ### Reference-index diagnostics
 
@@ -105,7 +90,16 @@ A separate read-only sweep checks stored graph quality across a broader corpus. 
 | Fair semantic dependent coverage   |      28,319 / 93,784 · 30.2% micro · 39.5% repo median |
 | Route-handler linkage              |                                 7,922 / 12,424 · 63.8% |
 | Route-binding integrity            |                                  7,218 / 7,923 · 91.1% |
-| Current-build direct probes        | 2 / 2 measured · 5 repeats each · 0 expectation misses |
+| Source-chunk attachment            |                              95,420 / 137,352 · 69.5% |
+| SCIP document coverage             |                                6,824 / 117,482 · 5.8% |
+| SCIP linked-node coverage          |                            25,506 / 1,122,980 · 2.3% |
+| Capability-producer completeness  |                              85,963 / 117,482 · 73.2% |
+| Graded default-surface probes      | 6 probes · 5 repeats each · 4 required-source hits · 2 calibrated abstentions · 100% useful-source recall where labeled · 0 misleading-source intrusions |
+| Integrity burden                   |             0 file errors · 0 dangling edges · 0 duplicate repositories |
+
+The graded probes include long, terse, and counterfactual forms on Airflow and Azure PowerShell. The four ordinary prompts returned their required production file. The two counterfactual prompts did not recover the required file, but now return a partial `missing_query_concept` packet rather than falsely claiming sufficiency. Across the six paired probes, median payload fell from 32,750 to 31,148 bytes (4.9%); this is a direct tool-output diagnostic, not an agent-task benchmark.
+
+See [`docs/benchmarks/research-integration-2026-07-10.md`](docs/benchmarks/research-integration-2026-07-10.md) for the research-to-implementation presentation, before/after interpretation, graph-invariance evidence, and remaining retrieval gap.
 
 Full definitions, per-language results, provenance, availability states, and repository rows are in [`docs/benchmarks/reference-quality-baseline.md`](docs/benchmarks/reference-quality-baseline.md). The methodology and claim boundary are in [`docs/benchmarks/reference-quality-sweep.md`](docs/benchmarks/reference-quality-sweep.md).
 
@@ -156,7 +150,7 @@ solidkg init -i --data-dir /local/solidkg-data/project-a /path/to/project
 | TypeScript API      | Initialize/open projects, index/sync/watch, search nodes, traverse callers/callees/impact, build context, render overviews, inspect hyperedges, manage snapshots, analyze architecture, and import/generate SCIP.                                                                     |
 | Agent install       | Idempotent MCP configuration and provider-neutral instructions for supported agents, preserving existing comments and sibling config where formats allow it.                                                                                                                          |
 | Flow coverage       | Static calls plus validated framework/dynamic-dispatch links for routes, event channels, UI render chains, callbacks, native bridges, and type contracts.                                                                                                                             |
-| Retrieval evidence  | Answer packets, source-completeness labels, capability footprints, and `source_body_chunk` ranking reasons from persisted local source-body/code-token chunks; exact symbol/path/trace evidence remains higher priority.                                                              |
+| Retrieval evidence  | Answer packets, source-completeness labels, capability footprints, counterfactual concept coverage, and `source_body_chunk` ranking reasons from persisted local source-body/code-token chunks; exact symbol/path/trace evidence remains higher priority. Explicit exclusions are constraints, and uncovered concepts produce a partial `missing_query_concept` packet. |
 | Local-first posture | No network retrieval, embeddings, reranking services, API keys, or telemetry in the default graph/query path.                                                                                                                                                                         |
 
 Static analysis still has limits. Generated code, reflection-heavy systems, anonymous closures outside validated patterns, and runtime-only dispatch can still require direct source inspection.
@@ -208,6 +202,8 @@ The API covers the same core surfaces as the CLI/MCP server: indexing, syncing, 
 
 SCIP data is optional and additive. SolidKG can generate or import `.scip` indexes, link SCIP symbols back to graph nodes, and expose compiler-grade definitions, references, implementations, and type-definition relationships when the data exists.
 
+The low SCIP percentages in the reference-index diagnostic describe **data availability in a mixed historical corpus**, not a failed integration. Most stored indexes were created before SCIP was generated/imported for them or on machines without the matching external indexer. Normal AST indexing remains complete without SCIP.
+
 Default indexer commands:
 
 | Language              | Command           |
@@ -219,6 +215,12 @@ Default indexer commands:
 | C#                    | `scip-dotnet`     |
 
 If an indexer is missing or no SCIP file is imported, the AST graph still works.
+
+- `solidkg init -i` uses SCIP `auto`: it imports generated data when a supported indexer is installed and otherwise continues with the AST graph.
+- `solidkg index` and the library `indexAll()` default to SCIP `off`; pass `--scip auto` to opt in or `--scip required` to fail when generation is unavailable.
+- `solidkg scip generate`, `solidkg scip import`, `solidkg status`, and `solidkg_precise_refs` provide explicit generation, import, health, and query surfaces.
+
+The remaining SCIP work is measurement and coverage, not basic plumbing: rebuild a pinned corpus with the current build and installed indexers, then improve symbol-to-AST linking only where that fresh run still reports low linked-node coverage.
 
 ## Supported code
 
@@ -280,6 +282,14 @@ If a lock file is stale:
 ```bash
 solidkg unlock /path/to/project
 ```
+
+If indexing stops or appears stalled, inspect the lifecycle diagnostic in the index data directory:
+
+```text
+<data-dir>/index-lifecycle.json
+```
+
+`index` and the initial index run by `init -i` update this record through a random exclusive temporary file followed by atomic replacement. Phase, detail, completion, and terminal success or failure are persisted immediately. Counts during a running index are periodically checkpointed, with an intended lag of at most about two seconds, so they reflect the latest checkpoint rather than the instant you inspect the file. Where POSIX modes apply, it is owner-only. It can include absolute paths and stack traces, so treat it as sensitive diagnostic output and review it before sharing.
 
 On Windows network drives or SMB shares, put `--data-dir` on a local disk to avoid SQLite locking issues.
 

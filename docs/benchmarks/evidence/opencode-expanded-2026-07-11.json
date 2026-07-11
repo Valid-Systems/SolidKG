@@ -1,0 +1,58 @@
+{
+  "schema": "solidkg.benchmark-evidence.v1",
+  "benchmark": "opencode-expanded-solidkg-codegraph-2026-07-11",
+  "generated_at": "2026-07-11T08:39:17.593Z",
+  "environment": {
+    "model": "openai/gpt-5.6-sol",
+    "opencode": "1.17.18",
+    "node": "v24.12.0"
+  },
+  "plan": {
+    "schema": "solidkg-codegraph-matched-benchmark.v6",
+    "sha256": "594831c7d80750e64785c97f74cfe78b698ed9470099a25d7cbfb12f43a71826"
+  },
+  "binaries": {
+    "solidkg": { "sha256": "33ffed1b03a6bd8aa0689d515a2abe6314864007775599755f9bb1e4b8f3b9c8" },
+    "codegraph": { "sha256": "09f9bf91d735282531c8356cba8098f041093271af4062824774460db69d549a" }
+  },
+  "harness": {
+    "runner_sha256": "7f4ffca4525f89bda93284426adcf0fda4e1189bd69f6a095db4bc60d72c3513",
+    "analyzer_sha256": "eb80327575180b71e3c23c9055b9bd72ae018a06891026bdf3420934e3172fde",
+    "spec_sha256": "c1837bcedd6e6d4bcd8c1c34205fd8871a448140150d8532c586b2edeb25cd76",
+    "location": "External local harness under D:\\tmp\\opencode\\solidkg-expanded-benchmark-2026-07-11; its raw artifacts are not versioned in this repository."
+  },
+  "repositories": {
+    "cartog": { "revision": "61fd98379e8240455856f167c1ce333f17297bb8", "revision_kind": "git" },
+    "tilth": { "revision": "e7ef4647e0f8778491e3327e05c98260ff1b2d05", "revision_kind": "git" },
+    "azure-powershell": { "revision": null, "revision_kind": "local-snapshot", "caveat": "No Git revision is claimed. This row is not an independent-reproduction or claim-grade result." },
+    "apache-airflow": { "revision": null, "revision_kind": "local-snapshot", "caveat": "No Git revision is claimed. This row is not an independent-reproduction or claim-grade result." }
+  },
+  "validity": {
+    "planned_runs": 32,
+    "completed_runs": 32,
+    "source_file_citations": 32,
+    "runs_with_tool_errors": 0,
+    "mechanism_screen_complete": 31,
+    "mechanism_screen_total": 32
+  },
+  "metric_units": { "time_s": "seconds", "tools": "calls", "read": "calls", "grep": "calls", "glob": "calls", "graph": "calls", "tokens": "tokens" },
+  "cells": [
+    { "repository": "cartog", "product": "solidkg", "repeats": 4, "median": { "time_s": 55.424, "tools": 2, "read": 0, "grep": 0, "glob": 0, "graph": 2, "tokens": 49636.5 }, "range": { "time_s": [54.332, 59.287], "tools": [2, 11], "read": [0, 6], "grep": [0, 3], "glob": [0, 0], "graph": [2, 2], "tokens": [47770, 161454] } },
+    { "repository": "cartog", "product": "codegraph", "repeats": 4, "median": { "time_s": 68.2215, "tools": 13, "read": 7, "grep": 2, "glob": 1.5, "graph": 2, "tokens": 150187.5 }, "range": { "time_s": [53.419, 75.327], "tools": [10, 14], "read": [5, 8], "grep": [1, 4], "glob": [1, 2], "graph": [2, 2], "tokens": [134082, 167404] } },
+    { "repository": "tilth", "product": "solidkg", "repeats": 4, "median": { "time_s": 44.632, "tools": 8, "read": 5.5, "grep": 1, "glob": 0, "graph": 1, "tokens": 92539.5 }, "range": { "time_s": [38.216, 48.986], "tools": [6, 9], "read": [4, 7], "grep": [1, 1], "glob": [0, 1], "graph": [1, 1], "tokens": [68875, 143838] } },
+    { "repository": "tilth", "product": "codegraph", "repeats": 4, "median": { "time_s": 41.095, "tools": 7, "read": 4, "grep": 1.5, "glob": 0, "graph": 1, "tokens": 105282.5 }, "range": { "time_s": [38.099, 62.096], "tools": [6, 7], "read": [4, 5], "grep": [1, 2], "glob": [0, 0], "graph": [1, 1], "tokens": [79594, 128026] } },
+    { "repository": "azure-powershell", "product": "solidkg", "repeats": 4, "median": { "time_s": 112.524, "tools": 3, "read": 1, "grep": 0, "glob": 0, "graph": 2, "tokens": 75369 }, "range": { "time_s": [99.688, 117.979], "tools": [3, 5], "read": [1, 3], "grep": [0, 0], "glob": [0, 0], "graph": [2, 2], "tokens": [69354, 92211] } },
+    { "repository": "azure-powershell", "product": "codegraph", "repeats": 4, "median": { "time_s": 188.637, "tools": 7, "read": 1.5, "grep": 1, "glob": 1, "graph": 3, "tokens": 139654.5 }, "range": { "time_s": [171.952, 250.47], "tools": [4, 7], "read": [1, 2], "grep": [0, 1], "glob": [1, 1], "graph": [2, 4], "tokens": [82485, 147374] } },
+    { "repository": "apache-airflow", "product": "solidkg", "repeats": 4, "median": { "time_s": 81.382, "tools": 4, "read": 1.5, "grep": 0, "glob": 0, "graph": 2.5, "tokens": 80774.5 }, "range": { "time_s": [75.101, 100.934], "tools": [2, 6], "read": [0, 3], "grep": [0, 0], "glob": [0, 0], "graph": [2, 3], "tokens": [48240, 96855] } },
+    { "repository": "apache-airflow", "product": "codegraph", "repeats": 4, "median": { "time_s": 59.264, "tools": 4.5, "read": 1.5, "grep": 0, "glob": 0, "graph": 3, "tokens": 93550 }, "range": { "time_s": [55.552, 60.147], "tools": [3, 5], "read": [0, 2], "grep": [0, 0], "glob": [0, 0], "graph": [3, 3], "tokens": [60582, 100635] } }
+  ],
+  "equal_repository_reduction_percent": { "time_s": 3.2949, "tools": 34.6459, "read": 23.9583, "grep": 77.7778, "glob": 100, "graph": 12.5, "tokens": 34.6855 },
+  "correctness_audit": {
+    "method": "Read-only source review of one deterministically selected median-representative answer per repository/product cell against the recorded snapshots.",
+    "representative_cells": 8,
+    "pass": 8,
+    "partial_nonrepresentative_runs": 1,
+    "partial_detail": "Cartog SolidKG repeat 4 omitted the normal Git-diff stage.",
+    "scope_limit": "The audit supports only the eight reviewed answers in their recorded snapshots, not universal correctness or product-wide superiority."
+  }
+}

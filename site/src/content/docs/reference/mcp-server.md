@@ -78,6 +78,8 @@ Source-completeness fields are returned-source coverage only, not answer/path/ru
 
 Another graph call is warranted for a real blocker: missing required anchors, stale or unreadable required source, no results, no static path, or explicit endpoint ambiguity. Generic prose words such as "send" and "request" do not become flow endpoints.
 
+Explicit exclusions such as “not tests” or “excluding generated metadata” are retrieval constraints, not positive terms. For counterfactual queries, SolidKG checks whether returned source covers the remaining explicit concepts. If not, the answer packet is partial and includes `missing_query_concept` rather than claiming the evidence is sufficient.
+
 In the advanced profile, `solidkg_trace` provides exact endpoint-to-endpoint paths with hop bodies, `solidkg_files format="overview"` provides repository orientation, and `solidkg_node` is for one specific missing symbol or hop, not a loop over many symbols.
 
 Ranking reasons may include `source_body_chunk` when persisted local source-body/code-token chunks seeded or boosted `solidkg_context`, `solidkg_explore`, or `solidkg_search` results. Treat this as deterministic body evidence below exact symbols, paths, trace paths, semantic relations, and SCIP facts.

@@ -51,7 +51,9 @@ solidkg status --data-dir ~/.cache/solidkg/my-repo /path/to/project
 solidkg serve --mcp --path /path/to/project --data-dir ~/.cache/solidkg/my-repo
 ```
 
-Without `--data-dir`, the default remains `<project>/.solidkg/`. With `--data-dir`, SolidKG stores the database, daemon pid/log, lock file, error log, and generated SCIP output in the requested directory while indexing files from the project path. Pass the same directory to later `index`, `sync`, `status`, query, `scip`, `unlock`, and MCP server commands; SolidKG does not migrate or auto-discover external directories.
+Without `--data-dir`, the default remains `<project>/.solidkg/`. With `--data-dir`, SolidKG stores the database, daemon pid/log, lock file, error log, generated SCIP output, and `index-lifecycle.json` in the requested directory while indexing files from the project path. Pass the same directory to later `index`, `sync`, `status`, query, `scip`, `unlock`, and MCP server commands; SolidKG does not migrate or auto-discover external directories.
+
+`index` and the initial index run by `init -i` atomically replace `<data-dir>/index-lifecycle.json`. Phase, detail, completion, and terminal success or failure are persisted immediately. Counts during a running index are periodically checkpointed, with an intended lag of at most about two seconds, so they may reflect the latest checkpoint rather than the instant you inspect the file. The replacement uses a random exclusive temporary file. Where POSIX modes apply, the lifecycle file is owner-only. It can contain absolute paths and stack traces, so treat it as sensitive diagnostic output before sharing. Inspect it when an index stops or appears stalled.
 
 Use one data directory per worktree or branch for feature-branch work. SolidKG has one active source root and one data directory per initialized command, and it does not provide branch overlays or shared-main plus local-feature overlays. A team-shared directory is safe only when everyone intentionally queries the same branch, usually a shared main-branch index. On Windows network drives or SMB shares, prefer a local external data directory to avoid SQLite WAL/disk I/O failures; if one occurs, stop MCP sessions and reinitialize with a local `--data-dir`.
 
@@ -69,6 +71,8 @@ solidkg index --include-vendored /path/to/project
 Committed `vendor/` and `vendored/` source are skipped by default even when Git tracks them. Use `--include-vendored` when vendored source is intentionally part of the graph. Nested Git repositories and submodules are skipped by default; use `--recurse-submodules` to opt in.
 
 `--max-file-size <size>` skips source files larger than the configured size. Values accept bytes, `kb`, `mb`, or `gb`; the default is `5mb`. Index output reports skipped files grouped by reason, and the library API exposes them through `IndexResult.skippedFiles`.
+
+Source projection is a visible index phase. It flushes at 128 files or 32 MiB, whichever comes first. Generated source chunks are limited to 8 KiB, with a 1,024-chunk-per-file safety cap.
 
 File-level tracked formats such as `.yml`, `.yaml`, `.twig`, and Lazarus `.lpi` are counted as indexed file records even when they intentionally have no symbol nodes. CUDA `.cu`/`.cuh` files are accepted through the C++ parser; kernel-launch semantics are not reported unless future extraction tests prove them.
 

@@ -241,3 +241,7 @@ Every experiment should preserve the existing order of proof:
 4. tool calls, Read/Grep, latency, payload, tokens, and cost.
 
 No idea should ship solely because it lowers token count or creates a plausible graph story.
+
+## Implemented outcome
+
+The first bounded integration is recorded in [the research integration benchmark](benchmarks/research-integration-2026-07-10.md). It adds canonical fresh-index/sync graph fingerprints, graded source judgments, explicit exclusion handling, and counterfactual concept coverage on the existing `solidkg_explore` surface. The finished-build sweep returned required source for all four ordinary probes and calibrated both counterfactual misses as partial instead of sufficient. The misses remain an explicit retrieval gap; no neural, vector, randomized, or new-tool subsystem was adopted.

@@ -1,5 +1,7 @@
 # Call-sequence analysis — why read savings don't convert to wall-clock
 
+> Historical provenance note: this document entered the SolidKG repository with the initial import and contains the predecessor CodeGraph/early-tool benchmark history. Do not cite its Claude-era percentages as SolidKG benchmark results. Current SolidKG-vs-CodeGraph evidence is documented in `docs/benchmarks/opencode-head-to-head-2026-07-10.md` using OpenAI through OpenCode.
+
 **Date:** 2026-05-23 · **Branch:** `architectural-improvements` · **Source data:** the surviving
 stream-json logs from the A/B matrix (`/tmp/ab-matrix/<Cell>/run-headless-{with,without}.jsonl`,
 37 cells × 2 arms). Re-mined — **no re-runs** — with `scripts/agent-eval/seq-matrix.mjs`.

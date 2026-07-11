@@ -11,7 +11,7 @@ It exists to help AI coding agents — Claude Code, Cursor, Codex CLI, opencode,
 
 When an agent explores a codebase, it can spend much of its budget on *discovery* — finding the right files before it can read them. SolidKG reduces that work when indexed graph evidence is sufficient; direct source inspection remains necessary when coverage is partial or runtime-only.
 
-Benchmark notes across 7 real-world open-source codebases show that a pre-built graph can reduce rediscovery work. Outcomes vary by model and harness: an earlier Claude A/B showed fewer calls, tokens, and elapsed time with SolidKG, while a 2026 OpenCode diagnostic found fewer discovery calls but higher SolidKG token use and found CodeGraph more efficient than SolidKG on tool calls and tokens. Treat these as benchmark-context evidence, not universal savings.
+The [Capability Record](/solidkg/core-concepts/capabilities/) presents the OpenAI/OpenCode comparison and retrieval diagnostics in chart form, including repeat counts and claim boundaries.
 
 ## What's in the graph
 

@@ -8,26 +8,32 @@ Static analysis still has limits. Generated code, reflection, inherited framewor
 
 | Evidence | Result | Source |
 |---|---:|---|
-| 37 language/framework flow-question cells, with SolidKG MCP vs no MCP | Reads fell `159 -> 38` (76% fewer), greps fell `72 -> 22`, tool calls fell `321 -> 189`, mean wall-clock `48s -> 38s`; no cell increased reads | `docs/benchmarks/solidkg-ab-matrix.md` |
-| 7 README benchmark repos, median of 4 runs/arm | 46% faster wall-clock, 71% fewer tool calls, 57% fewer tokens, 35% lower cost | `docs/benchmarks/call-sequence-analysis.md` |
-| 2026-07-10 exploratory OpenCode diagnostic, 7 repos × 3 arms × 4 repeats | CodeGraph used fewer tool calls and tokens than SolidKG in all 7 repository medians; unweighted average reductions were 58.6% and 58.9%. Missing raw/exact-binary provenance keeps this diagnostic, not claim-grade. | `docs/benchmarks/opencode-head-to-head-2026-07-10.md` |
+| Matched OpenCode comparison, 7 repos × 2 products × 4 repeats | SolidKG used 16.7% fewer tool calls and 15.9% fewer tokens by equal-repository aggregate; both products had zero median Read/Grep/Glob calls in all 7 repositories | `docs/benchmarks/opencode-head-to-head-2026-07-10.md` |
+| Expanded matched OpenCode comparison, 4 repos × 2 products × 4 repeats | SolidKG used 34.6% fewer tool calls, 24.0% fewer Reads, 77.8% fewer Greps, 100.0% fewer Globs, 12.5% fewer graph calls, and 34.7% fewer tokens by equal-repository aggregate | `docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md`, `docs/benchmarks/evidence/opencode-expanded-2026-07-11.json` |
+| Large-index reliability runs | Azure PowerShell completed 34,746 files and Apache Airflow completed 8,772 files; phase, detail, completion, and terminal state/error are atomically persisted immediately at `<data-dir>/index-lifecycle.json`, while running counts reflect the latest periodic checkpoint, with an intended lag of at most about two seconds | `docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md` |
+| Pre-fix 2026-07-10 OpenCode diagnostic, 7 repos × 3 arms × 4 repeats | CodeGraph used fewer tool calls and tokens than pre-fix SolidKG in all 7 repository medians; the compact-profile and stop-contract work targeted the measured self-drilling cause | `docs/benchmarks/opencode-head-to-head-2026-07-10.md` |
 | Large-reference stress suite | 118 local reference snapshots covering major OSS systems and language ecosystems | `docs/tested-codebases.md` |
 | Source-body retrieval fixture | body-query, exact-query, generated/test demotion, no-match, and trace controls all passed at recall@5 `1.00`, MRR `1.00`, source-reference fidelity `1.00` | `.omo/evidence/retrieval-quality-codeseek-retrieval-improvements.md` |
 | Aider/PageRank-style explore allocation fixture | MRR `0.50 -> 1.00`, files-to-cover `2 -> 1`, chars-to-cover `490 -> 253` | `.omo/evidence/retrieval-quality-codeseek-retrieval-improvements.md` |
+| 2026-07-10 graded default-surface diagnostic, 2 repos × 3 query variants × 5 repeats | 4/4 ordinary prompts returned required production source; 2/2 counterfactual misses abstained; useful-source recall was 100% where labeled; zero misleading-source intrusions; paired median payload fell 4.9% | `docs/benchmarks/research-integration-2026-07-10.md` |
 
 The primary product metric is not token savings by itself. The useful outcome is that agents answer structural questions with fewer raw `Read`/`Grep`/shell rediscovery loops and fewer total turns.
+
+The expanded comparison completed 32/32 runs with zero tool errors and 32/32 source-file citations. Its 31/32 mechanism screen is triage, not correctness proof. A separate review passed all eight median-representative answers; one non-representative Cartog/SolidKG answer was partial because it omitted the Git-diff stage. Cartog and Tilth were pinned, while Azure PowerShell and Apache Airflow were unversioned local snapshots. The report therefore does not make an independent-reproduction or claim-grade assertion for those snapshot rows. Its 3.3% wall-clock observation is concurrent, subscription-host descriptive evidence, not a controlled speed measure.
 
 ## Core capabilities
 
 - **AST-derived graph, not summaries.** Files become symbols, pairwise edges, semantic hyperedges, and optional SCIP facts stored locally in SQLite.
-- **Structural tools for agents.** `trace`, `context`, `explore`, `search`, `callers`, `callees`, `impact`, `files`, `snapshot`, and `architecture` expose graph evidence without requiring broad filesystem scans.
+- **Structural tools for agents.** The compact profile exposes `solidkg_explore`; the full profile adds `solidkg_search`, `solidkg_context`, `solidkg_trace`, `solidkg_node`, `solidkg_callers`, `solidkg_callees`, `solidkg_impact`, `solidkg_files`, `solidkg_status`, `solidkg_snapshot`, `solidkg_architecture`, and `solidkg_precise_refs`.
 - **Semantic hyperedges.** Route chains, event channels, UI render links, dynamic dispatch, native bridges, and type contracts preserve multi-symbol relationships that pairwise edges flatten.
 - **Answer packets.** Tool output includes evidence anchors, ranking reasons, bounded uncertainty, sufficiency hints, and next-tool suggestions so agents know when to stop or continue.
 - **Source-completeness labels.** Returned source is labeled as complete/partial/omitted/truncated/unreadable/skipped where applicable; this is returned-source coverage, not runtime proof.
 - **Capability footprints.** Trace/node output can surface may-read/write/guard/emit/subscribe/send/mutate behavior with explicit coverage states.
 - **Source-body chunk retrieval.** Indexed symbol bodies are stored as local derived chunks and searched with SQLite FTS5/code-token text, then fused into existing `context`, `explore`, and `search` ranking as `source_body_chunk` evidence. Exact symbol/path/trace/semantic/SCIP evidence stays higher-salience than body-only hits.
 - **Graph-ranked explore allocation.** When exact file/symbol tiers do not settle an explore query, a bounded personalized file-graph ranking can prioritize the files most connected to the query evidence.
+- **Counterfactual retrieval calibration.** Explicit exclusions are retrieval constraints rather than positive terms. If returned source misses a required positive concept, `missing_query_concept` keeps the answer packet partial instead of overstating sufficiency.
 - **Overview projection.** `files --format overview` and `overview` provide a budgeted repository map from indexed facts, not a separate scanner.
+- **Index lifecycle diagnostics.** `index` and the initial index run by `init -i` expose source projection as a visible phase, flush it at 128 files or 32 MiB, produce chunks up to 8 KiB with a 1,024-chunk-per-file safety cap, and atomically replace `<data-dir>/index-lifecycle.json`. Phase, detail, completion, and terminal success or failure are persisted immediately. Running counts are periodically checkpointed with an intended lag of at most about two seconds, so they reflect the latest checkpoint rather than the instant you inspect the file. Where POSIX modes apply, that diagnostic is owner-only and may contain absolute paths or stack traces, so treat it as sensitive.
 - **Local-first default.** External embeddings, vector databases, rerankers, network calls, API keys, and telemetry are not enabled by default.
 
 ## Validated framework and dispatch coverage
@@ -75,6 +81,7 @@ The table records the evidence we still remember from the validation playbooks. 
 - `docs/benchmarks/solidkg-ab-matrix.md`
 - `docs/benchmarks/call-sequence-analysis.md`
 - `docs/benchmarks/opencode-head-to-head-2026-07-10.md`
+- `docs/benchmarks/research-integration-2026-07-10.md`
 - `docs/tested-codebases.md`
 - `docs/design/dynamic-dispatch-coverage-playbook.md`
 - `docs/design/claims-register.md`

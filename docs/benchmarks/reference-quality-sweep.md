@@ -54,7 +54,7 @@ Static scans also run against a disposable copy of each `solidkg.db*` set. Altho
 
 ## Direct probes
 
-Curated probes live in `scripts/agent-eval/reference-quality-probes.json`. Each case pins a repository ID, exact tool arguments, expected source files, and section-qualified response expectations.
+Curated probes live in `scripts/agent-eval/reference-quality-probes.json`. Each case pins a repository ID, exact tool arguments, expected source files, section-qualified response expectations, and optional graded `required`, `useful`, or `misleading` source judgments. Probe families can label long, terse, and counterfactual query variants.
 
 The runner:
 
@@ -63,7 +63,7 @@ The runner:
 3. checks expected source-file hashes against the copied index;
 4. opens only the disposable copy through the current built `ToolHandler`;
 5. performs one warm-up and five measured repeats;
-6. records output hashes, UTF-8 payload bytes, p50/range latency, answer-packet/source-completeness availability, and expectation results;
+6. records output hashes, UTF-8 payload bytes, p50/range latency, answer-packet/source-completeness availability, expectation results, required/useful source recall, and misleading-source intrusion;
 7. deletes the copy and proves that every original DB/WAL/SHM artifact is unchanged.
 
 Reports retain hashes, byte counts, parsed evidence, classifications, and timing summaries only. Full tool response payloads are intentionally discarded and are never committed as benchmark artifacts.
@@ -71,6 +71,8 @@ Reports retain hashes, byte counts, parsed evidence, classifications, and timing
 Each scan and probe runs in a child process with a hard deadline. Stable sequential execution is the default to avoid turning storage contention into benchmark noise.
 
 Answer-packet sufficiency is returned-context metadata, not answer correctness. Probe latency and payload are neutral diagnostics: comparisons use `changed` or `unchanged`, never improved/regressed.
+
+A missing required source is a `miss` when the packet still claims sufficiency. The same retrieval miss is recorded as `abstained` when the packet truthfully reports partial or insufficient evidence. Abstention improves calibration, not recall, so reports keep it separate from measured success.
 
 ## Comparison rules
 
