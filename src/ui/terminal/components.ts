@@ -5,6 +5,7 @@ export const PROGRESS_PHASE_LABELS: Record<string, string> = {
   scanning: 'Scanning files',
   parsing: 'Parsing code',
   storing: 'Saving graph',
+  source_chunks: 'Projecting source chunks',
   scip: 'SCIP indexing',
   resolving: 'Linking references',
   synthesis: 'Synthesizing relations',
@@ -33,7 +34,8 @@ interface ProgressCompletionModel {
   line: string;
 }
 
-function phaseLabel(phase: string): string {
+function phaseLabel(progress: IndexProgress): string {
+  const phase = progress.detail ?? progress.phase;
   return PROGRESS_PHASE_LABELS[phase] ?? phase;
 }
 
@@ -105,7 +107,7 @@ function truncateLine(line: string, columns: number | undefined, unicode: boolea
 
 function graphProgressModel(progress: IndexProgress, options: Required<Pick<GraphProgressRenderOptions, 'frame' | 'unicode'>> & Pick<GraphProgressRenderOptions, 'columns'>): GraphProgressModel {
   const spinner = spinnerFrame(options.frame, options.unicode);
-  const label = phaseLabel(progress.phase);
+  const label = phaseLabel(progress);
   const detail = formatProgressDetail(progress, options.frame, options.unicode);
 
   return {

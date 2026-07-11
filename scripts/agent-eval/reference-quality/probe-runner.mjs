@@ -10,6 +10,10 @@ const elapsed = (started) => Number((performance.now() - started).toFixed(3));
 const hashBuffer = (value) => createHash('sha256').update(value).digest('hex');
 const errorMessage = (error) => error instanceof Error ? error.message : String(error);
 
+function ratio(matched, total) {
+  return total === 0 ? null : Number((matched / total).toFixed(3));
+}
+
 function median(values) {
   const sorted = [...values].sort((left, right) => left - right);
   if (sorted.length === 0) return null;
@@ -25,6 +29,14 @@ export function summarizeProbeRepeats(repeats) {
   const outputHashes = [...new Set(measured.map((repeat) => repeat.outputHash).filter(Boolean))].sort();
   const expectationCounts = measured.map((repeat) => repeat.evidence.expectationResults.length);
   const expectationMissCounts = measured.map((repeat) => repeat.evidence.expectationResults.filter((item) => !item.matched).length);
+  const relevance = {
+    requiredRecall: measured.length ? Math.min(...measured.map((repeat) => repeat.evidence.relevance?.requiredRecall ?? 1)) : null,
+    usefulRecall: measured.length ? Math.min(...measured.map((repeat) => repeat.evidence.relevance?.usefulRecall ?? 1)) : null,
+    misleadingIntrusionRate: measured.length ? Math.max(...measured.map((repeat) => repeat.evidence.relevance?.misleadingIntrusionRate ?? 0)) : null,
+  };
+  if (measured.every((repeat) => repeat.evidence.relevance?.requiredRecall == null)) relevance.requiredRecall = null;
+  if (measured.every((repeat) => repeat.evidence.relevance?.usefulRecall == null)) relevance.usefulRecall = null;
+  if (measured.every((repeat) => repeat.evidence.relevance?.misleadingIntrusionRate == null)) relevance.misleadingIntrusionRate = null;
   return {
     repeatCount: repeats.length,
     latencyMs: {
@@ -38,6 +50,7 @@ export function summarizeProbeRepeats(repeats) {
     statuses,
     expectationCount: expectationCounts.length ? Math.max(...expectationCounts) : 0,
     expectationMissCount: expectationMissCounts.length ? Math.max(...expectationMissCounts) : 0,
+    relevance,
   };
 }
 
@@ -49,6 +62,12 @@ export function classifyProbeRepeats(repeats) {
   const summary = summarizeProbeRepeats(repeats);
   if (!summary.deterministic) return 'nondeterministic';
   if (summary.expectationMissCount > 0) return 'miss';
+  if (summary.relevance.misleadingIntrusionRate !== null && summary.relevance.misleadingIntrusionRate > 0) return 'miss';
+  if (summary.relevance.requiredRecall !== null && summary.relevance.requiredRecall < 1) {
+    return repeats.every((repeat) => repeat.evidence.sufficiency === 'partial' || repeat.evidence.sufficiency === 'insufficient')
+      ? 'abstained'
+      : 'miss';
+  }
   return 'measured';
 }
 
@@ -104,7 +123,7 @@ function sectionText(text, section) {
   return text.slice(start, next?.index ?? text.length);
 }
 
-export function parseToolOutput(text, expected) {
+export function parseToolOutput(text, expected, evidenceJudgments = []) {
   const expectationResults = (expected ?? []).map((item) => {
     const bounded = sectionText(text, item.section);
     return { section: item.section ?? null, includes: item.includes, matched: bounded?.includes(item.includes) ?? false };
@@ -115,6 +134,19 @@ export function parseToolOutput(text, expected) {
     ?? null;
   const rankingBlock = text.match(/- Ranking reasons:\r?\n((?:\s{2}- [^\r\n]+\r?\n?)*)/)?.[1] ?? '';
   const rankingReasons = [...rankingBlock.matchAll(/^\s+- ([^:]+):\s*(.+)$/gm)].map((match) => ({ kind: match[1].trim(), label: match[2].trim() }));
+  const returnedSourceFiles = new Set(
+    [...text.matchAll(/^####\s+(.+?)(?:\s+\[[^\]]+\]|\s+—|\s*$)/gm)]
+      .map((match) => match[1].trim().replace(/\\/g, '/')),
+  );
+  const relevanceResults = evidenceJudgments.map((judgment) => ({
+    file: judgment.file,
+    relevance: judgment.relevance,
+    matched: returnedSourceFiles.has(judgment.file.replace(/\\/g, '/')),
+  }));
+  const relevanceCount = (kind) => relevanceResults.filter((result) => result.relevance === kind);
+  const required = relevanceCount('required');
+  const useful = relevanceCount('useful');
+  const misleading = relevanceCount('misleading');
   return {
     packetSchema,
     answerPacketAvailability: packetSchema === null ? 'unavailable' : 'available',
@@ -124,6 +156,12 @@ export function parseToolOutput(text, expected) {
     sourceCompletenessAvailability: sourceCompleteness === null ? 'unavailable' : 'available',
     rankingReasons,
     expectationResults,
+    relevanceResults,
+    relevance: {
+      requiredRecall: ratio(required.filter((result) => result.matched).length, required.length),
+      usefulRecall: ratio(useful.filter((result) => result.matched).length, useful.length),
+      misleadingIntrusionRate: ratio(misleading.filter((result) => result.matched).length, misleading.length),
+    },
   };
 }
 
@@ -185,13 +223,13 @@ async function loadRuntime(engineRoot) {
   };
 }
 
-function summarizePayload(payload, executeMs, expectations) {
+function summarizePayload(payload, executeMs, expectations, evidenceJudgments) {
   return {
     status: 'measured',
     executeMs,
     payloadBytes: Buffer.byteLength(payload, 'utf8'),
     outputHash: hashBuffer(payload),
-    evidence: parseToolOutput(payload, expectations),
+    evidence: parseToolOutput(payload, expectations, evidenceJudgments),
   };
 }
 
@@ -229,7 +267,7 @@ export async function runProbeCase(options) {
             const toolResult = await handler.execute(options.probe.tool, options.probe.arguments);
             const payload = toolResult.content?.find((item) => item.type === 'text')?.text;
             if (typeof payload !== 'string') throw new Error('tool returned no text payload');
-            repeats.push(summarizePayload(payload, elapsed(executeStarted), options.probe.expectations));
+            repeats.push(summarizePayload(payload, elapsed(executeStarted), options.probe.expectations, options.probe.evidenceJudgments));
           } catch (error) {
             repeats.push({ status: 'error', executeMs: elapsed(executeStarted), payloadBytes: 0, outputHash: null, evidence: { expectationResults: [] }, error: errorMessage(error) });
           }

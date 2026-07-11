@@ -133,11 +133,21 @@ class NodeSqliteAdapter implements SqliteDatabase {
         this._db.exec(nested ? `RELEASE SAVEPOINT ${savepoint}` : 'COMMIT');
         return result;
       } catch (error) {
-        if (nested) {
-          this._db.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
-          this._db.exec(`RELEASE SAVEPOINT ${savepoint}`);
-        } else {
-          this._db.exec('ROLLBACK');
+        try {
+          if (this._db.isTransaction) {
+            if (nested) {
+              this._db.exec(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+              this._db.exec(`RELEASE SAVEPOINT ${savepoint}`);
+            } else {
+              this._db.exec('ROLLBACK');
+            }
+          }
+        } catch (cleanupError) {
+          if (error instanceof Error && error.cause === undefined) {
+            Object.defineProperty(error, 'cause', { value: cleanupError });
+            throw error;
+          }
+          throw new AggregateError([error, cleanupError], 'Transaction failed and cleanup failed', { cause: error });
         }
         throw error;
       } finally {

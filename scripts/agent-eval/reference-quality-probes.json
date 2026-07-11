@@ -2,27 +2,106 @@
   "schemaName": "solidkg.reference-quality.probes.v1",
   "probes": [
     {
-      "id": "airflow-dagbag-context",
+      "id": "airflow-dagbag-explore-long",
+      "familyId": "airflow-dagbag-explore",
+      "queryVariant": "long",
       "repoId": "apache__airflow",
-      "tool": "solidkg_context",
-      "arguments": { "task": "DagBag process_file collect_dags parse DAG files", "detailLevel": "minimal", "includeCode": false, "maxNodes": 12 },
+      "tool": "solidkg_explore",
+      "arguments": { "query": "How does DagBag process_file collect and parse DAG files?", "maxFiles": 10 },
       "expectedFiles": ["airflow-core/src/airflow/dag_processing/dagbag.py"],
       "expectedLanguage": "python",
+      "evidenceJudgments": [
+        { "file": "airflow-core/src/airflow/dag_processing/dagbag.py", "relevance": "required" },
+        { "file": "airflow-core/src/airflow/dag_processing/collection.py", "relevance": "useful" },
+        { "file": "airflow-core/src/airflow/models/dagbag.py", "relevance": "misleading" },
+        { "file": "airflow-core/tests/unit/dag_processing/test_dagbag.py", "relevance": "misleading" }
+      ],
       "expectations": [
-        { "section": "### Answer Packet", "includes": "Evidence anchors" },
-        { "section": "### Entry Points", "includes": "DagBag" }
+        { "section": "### Answer Packet", "includes": "Evidence anchors" }
       ]
     },
     {
-      "id": "azure-rest-method-context",
+      "id": "airflow-dagbag-explore-terse",
+      "familyId": "airflow-dagbag-explore",
+      "queryVariant": "terse",
+      "repoId": "apache__airflow",
+      "tool": "solidkg_explore",
+      "arguments": { "query": "DagBag process_file collect_dags", "maxFiles": 10 },
+      "expectedFiles": ["airflow-core/src/airflow/dag_processing/dagbag.py"],
+      "expectedLanguage": "python",
+      "evidenceJudgments": [
+        { "file": "airflow-core/src/airflow/dag_processing/dagbag.py", "relevance": "required" },
+        { "file": "airflow-core/src/airflow/models/dagbag.py", "relevance": "misleading" },
+        { "file": "airflow-core/tests/unit/dag_processing/test_dagbag.py", "relevance": "misleading" }
+      ],
+      "expectations": [
+        { "section": "### Answer Packet", "includes": "Evidence anchors" }
+      ]
+    },
+    {
+      "id": "airflow-dagbag-explore-counterfactual",
+      "familyId": "airflow-dagbag-explore",
+      "queryVariant": "counterfactual",
+      "repoId": "apache__airflow",
+      "tool": "solidkg_explore",
+      "arguments": { "query": "Find the production DAG file parsing implementation, not the API model or its tests", "maxFiles": 10 },
+      "expectedFiles": ["airflow-core/src/airflow/dag_processing/dagbag.py"],
+      "expectedLanguage": "python",
+      "evidenceJudgments": [
+        { "file": "airflow-core/src/airflow/dag_processing/dagbag.py", "relevance": "required" },
+        { "file": "airflow-core/src/airflow/models/dagbag.py", "relevance": "misleading" },
+        { "file": "airflow-core/tests/unit/dag_processing/test_dagbag.py", "relevance": "misleading" }
+      ],
+      "expectations": [
+        { "section": "### Answer Packet", "includes": "Evidence anchors" }
+      ]
+    },
+    {
+      "id": "azure-rest-method-explore-long",
+      "familyId": "azure-rest-method-explore",
+      "queryVariant": "long",
       "repoId": "Azure__azure-powershell",
-      "tool": "solidkg_context",
-      "arguments": { "task": "InvokeAzRestMethodCommand ExecuteCmdlet InitializeServiceClient ValidateParameters", "detailLevel": "minimal", "includeCode": false, "maxNodes": 12 },
+      "tool": "solidkg_explore",
+      "arguments": { "query": "How does InvokeAzRestMethodCommand validate parameters, initialize the service client, and execute the cmdlet?", "maxFiles": 10 },
       "expectedFiles": ["src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs"],
       "expectedLanguage": "csharp",
+      "evidenceJudgments": [
+        { "file": "src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs", "relevance": "required" }
+      ],
       "expectations": [
-        { "section": "### Answer Packet", "includes": "Binary sufficiency" },
-        { "section": "### Entry Points", "includes": "InvokeAzRestMethodCommand" }
+        { "section": "### Answer Packet", "includes": "Binary sufficiency" }
+      ]
+    },
+    {
+      "id": "azure-rest-method-explore-terse",
+      "familyId": "azure-rest-method-explore",
+      "queryVariant": "terse",
+      "repoId": "Azure__azure-powershell",
+      "tool": "solidkg_explore",
+      "arguments": { "query": "InvokeAzRestMethodCommand ExecuteCmdlet ValidateParameters", "maxFiles": 10 },
+      "expectedFiles": ["src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs"],
+      "expectedLanguage": "csharp",
+      "evidenceJudgments": [
+        { "file": "src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs", "relevance": "required" }
+      ],
+      "expectations": [
+        { "section": "### Answer Packet", "includes": "Binary sufficiency" }
+      ]
+    },
+    {
+      "id": "azure-rest-method-explore-counterfactual",
+      "familyId": "azure-rest-method-explore",
+      "queryVariant": "counterfactual",
+      "repoId": "Azure__azure-powershell",
+      "tool": "solidkg_explore",
+      "arguments": { "query": "Find the production implementation that prepares and sends arbitrary Azure REST requests, excluding serialized command metadata", "maxFiles": 10 },
+      "expectedFiles": ["src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs"],
+      "expectedLanguage": "csharp",
+      "evidenceJudgments": [
+        { "file": "src/Accounts/Accounts/Rest/InvokeAzRestMethodCommand.cs", "relevance": "required" }
+      ],
+      "expectations": [
+        { "section": "### Answer Packet", "includes": "Binary sufficiency" }
       ]
     }
   ]

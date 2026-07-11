@@ -48,9 +48,13 @@ export class SolidKGError extends Error {
   /** Additional context about the error */
   readonly context?: Record<string, unknown>;
 
-  constructor(message: string, code: string, context?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    code: string,
+    context?: Record<string, unknown>,
+  ) {
     super(message);
-    this.name = 'SolidKGError';
+    this.name = "SolidKGError";
     this.code = code;
     this.context = context;
 
@@ -68,8 +72,8 @@ export class FileError extends SolidKGError {
   readonly filePath: string;
 
   constructor(message: string, filePath: string, cause?: Error) {
-    super(message, 'FILE_ERROR', { filePath, cause: cause?.message });
-    this.name = 'FileError';
+    super(message, "FILE_ERROR", { filePath, cause: cause?.message });
+    this.name = "FileError";
     this.filePath = filePath;
     if (cause) {
       this.cause = cause;
@@ -88,15 +92,15 @@ export class ParseError extends SolidKGError {
   constructor(
     message: string,
     filePath: string,
-    options?: { line?: number; column?: number; cause?: Error }
+    options?: { line?: number; column?: number; cause?: Error },
   ) {
-    super(message, 'PARSE_ERROR', {
+    super(message, "PARSE_ERROR", {
       filePath,
       line: options?.line,
       column: options?.column,
       cause: options?.cause?.message,
     });
-    this.name = 'ParseError';
+    this.name = "ParseError";
     this.filePath = filePath;
     this.line = options?.line;
     this.column = options?.column;
@@ -113,8 +117,8 @@ export class DatabaseError extends SolidKGError {
   readonly operation: string;
 
   constructor(message: string, operation: string, cause?: Error) {
-    super(message, 'DATABASE_ERROR', { operation, cause: cause?.message });
-    this.name = 'DatabaseError';
+    super(message, "DATABASE_ERROR", { operation, cause: cause?.message });
+    this.name = "DatabaseError";
     this.operation = operation;
     if (cause) {
       this.cause = cause;
@@ -129,8 +133,8 @@ export class SearchError extends SolidKGError {
   readonly query: string;
 
   constructor(message: string, query: string, cause?: Error) {
-    super(message, 'SEARCH_ERROR', { query, cause: cause?.message });
-    this.name = 'SearchError';
+    super(message, "SEARCH_ERROR", { query, cause: cause?.message });
+    this.name = "SearchError";
     this.query = query;
     if (cause) {
       this.cause = cause;
@@ -143,8 +147,8 @@ export class SearchError extends SolidKGError {
  */
 export class VectorError extends SolidKGError {
   constructor(message: string, operation: string, cause?: Error) {
-    super(message, 'VECTOR_ERROR', { operation, cause: cause?.message });
-    this.name = 'VectorError';
+    super(message, "VECTOR_ERROR", { operation, cause: cause?.message });
+    this.name = "VectorError";
     if (cause) {
       this.cause = cause;
     }
@@ -156,8 +160,8 @@ export class VectorError extends SolidKGError {
  */
 export class ConfigError extends SolidKGError {
   constructor(message: string, details?: Record<string, unknown>) {
-    super(message, 'CONFIG_ERROR', details);
-    this.name = 'ConfigError';
+    super(message, "CONFIG_ERROR", details);
+    this.name = "ConfigError";
   }
 }
 
@@ -179,14 +183,14 @@ export interface Logger {
 export const defaultLogger: Logger = {
   debug(message: string, context?: Record<string, unknown>): void {
     if (process.env.SOLIDKG_DEBUG) {
-      console.debug(`[SolidKG] ${message}`, context ?? '');
+      console.debug(`[SolidKG] ${message}`, context ?? "");
     }
   },
   warn(message: string, context?: Record<string, unknown>): void {
-    console.warn(`[SolidKG] ${message}`, context ?? '');
+    console.warn(`[SolidKG] ${message}`, context ?? "");
   },
   error(message: string, context?: Record<string, unknown>): void {
-    console.error(`[SolidKG] ${message}`, context ?? '');
+    console.error(`[SolidKG] ${message}`, context ?? "");
   },
 };
 
@@ -221,13 +225,19 @@ export function getLogger(): Logger {
 /**
  * Log a debug message
  */
-export function logDebug(message: string, context?: Record<string, unknown>): void {
+export function logDebug(
+  message: string,
+  context?: Record<string, unknown>,
+): void {
   currentLogger.debug(message, context);
 }
 
 /**
  * Log a warning message
  */
-export function logWarn(message: string, context?: Record<string, unknown>): void {
+export function logWarn(
+  message: string,
+  context?: Record<string, unknown>,
+): void {
   currentLogger.warn(message, context);
 }

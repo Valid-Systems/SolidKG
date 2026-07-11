@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { arch, platform, tmpdir } from 'node:os';
-import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
+import { basename, dirname, join, posix, relative, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { buildReferenceQualityReport, compareReports, isReferenceQualityReport, renderMarkdown, serializeReport } from './reference-quality/report.mjs';
@@ -15,6 +15,15 @@ const READ_ONLY_PROBE_TOOLS = new Set([
   'solidkg_search', 'solidkg_context', 'solidkg_explore', 'solidkg_trace', 'solidkg_node',
   'solidkg_callers', 'solidkg_callees', 'solidkg_impact', 'solidkg_files', 'solidkg_status', 'solidkg_precise_refs',
 ]);
+const EVIDENCE_RELEVANCE = new Set(['required', 'useful', 'misleading']);
+const QUERY_VARIANTS = new Set(['long', 'terse', 'counterfactual']);
+
+function portableRelativePath(value) {
+  if (typeof value !== 'string' || value.length === 0 || posix.isAbsolute(value) || win32.isAbsolute(value)) return null;
+  const normalized = posix.normalize(value.replace(/\\/g, '/'));
+  if (normalized === '..' || normalized.startsWith('../')) return null;
+  return normalized;
+}
 
 function help() {
   return `SolidKG diagnostic reference-quality sweep
@@ -125,8 +134,20 @@ function validateProbeManifest(manifest) {
   for (const probe of manifest.probes) {
     if (!probe || typeof probe.id !== 'string' || typeof probe.repoId !== 'string' || !READ_ONLY_PROBE_TOOLS.has(probe.tool) || !probe.arguments || typeof probe.arguments !== 'object') throw new Error('invalid probe manifest');
     if ('projectPath' in probe.arguments || 'dataDir' in probe.arguments) throw new Error('invalid probe manifest: projectPath and dataDir are forbidden');
-    if (!Array.isArray(probe.expectedFiles) || probe.expectedFiles.length > 50 || probe.expectedFiles.some((file) => typeof file !== 'string' || isAbsolute(file) || normalize(file).startsWith('..'))) throw new Error('invalid probe manifest: expectedFiles must be repository-relative');
+    if (!Array.isArray(probe.expectedFiles) || probe.expectedFiles.length > 50 || probe.expectedFiles.some((file) => portableRelativePath(file) === null)) throw new Error('invalid probe manifest: expectedFiles must be repository-relative');
     if (!Array.isArray(probe.expectations) || probe.expectations.length > 50) throw new Error('invalid probe manifest');
+    if (probe.familyId !== undefined && (typeof probe.familyId !== 'string' || probe.familyId.length === 0)) throw new Error('invalid probe manifest: familyId must be a non-empty string');
+    if (probe.queryVariant !== undefined && !QUERY_VARIANTS.has(probe.queryVariant)) throw new Error('invalid probe manifest: queryVariant must be long, terse, or counterfactual');
+    if (probe.evidenceJudgments !== undefined) {
+      if (!Array.isArray(probe.evidenceJudgments) || probe.evidenceJudgments.length > 100) throw new Error('invalid probe manifest: evidenceJudgments must be a bounded array');
+      const files = new Set();
+      for (const judgment of probe.evidenceJudgments) {
+        const normalizedFile = portableRelativePath(judgment?.file);
+        if (!judgment || normalizedFile === null || !EVIDENCE_RELEVANCE.has(judgment.relevance)) throw new Error('invalid probe manifest: evidenceJudgments must use portable files and known relevance');
+        if (files.has(normalizedFile)) throw new Error('invalid probe manifest: evidenceJudgments files must be unique');
+        files.add(normalizedFile);
+      }
+    }
   }
 }
 

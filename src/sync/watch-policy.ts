@@ -14,8 +14,8 @@
  * server (for diagnostics), and the installer all agree.
  */
 
-import * as fs from 'fs';
-import { normalizePath } from '../utils';
+import * as fs from "fs";
+import { normalizePath } from "../utils";
 
 let wslChecked = false;
 let wslValue = false;
@@ -31,7 +31,7 @@ export function detectWsl(): boolean {
   if (wslChecked) return wslValue;
   wslChecked = true;
 
-  if (process.platform !== 'linux') {
+  if (process.platform !== "linux") {
     wslValue = false;
     return wslValue;
   }
@@ -40,8 +40,8 @@ export function detectWsl(): boolean {
     return wslValue;
   }
   try {
-    const version = fs.readFileSync('/proc/version', 'utf8').toLowerCase();
-    wslValue = version.includes('microsoft') || version.includes('wsl');
+    const version = fs.readFileSync("/proc/version", "utf8").toLowerCase();
+    wslValue = version.includes("microsoft") || version.includes("wsl");
   } catch {
     wslValue = false;
   }
@@ -79,19 +79,22 @@ export interface WatchProbe {
  *  2. `SOLIDKG_FORCE_WATCH=1` → on   (overrides auto-detection)
  *  3. WSL2 + `/mnt/*` drive     → off  (recursive fs.watch is too slow; #199)
  */
-export function watchDisabledReason(projectRoot: string, probe: WatchProbe = {}): string | null {
+export function watchDisabledReason(
+  projectRoot: string,
+  probe: WatchProbe = {},
+): string | null {
   const env = probe.env ?? process.env;
 
-  if (env.SOLIDKG_NO_WATCH === '1') {
-    return 'SOLIDKG_NO_WATCH=1 is set';
+  if (env.SOLIDKG_NO_WATCH === "1") {
+    return "SOLIDKG_NO_WATCH=1 is set";
   }
-  if (env.SOLIDKG_FORCE_WATCH === '1') {
+  if (env.SOLIDKG_FORCE_WATCH === "1") {
     return null;
   }
 
   const isWsl = probe.isWsl ?? detectWsl();
   if (isWsl && isWindowsDriveMount(projectRoot)) {
-    return 'project is on a WSL2 /mnt/ drive, where recursive fs.watch is too slow to be reliable';
+    return "project is on a WSL2 /mnt/ drive, where recursive fs.watch is too slow to be reliable";
   }
 
   return null;

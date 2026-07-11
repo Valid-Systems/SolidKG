@@ -28,8 +28,8 @@
  *   no nested escapes).
  */
 
-import { NODE_KINDS, LANGUAGES } from '../types';
-import type { NodeKind, Language } from '../types';
+import { NODE_KINDS, LANGUAGES } from "../types";
+import type { NodeKind, Language } from "../types";
 
 export interface ParsedQuery {
   /** Free-text portion to feed to FTS / LIKE. May be empty. */
@@ -55,7 +55,8 @@ const LANGUAGE_VALUES: ReadonlySet<string> = new Set<Language>(LANGUAGES);
  * keep whitespace in path filters: `path:"my dir/file"`.
  */
 function unquote(s: string): string {
-  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) return s.slice(1, -1);
+  if (s.length >= 2 && s.startsWith('"') && s.endsWith('"'))
+    return s.slice(1, -1);
   return s;
 }
 
@@ -65,7 +66,7 @@ function unquote(s: string): string {
  */
 export function parseQuery(raw: string): ParsedQuery {
   const out: ParsedQuery = {
-    text: '',
+    text: "",
     kinds: [],
     languages: [],
     pathFilters: [],
@@ -101,7 +102,7 @@ export function parseQuery(raw: string): ParsedQuery {
 
   const textParts: string[] = [];
   for (const tok of tokens) {
-    const colon = tok.indexOf(':');
+    const colon = tok.indexOf(":");
     if (colon <= 0 || colon === tok.length - 1) {
       textParts.push(tok);
       continue;
@@ -113,7 +114,7 @@ export function parseQuery(raw: string): ParsedQuery {
       continue;
     }
     switch (key) {
-      case 'kind': {
+      case "kind": {
         if (KIND_VALUES.has(valueRaw)) {
           out.kinds.push(valueRaw as NodeKind);
         } else {
@@ -121,8 +122,8 @@ export function parseQuery(raw: string): ParsedQuery {
         }
         break;
       }
-      case 'lang':
-      case 'language': {
+      case "lang":
+      case "language": {
         const lower = valueRaw.toLowerCase();
         if (LANGUAGE_VALUES.has(lower)) {
           out.languages.push(lower as Language);
@@ -131,10 +132,10 @@ export function parseQuery(raw: string): ParsedQuery {
         }
         break;
       }
-      case 'path':
+      case "path":
         out.pathFilters.push(valueRaw);
         break;
-      case 'name':
+      case "name":
         out.nameFilters.push(valueRaw);
         break;
       default:
@@ -142,7 +143,7 @@ export function parseQuery(raw: string): ParsedQuery {
     }
   }
 
-  out.text = textParts.join(' ').trim();
+  out.text = textParts.join(" ").trim();
   return out;
 }
 
@@ -154,7 +155,11 @@ export function parseQuery(raw: string): ParsedQuery {
  * Pure DP, O(min(len(a), len(b))) memory. Compares case-folded inputs;
  * callers should pass `lowercase(name)` strings.
  */
-export function boundedEditDistance(a: string, b: string, maxDist: number): number {
+export function boundedEditDistance(
+  a: string,
+  b: string,
+  maxDist: number,
+): number {
   if (a === b) return 0;
   const al = a.length;
   const bl = b.length;

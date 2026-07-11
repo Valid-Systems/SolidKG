@@ -9,7 +9,7 @@
  * This file takes precedence over node_modules/web-tree-sitter/web-tree-sitter.d.ts
  * because TypeScript resolves local declarations first.
  */
-declare module 'web-tree-sitter' {
+declare module "web-tree-sitter" {
   export interface Point {
     row: number;
     column: number;
@@ -31,11 +31,17 @@ declare module 'web-tree-sitter' {
     newEndIndex: number;
   }
 
-  export type ParseCallback = (index: number, position: Point) => string | undefined;
+  export type ParseCallback = (
+    index: number,
+    position: Point,
+  ) => string | undefined;
 
   export interface ParseOptions {
     includedRanges?: Range[];
-    progressCallback?: (state: { currentOffset: number; hasError: boolean }) => void;
+    progressCallback?: (state: {
+      currentOffset: number;
+      hasError: boolean;
+    }) => void;
   }
 
   export interface EmscriptenModule {
@@ -48,12 +54,18 @@ declare module 'web-tree-sitter' {
     constructor();
     delete(): void;
     setLanguage(language: Language | null): this;
-    parse(callback: string | ParseCallback, oldTree?: Tree | null, options?: ParseOptions): Tree | null;
+    parse(
+      callback: string | ParseCallback,
+      oldTree?: Tree | null,
+      options?: ParseOptions,
+    ): Tree | null;
     reset(): void;
     getIncludedRanges(): Range[];
     getTimeoutMicros(): number;
     setTimeoutMicros(timeout: number): void;
-    setLogger(callback: ((message: string, isLex: boolean) => void) | boolean | null): this;
+    setLogger(
+      callback: ((message: string, isLex: boolean) => void) | boolean | null,
+    ): this;
     getLogger(): ((message: string, isLex: boolean) => void) | null;
   }
 
@@ -132,7 +144,11 @@ declare module 'web-tree-sitter' {
     // Override: non-nullable arrays (tree-sitter never returns null in these)
     get children(): Node[];
     get namedChildren(): Node[];
-    descendantsOfType(types: string | string[], startPosition?: Point, endPosition?: Point): Node[];
+    descendantsOfType(
+      types: string | string[],
+      startPosition?: Point,
+      endPosition?: Point,
+    ): Node[];
     get nextSibling(): Node | null;
     get previousSibling(): Node | null;
     get nextNamedSibling(): Node | null;

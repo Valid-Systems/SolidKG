@@ -8,6 +8,7 @@ import { QueryBuilder } from '../src/db/queries';
 import SolidKG from '../src/index';
 import { ToolHandler } from '../src/mcp/tools';
 import { buildSourceChunkCodeTokenText, buildSourceChunkFtsQuery, tokenizeCodeForSearch } from '../src/search/query-utils';
+import type { IndexProgress } from '../src/extraction';
 import type { Language, Node, RetrievalExtensionConfig, SearchResult, SourceChunkRecord } from '../src/types';
 
 const tempDirs: string[] = [];
@@ -510,6 +511,88 @@ describe('source chunk index sync lifecycle', () => {
       graph.close();
     }
   });
+
+  it('batches 129 source chunk writes and reports committed storing/source_chunks progress before SCIP', async () => {
+    // Given: more source files than one source-chunk transaction batch, each with one searchable function body.
+    const projectRoot = createTempDir('chunk-index-batched-progress-');
+    const sourceDir = path.join(projectRoot, 'src');
+    const fileCount = 129;
+    fs.mkdirSync(sourceDir);
+    for (let fileNumber = 1; fileNumber <= fileCount; fileNumber++) {
+      const suffix = String(fileNumber).padStart(3, '0');
+      fs.writeFileSync(
+        path.join(sourceDir, `batch-${suffix}.ts`),
+        `export function batchSourceChunkNeedle${suffix}(): string { return 'batchSourceChunkNeedle${suffix}'; }\n`,
+      );
+    }
+
+    const committedSourceChunkBatchSizes: number[] = [];
+    const originalUpsertSourceChunks = QueryBuilder.prototype.upsertSourceChunks;
+    QueryBuilder.prototype.upsertSourceChunks = function observeCommittedSourceChunkBatch(chunks) {
+      originalUpsertSourceChunks.call(this, chunks);
+      committedSourceChunkBatchSizes.push(chunks.length);
+    };
+    const graph = SolidKG.initSync(projectRoot);
+    try {
+      const sourceProjectionProgress = {
+        phase: 'storing',
+        detail: 'source_chunks',
+        current: 0,
+        total: fileCount,
+      } satisfies IndexProgress;
+      const progressEvents: IndexProgress[] = [];
+      const sourceChunkProgressAfterCommittedBatches: Array<{
+        readonly current: number;
+        readonly total: number;
+        readonly committedBatchCount: number;
+      }> = [];
+
+      // When: the public index operation persists source chunks and reaches its SCIP boundary.
+      const result = await graph.indexAll({
+        onProgress: (progress) => {
+          progressEvents.push(progress);
+          if (
+            progress.phase === sourceProjectionProgress.phase
+            && progress.detail === sourceProjectionProgress.detail
+            && progress.current > 0
+          ) {
+            sourceChunkProgressAfterCommittedBatches.push({
+              current: progress.current,
+              total: progress.total,
+              committedBatchCount: committedSourceChunkBatchSizes.length,
+            });
+          }
+        },
+      });
+      const sourceChunkProgressIndex = progressEvents.findIndex((event) => (
+        event.phase === sourceProjectionProgress.phase
+        && event.detail === sourceProjectionProgress.detail
+      ));
+      const scipProgressIndex = progressEvents.findIndex((event) => event.phase === 'scip');
+
+      // Then: batches commit at 128 files, storage detail follows committed batches before SCIP, and chunk FTS stays intact.
+      expect.soft(result.success).toBe(true);
+      expect.soft(committedSourceChunkBatchSizes).toHaveLength(2);
+      expect.soft(committedSourceChunkBatchSizes.every((batchSize) => batchSize > 0)).toBe(true);
+      expect.soft(sourceChunkProgressAfterCommittedBatches.map((event) => event.current)).toEqual([128, fileCount]);
+      expect.soft(sourceChunkProgressAfterCommittedBatches.map((event) => event.total)).toEqual([fileCount, fileCount]);
+      expect.soft(sourceChunkProgressAfterCommittedBatches.map((event) => event.committedBatchCount)).toEqual([1, 2]);
+      expect.soft(sourceChunkProgressIndex).toBeGreaterThanOrEqual(0);
+      if (sourceChunkProgressIndex >= 0) {
+        expect.soft(scipProgressIndex).toBeGreaterThan(sourceChunkProgressIndex);
+      }
+      expect.soft(
+        graph.searchSourceChunks('batchSourceChunkNeedle129', { limit: 5 }).map((hit) => hit.chunk.filePath),
+      ).toContain('src/batch-129.ts');
+      const diagnostics = graph.getSourceChunkDiagnostics();
+      expect.soft(diagnostics.chunkCount).toBeGreaterThanOrEqual(fileCount);
+      expect.soft(diagnostics.ftsRowCount).toBe(diagnostics.chunkCount);
+      expect.soft(diagnostics.orphanFtsRowCount).toBe(0);
+    } finally {
+      graph.close();
+      QueryBuilder.prototype.upsertSourceChunks = originalUpsertSourceChunks;
+    }
+  }, 30_000);
 
   it('replaces changed-file chunks during sync so old body and code-token terms disappear', async () => {
     // Given: an indexed project with a body-only term in one function.

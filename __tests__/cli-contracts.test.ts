@@ -107,6 +107,29 @@ describe('standalone CLI JSON contracts', () => {
     expect(cliSource).toContain("...issueSegments");
   });
 
+  it('renders verbose source-chunk progress when detail changes within one phase', () => {
+    const cliSource = fs.readFileSync(path.resolve(__dirname, '../src/bin/solidkg.ts'), 'utf8');
+    const indexSource = fs.readFileSync(path.resolve(__dirname, '../src/index.ts'), 'utf8');
+
+    expect(cliSource).toContain('const progressLabel = progress.detail ?? progress.phase;');
+    expect(cliSource).toContain('if (progressLabel !== lastPhase)');
+    expect(cliSource).toContain('PROGRESS_PHASE_LABELS[progressLabel]');
+    expect(indexSource).toContain('phase: "storing",\n      detail: "source_chunks",');
+    expect(indexSource).not.toContain('phase: "indexing",\n      detail: "source_chunks",');
+  });
+
+  it('reports bounded graph cleanup failures without exposing raw error details', () => {
+    const cliSource = fs.readFileSync(path.resolve(__dirname, '../src/bin/solidkg.ts'), 'utf8');
+    const destroyIndex = cliSource.indexOf('function destroyIndexGraph');
+    const destroySource = cliSource.slice(destroyIndex, cliSource.indexOf('\n}\n', destroyIndex) + 3);
+
+    expect(destroySource).toContain('logWarn(');
+    expect(destroySource).toContain('process.stderr.write(');
+    expect(destroySource).toContain('Graph cleanup failed');
+    expect(destroySource).not.toContain('error.stack');
+    expect(destroySource).not.toContain('String(error)');
+  });
+
   it('keeps include-vendored CLI help aligned with vendor and vendored behavior', () => {
     const cliSource = fs.readFileSync(path.resolve(__dirname, '../src/bin/solidkg.ts'), 'utf8');
 
@@ -453,6 +476,43 @@ it('uses entry', () => { entry(); });
     expectNoAnsiEscapeSequences(result.stderr);
   });
 
+  it('persists a terminal lifecycle diagnostic across index CLI output modes', () => {
+    // Given
+    const dataDir = path.join(testDir, '.solidkg');
+    const diagnosticPath = path.join(dataDir, 'index-lifecycle.json');
+    const modes = [
+      ['index', testDir, '--quiet'],
+      ['index', testDir, '--profile-json'],
+      ['index', testDir],
+      ['index', testDir, '--verbose'],
+    ];
+
+    // When
+    for (const args of modes) {
+      const result = runCli(args);
+
+      // Then
+      expect(result.status).toBe(0);
+      const diagnostic: unknown = JSON.parse(fs.readFileSync(diagnosticPath, 'utf8'));
+      expect(diagnostic).toMatchObject({
+        schemaVersion: 'solidkg.indexLifecycleDiagnostic.v1',
+        operation: 'indexAll',
+        status: 'succeeded',
+        counts: {
+          filesScanned: expect.any(Number),
+          filesIndexed: expect.any(Number),
+          filesSkipped: expect.any(Number),
+          filesErrored: expect.any(Number),
+          nodesCreated: expect.any(Number),
+          edgesCreated: expect.any(Number),
+        },
+        activeResources: expect.any(Array),
+        process: { pid: expect.any(Number), runtime: 'node' },
+      });
+      expect(fs.readdirSync(dataDir).filter((entry) => entry.startsWith('index-lifecycle.json.'))).toEqual([]);
+    }
+  });
+
   it('init with indexing emits one concise success line on normal success', () => {
     const initDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solidkg-cli-init-terse-'));
     try {
@@ -472,6 +532,42 @@ it('uses entry', () => { entry(); });
       expect(fs.existsSync(path.join(initDir, '.solidkg', 'errors.log'))).toBe(false);
       expectNoTerminalFrames(result.stderr);
       expectNoAnsiEscapeSequences(result.stderr);
+    } finally {
+      fs.rmSync(initDir, { recursive: true, force: true });
+    }
+  });
+
+  it('persists a successful lifecycle diagnostic when init indexes a project', () => {
+    // Given: a new project initialized and indexed through the public CLI lifecycle.
+    const initDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solidkg-cli-init-lifecycle-'));
+    try {
+      fs.writeFileSync(path.join(initDir, 'service.ts'), 'export const value = 1;\n');
+
+      // When: init performs its optional indexing pass.
+      const result = runCli(['init', '-i', initDir, '--include', '**/*.ts']);
+      const dataDir = path.join(initDir, '.solidkg');
+      const diagnosticPath = path.join(dataDir, 'index-lifecycle.json');
+
+      // Then: init produces the same completed index diagnostic contract as index.
+      expect(result.status).toBe(0);
+      const diagnostic: unknown = JSON.parse(fs.readFileSync(diagnosticPath, 'utf8'));
+      expect(diagnostic).toMatchObject({
+        schemaVersion: 'solidkg.indexLifecycleDiagnostic.v1',
+        operation: 'indexAll',
+        status: 'succeeded',
+        counts: {
+          filesScanned: expect.any(Number),
+          filesIndexed: expect.any(Number),
+          filesSkipped: expect.any(Number),
+          filesErrored: expect.any(Number),
+          nodesCreated: expect.any(Number),
+          edgesCreated: expect.any(Number),
+        },
+        activeResources: expect.any(Array),
+        process: { pid: expect.any(Number), runtime: 'node' },
+        completedAt: expect.any(String),
+      });
+      expect(fs.readdirSync(dataDir).filter((entry) => entry.startsWith('index-lifecycle.json.'))).toEqual([]);
     } finally {
       fs.rmSync(initDir, { recursive: true, force: true });
     }

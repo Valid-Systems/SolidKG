@@ -38,6 +38,7 @@ ONE call usually answers a structural question. Treat returned source as already
 - **Follow up only for a real blocker.** Another graph call is warranted for missing required anchors, stale or unreadable required source, no results, no static path, or explicit endpoint ambiguity. Do not follow up solely because candidate coverage is partial, omitted, or truncated.
 - **Prefer SolidKG over broad grep/read loops.** Fall back to targeted Read only when the answer packet is insufficient because required source is stale, unreadable, or absent.
 - **Natural language is not symbol ambiguity.** Generic words such as "send" or "request" in a prose question do not become flow endpoints. Explicit unqualified duplicate symbols still require a qualified or path-qualified name.
+- **Exclusions are constraints.** Phrases such as "not tests" or "excluding generated metadata" are not positive search terms. \`missing_query_concept\` means explicit counterfactual concepts were not all evidenced, so the packet is intentionally partial.
 - **Index lag.** When a response names files pending re-index, Read only those stale files. Files not listed in the staleness banner remain graph-fresh.
 
 The raw MCP server tool names use \`solidkg_*\`. Some clients display a host-specific server prefix around those names; do not add another \`solidkg_\` prefix in calls.

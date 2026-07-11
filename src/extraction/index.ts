@@ -79,6 +79,7 @@ export function parseTimeoutMsForContentLength(contentLength: number): number {
  */
 export interface IndexProgress {
   phase: 'scanning' | 'parsing' | 'storing' | 'scip' | 'resolving' | 'synthesis';
+  detail?: 'source_chunks';
   current: number;
   total: number;
   currentFile?: string;

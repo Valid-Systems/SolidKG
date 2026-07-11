@@ -6,7 +6,7 @@ const repoRoot = path.resolve(__dirname, '..', '..');
 const modulePath = path.join(repoRoot, 'scripts', 'agent-eval', 'reference-quality', 'report.mjs');
 const validProvenance = { implementationHash: 'a'.repeat(64), runtimeHash: 'b'.repeat(64), host: 'test-host' };
 const validProbeProvenance = { ...validProvenance, probeManifestHash: 'c'.repeat(64), probeParserHash: 'd'.repeat(64) };
-const validProbe = { repoId: 'one', probeId: 'probe', status: 'measured', indexFingerprint: 'idx-a', summary: { repeatCount: 1, latencyMs: { p50: 5, min: 5, max: 5 }, payloadBytes: 10, outputHashes: ['hash'], deterministic: true, statuses: { measured: 1 }, expectationCount: 0, expectationMissCount: 0 } };
+const validProbe = { repoId: 'one', probeId: 'probe', status: 'measured', indexFingerprint: 'idx-a', summary: { repeatCount: 1, latencyMs: { p50: 5, min: 5, max: 5 }, payloadBytes: 10, outputHashes: ['hash'], deterministic: true, statuses: { measured: 1 }, expectationCount: 0, expectationMissCount: 0, relevance: { requiredRecall: 1, usefulRecall: 0.5, misleadingIntrusionRate: 0 } } };
 
 function evaluate(expression: string): unknown {
   const source = `import * as report from ${JSON.stringify(new URL(`file://${modulePath.replace(/\\/g, '/')}`).href)};\nconst validProvenance = ${JSON.stringify(validProvenance)};\nconst validProbeProvenance = ${JSON.stringify(validProbeProvenance)};\nconst validProbe = ${JSON.stringify(validProbe)};\nconsole.log(JSON.stringify(${expression}));`;
@@ -35,6 +35,26 @@ describe('reference quality reporting and comparison', () => {
 
     expect(result.sameJson).toBe(true); expect(result.first.aggregate.fairAny).toEqual({ numerator: 2, denominator: 4, rate: 0.5, repoMedian: 0.5 });
     expect(result.markdown).toContain('Diagnostic reference-index snapshot'); expect(result.comparison.status).toBe('unchanged'); expect(result.comparison.metrics.every((metric) => metric.classification === 'unchanged')).toBe(true);
+  });
+
+  it('aggregates graded probe relevance without collapsing it into static graph coverage', () => {
+    const result = evaluate(`(() => {
+      const secondProbe = structuredClone(validProbe);
+      secondProbe.probeId = 'probe-two';
+      secondProbe.summary.relevance = { requiredRecall: 0.5, usefulRecall: null, misleadingIntrusionRate: 0.25 };
+      const value = report.buildReferenceQualityReport({ repos: [${JSON.stringify(measuredRepo)}], probes: [validProbe, secondProbe], generatedAt: '2026-01-01T00:00:00.000Z', provenance: validProbeProvenance });
+      return { quality: value.probeQuality, markdown: report.renderMarkdown(value), valid: report.isReferenceQualityReport(value) };
+    })()`) as { quality: Record<string, number>; markdown: string; valid: boolean };
+
+    expect(result.valid).toBe(true);
+    expect(result.quality).toEqual({
+      gradedProbeCount: 2,
+      requiredRecallMedian: 0.75,
+      usefulRecallMedian: 0.5,
+      misleadingIntrusionRateMedian: 0.125,
+    });
+    expect(result.markdown).toContain('Required recall');
+    expect(result.markdown).toContain('Misleading intrusion');
   });
 
   it('marks denominator, policy, and neutral changes honestly', () => {

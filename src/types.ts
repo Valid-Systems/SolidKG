@@ -4,7 +4,7 @@
  * Core types for the semantic knowledge graph system.
  */
 
-import type { ContextBudget } from './context/budget';
+import type { ContextBudget } from "./context/budget";
 
 // =============================================================================
 // Union Types
@@ -18,28 +18,28 @@ import type { ContextBudget } from './context/budget';
  * (e.g. the search query parser).
  */
 export const NODE_KINDS = [
-  'file',
-  'module',
-  'class',
-  'struct',
-  'interface',
-  'trait',
-  'protocol',
-  'function',
-  'method',
-  'property',
-  'field',
-  'variable',
-  'constant',
-  'enum',
-  'enum_member',
-  'type_alias',
-  'namespace',
-  'parameter',
-  'import',
-  'export',
-  'route',
-  'component',
+  "file",
+  "module",
+  "class",
+  "struct",
+  "interface",
+  "trait",
+  "protocol",
+  "function",
+  "method",
+  "property",
+  "field",
+  "variable",
+  "constant",
+  "enum",
+  "enum_member",
+  "type_alias",
+  "namespace",
+  "parameter",
+  "import",
+  "export",
+  "route",
+  "component",
 ] as const;
 
 export type NodeKind = (typeof NODE_KINDS)[number];
@@ -49,12 +49,12 @@ export type NodeKind = (typeof NODE_KINDS)[number];
  * runtime-iterable const array.
  */
 export const HYPEREDGE_KINDS = [
-  'route_binding',
-  'event_channel',
-  'ui_render',
-  'dynamic_dispatch',
-  'native_bridge',
-  'type_contract',
+  "route_binding",
+  "event_channel",
+  "ui_render",
+  "dynamic_dispatch",
+  "native_bridge",
+  "type_contract",
 ] as const;
 
 export type HyperedgeKind = (typeof HYPEREDGE_KINDS)[number];
@@ -62,76 +62,84 @@ export type HyperedgeKind = (typeof HYPEREDGE_KINDS)[number];
 /**
  * How a semantic hyperedge was created.
  */
-export type HyperedgeProvenance = 'tree-sitter' | 'scip' | 'heuristic' | 'manual';
+export type HyperedgeProvenance =
+  | "tree-sitter"
+  | "scip"
+  | "heuristic"
+  | "manual";
 
-export type SemanticRelationProvenance = 'scip' | 'ast_static' | 'semantic_synthesis' | 'heuristic_resolver';
+export type SemanticRelationProvenance =
+  | "scip"
+  | "ast_static"
+  | "semantic_synthesis"
+  | "heuristic_resolver";
 
 /**
  * Types of edges (relationships) between nodes
  */
 export type EdgeKind =
-  | 'contains'        // Parent contains child (file→class, class→method)
-  | 'calls'           // Function/method calls another
-  | 'imports'         // File imports from another
-  | 'exports'         // File exports a symbol
-  | 'extends'         // Class/interface extends another
-  | 'implements'      // Class implements interface
-  | 'references'      // Generic reference to another symbol
-  | 'type_of'         // Variable/parameter has type
-  | 'returns'         // Function returns type
-  | 'instantiates'    // Creates instance of class
-  | 'overrides'       // Method overrides parent method
-  | 'decorates';      // Decorator applied to symbol
+  | "contains" // Parent contains child (file→class, class→method)
+  | "calls" // Function/method calls another
+  | "imports" // File imports from another
+  | "exports" // File exports a symbol
+  | "extends" // Class/interface extends another
+  | "implements" // Class implements interface
+  | "references" // Generic reference to another symbol
+  | "type_of" // Variable/parameter has type
+  | "returns" // Function returns type
+  | "instantiates" // Creates instance of class
+  | "overrides" // Method overrides parent method
+  | "decorates"; // Decorator applied to symbol
 
 /**
  * Supported programming languages. See NODE_KINDS for why this is a
  * runtime-iterable const array.
  */
 export const LANGUAGES = [
-  'typescript',
-  'javascript',
-  'tsx',
-  'jsx',
-  'python',
-  'go',
-  'rust',
-  'java',
-  'c',
-  'cpp',
-  'csharp',
-  'php',
-  'ruby',
-  'swift',
-  'kotlin',
-  'dart',
-  'svelte',
-  'vue',
-  'liquid',
-  'astro',
-  'jinja',
-  'razor',
-  'pascal',
-  'scala',
-  'lua',
-  'luau',
-  'objc',
-  'systemverilog',
-  'julia',
-  'fortran',
-  'r',
-  'groovy',
-  'vbnet',
-  'sql',
-  'hcl',
-  'nix',
-  'arkts',
-  'scl',
-  'solidity',
-  'bash',
-  'powershell',
-  'yaml',
-  'twig',
-  'unknown',
+  "typescript",
+  "javascript",
+  "tsx",
+  "jsx",
+  "python",
+  "go",
+  "rust",
+  "java",
+  "c",
+  "cpp",
+  "csharp",
+  "php",
+  "ruby",
+  "swift",
+  "kotlin",
+  "dart",
+  "svelte",
+  "vue",
+  "liquid",
+  "astro",
+  "jinja",
+  "razor",
+  "pascal",
+  "scala",
+  "lua",
+  "luau",
+  "objc",
+  "systemverilog",
+  "julia",
+  "fortran",
+  "r",
+  "groovy",
+  "vbnet",
+  "sql",
+  "hcl",
+  "nix",
+  "arkts",
+  "scl",
+  "solidity",
+  "bash",
+  "powershell",
+  "yaml",
+  "twig",
+  "unknown",
 ] as const;
 
 export type Language = (typeof LANGUAGES)[number];
@@ -188,7 +196,7 @@ export interface Node {
   scipSourceIndexers?: string[];
 
   /** Visibility modifier */
-  visibility?: 'public' | 'private' | 'protected' | 'internal';
+  visibility?: "public" | "private" | "protected" | "internal";
 
   /** Whether symbol is exported */
   isExported?: boolean;
@@ -235,7 +243,7 @@ export interface Edge {
   column?: number;
 
   /** How this edge was created */
-  provenance?: 'tree-sitter' | 'scip' | 'heuristic';
+  provenance?: "tree-sitter" | "scip" | "heuristic";
 }
 
 /**
@@ -377,7 +385,7 @@ export interface ExtractionError {
   column?: number;
 
   /** Error severity */
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 
   /** Error code for categorization */
   code?: string;
@@ -415,7 +423,12 @@ export interface UnresolvedReference {
   relationHint?: FrameworkRelationHintRef;
 }
 
-export type FrameworkRelationHintMemberRole = 'route' | 'middleware' | 'validator' | 'handler' | 'template';
+export type FrameworkRelationHintMemberRole =
+  | "route"
+  | "middleware"
+  | "validator"
+  | "handler"
+  | "template";
 
 export interface FrameworkRelationHintMember {
   role: FrameworkRelationHintMemberRole;
@@ -427,8 +440,8 @@ export interface FrameworkRelationHintMember {
 
 export interface FrameworkRelationHint {
   id: string;
-  kind: 'route_chain';
-  relationKind: 'route_binding';
+  kind: "route_chain";
+  relationKind: "route_binding";
   sourceFile: string;
   line: number;
   column: number;
@@ -437,8 +450,8 @@ export interface FrameworkRelationHint {
 
 export interface FrameworkRelationHintRef {
   id: string;
-  kind: FrameworkRelationHint['kind'];
-  relationKind: FrameworkRelationHint['relationKind'];
+  kind: FrameworkRelationHint["kind"];
+  relationKind: FrameworkRelationHint["relationKind"];
   role: FrameworkRelationHintMemberRole;
   ordinal: number;
 }
@@ -481,7 +494,7 @@ interface PairwiseTraversalOptions {
   nodeKinds?: NodeKind[];
 
   /** Direction of traversal */
-  direction?: 'outgoing' | 'incoming' | 'both';
+  direction?: "outgoing" | "incoming" | "both";
 
   /** Maximum nodes to return */
   limit?: number;
@@ -498,7 +511,7 @@ interface HyperedgeTraversalOptions extends PairwiseTraversalOptions {
   hyperedgeKinds?: HyperedgeKind[];
 
   /** How matching hyperedges expand traversal */
-  hyperedgeExpansion?: 'members' | 'ordered-flow';
+  hyperedgeExpansion?: "members" | "ordered-flow";
 
   /** Maximum hyperedges to include during traversal */
   maxHyperedges?: number;
@@ -507,7 +520,9 @@ interface HyperedgeTraversalOptions extends PairwiseTraversalOptions {
 /**
  * Options for graph traversal
  */
-export type TraversalOptions = PairwiseTraversalOptions | HyperedgeTraversalOptions;
+export type TraversalOptions =
+  | PairwiseTraversalOptions
+  | HyperedgeTraversalOptions;
 
 /**
  * Options for searching the graph
@@ -536,13 +551,13 @@ export interface SearchOptions {
 }
 
 export type SearchRankingReasonKind =
-  | 'node_metadata'
-  | 'source_body_chunk'
-  | 'exact_symbol'
-  | 'exact_path'
-  | 'graph_signal'
-  | 'fusion'
-  | 'generated_or_test_dampening';
+  | "node_metadata"
+  | "source_body_chunk"
+  | "exact_symbol"
+  | "exact_path"
+  | "graph_signal"
+  | "fusion"
+  | "generated_or_test_dampening";
 
 export interface SearchRankingReason {
   readonly kind: SearchRankingReasonKind;
@@ -589,7 +604,7 @@ export interface SourceChunkRecord {
 
 export interface SourceChunkDiagnostic {
   readonly message: string;
-  readonly severity: 'error' | 'warning' | 'info';
+  readonly severity: "error" | "warning" | "info";
   readonly code?: string;
   readonly line?: number;
   readonly column?: number;
@@ -614,7 +629,7 @@ export interface SourceChunkDiagnostics {
   readonly orphanFtsRowCount: number;
 }
 
-export type RetrievalCandidateChannelKind = 'dense' | 'reranker';
+export type RetrievalCandidateChannelKind = "dense" | "reranker";
 
 export interface RetrievalCandidate {
   readonly nodeId: string;
@@ -633,7 +648,9 @@ export interface RetrievalCandidateQuery {
 
 export interface RetrievalCandidateChannel {
   readonly kind: RetrievalCandidateChannelKind;
-  readonly searchCandidates: (query: RetrievalCandidateQuery) => readonly RetrievalCandidate[];
+  readonly searchCandidates: (
+    query: RetrievalCandidateQuery,
+  ) => readonly RetrievalCandidate[];
 }
 
 export interface RetrievalCandidateChannelFactory {
@@ -648,7 +665,7 @@ export interface RetrievalExtensionBounds {
 }
 
 export interface HybridRetrievalConfig extends Partial<RetrievalExtensionBounds> {
-  readonly mode?: 'disabled' | 'external';
+  readonly mode?: "disabled" | "external";
   readonly candidateChannels?: readonly RetrievalCandidateChannelFactory[];
 }
 
@@ -657,14 +674,14 @@ export interface RetrievalExtensionConfig {
 }
 
 export interface RetrievalExtensionDiagnostic {
-  readonly severity: 'info' | 'warning' | 'error';
+  readonly severity: "info" | "warning" | "error";
   readonly code: string;
   readonly message: string;
   readonly channelKind?: RetrievalCandidateChannelKind;
 }
 
 export interface RetrievalExtensionStatus {
-  readonly mode: 'disabled';
+  readonly mode: "disabled";
   readonly activeChannels: readonly RetrievalCandidateChannelKind[];
   readonly skippedChannels: readonly RetrievalCandidateChannelKind[];
   readonly bounds: RetrievalExtensionBounds;
@@ -681,12 +698,12 @@ export interface RetrievalExtensionStatus {
  * runtime reachability, or other confidence signals.
  */
 export type SourceCompletenessStatus =
-  | 'complete'
-  | 'partial'
-  | 'truncated'
-  | 'omitted'
-  | 'unreadable'
-  | 'skipped';
+  | "complete"
+  | "partial"
+  | "truncated"
+  | "omitted"
+  | "unreadable"
+  | "skipped";
 
 /**
  * Summary metadata for returned source coverage in a context payload.
@@ -711,20 +728,24 @@ export interface SourceCompletenessFollowUp {
   solidkgFirst: string[];
 }
 
-export type AnswerSufficiencyStatus = 'sufficient' | 'partial' | 'insufficient';
+export type AnswerSufficiencyStatus = "sufficient" | "partial" | "insufficient";
 
 export type ReturnedEvidenceAction =
-  | 'explain_returned_evidence'
-  | 'localize_candidate'
-  | 'requires_focused_follow_up';
+  | "explain_returned_evidence"
+  | "localize_candidate"
+  | "requires_focused_follow_up";
 
-export type ReturnedEvidenceScope = 'returned_evidence_only';
+export type ReturnedEvidenceScope = "returned_evidence_only";
 
-export type ReturnedEvidenceFreshness = 'fresh' | 'stale' | 'unknown';
+export type ReturnedEvidenceFreshness = "fresh" | "stale" | "unknown";
 
-export type ReturnedEvidenceCapState = 'uncapped' | 'capped' | 'unknown';
+export type ReturnedEvidenceCapState = "uncapped" | "capped" | "unknown";
 
-export type ReturnedEvidenceProvenance = 'precise' | 'static' | 'heuristic' | 'unknown';
+export type ReturnedEvidenceProvenance =
+  | "precise"
+  | "static"
+  | "heuristic"
+  | "unknown";
 
 export interface ReturnedEvidenceNextAction {
   action: string;
@@ -736,7 +757,7 @@ export interface ReturnedEvidenceActionability {
   scope: ReturnedEvidenceScope;
   blockers: string[];
   evidenceProvenance: ReturnedEvidenceProvenance[];
-  sourceCoverage: SourceCompletenessStatus | 'unknown';
+  sourceCoverage: SourceCompletenessStatus | "unknown";
   freshness: ReturnedEvidenceFreshness;
   capState: ReturnedEvidenceCapState;
   nextAction: ReturnedEvidenceNextAction;
@@ -745,11 +766,12 @@ export interface ReturnedEvidenceActionability {
 }
 
 export type UncertaintyLabel =
-  | 'ambiguous_symbol'
-  | 'bounded_no_results'
-  | 'bounded_no_static_path'
-  | 'source_partial'
-  | 'heuristic_edge';
+  | "ambiguous_symbol"
+  | "bounded_no_results"
+  | "bounded_no_static_path"
+  | "missing_query_concept"
+  | "source_partial"
+  | "heuristic_edge";
 
 export interface SourceAnchor {
   nodeId?: string;
@@ -760,19 +782,25 @@ export interface SourceAnchor {
 
 export interface EvidencePacketEntry {
   evidenceId: string;
-  kind: 'symbol' | 'source' | 'relationship' | 'failure';
+  kind: "symbol" | "source" | "relationship" | "failure";
   label: string;
   sourceAnchor: SourceAnchor;
 }
 
 export interface RankingReason {
-  kind: 'entry_point' | 'source_returned' | 'source_body_chunk' | 'graph_relationship' | 'semantic_relation' | 'failure_boundary';
+  kind:
+    | "entry_point"
+    | "source_returned"
+    | "source_body_chunk"
+    | "graph_relationship"
+    | "semantic_relation"
+    | "failure_boundary";
   label: string;
   weight: number;
 }
 
 export interface AnswerPacket {
-  schemaVersion: 'solidkg.answer-packet.v1';
+  schemaVersion: "solidkg.answer-packet.v1";
   packetId: string;
   query: string;
   tool: string;
@@ -837,7 +865,10 @@ export interface CodeBlock {
   node?: Node;
 
   /** Returned-source coverage for this block when exposed in context output */
-  sourceCompleteness?: Exclude<SourceCompletenessStatus, 'partial' | 'omitted' | 'unreadable' | 'skipped'>;
+  sourceCompleteness?: Exclude<
+    SourceCompletenessStatus,
+    "partial" | "omitted" | "unreadable" | "skipped"
+  >;
 
   /** Original source character count before truncation */
   sourceOriginalChars?: number;
@@ -907,15 +938,15 @@ export interface GraphStats {
   lastUpdated: number;
 }
 
-export type ScipMode = 'auto' | 'off' | 'required';
+export type ScipMode = "auto" | "off" | "required";
 
 export type ScipGenerationState =
-  | 'available'
-  | 'generated'
-  | 'failed'
-  | 'skipped'
-  | 'indexer-missing'
-  | 'unsupported';
+  | "available"
+  | "generated"
+  | "failed"
+  | "skipped"
+  | "indexer-missing"
+  | "unsupported";
 
 export interface ScipGenerationLanguageStatus {
   language: string;
@@ -1069,10 +1100,10 @@ export interface BuildContextOptions {
   includeCode?: boolean;
 
   /** Output format (default: 'markdown') */
-  format?: 'markdown' | 'json';
+  format?: "markdown" | "json";
 
   /** Detail preset for context output (default: 'standard') */
-  detailLevel?: 'standard' | 'minimal';
+  detailLevel?: "standard" | "minimal";
 
   /** Number of semantic search results (default: 5) */
   searchLimit?: number;
@@ -1083,11 +1114,13 @@ export interface BuildContextOptions {
   /** Minimum semantic similarity score (default: 0.3) */
   minScore?: number;
 
-  redaction?: false | {
-    enabled?: boolean;
-    redactEmails?: boolean;
-    redactSecrets?: boolean;
-  };
+  redaction?:
+    | false
+    | {
+        enabled?: boolean;
+        redactEmails?: boolean;
+        redactSecrets?: boolean;
+      };
 }
 
 /**

@@ -33,7 +33,8 @@ import type {
 import { buildFailureAnswerPacket, buildNodeAnswerPacket, formatAnswerPacketMarkdown } from '../evidence/packets';
 import { buildGraphTraversalPacket, formatGraphTraversalPacketMarkdown, type GraphTraversalDirection, type GraphTraversalLimit, type GraphTraversalResult } from '../graph';
 import { mergeTraversalResults, relationCountsForEdges } from '../graph/traversal-results';
-import { isTestFile, selectRetrievalSearchTerms } from '../search/query-utils';
+import { extractExcludedRetrievalTerms, getStemVariants, isNonProductionQuery, isTestFile, selectRetrievalSearchTerms, tokenizeCodeForSearch } from '../search/query-utils';
+import { isRetrievalConceptCovered, selectRequiredRetrievalConcepts } from '../search/query-concepts';
 import { createHash } from 'crypto';
 import {
   constants as fsConstants,
@@ -198,24 +199,32 @@ function exactExploreSymbolQueryTokens(query: string): Set<string> {
   const tokens = new Set<string>();
   const naturalLanguageQuery = isNaturalLanguageExploreQuery(query);
   for (const raw of query.split(/\s+/)) {
+    const explicitToken = raw.replace(/^[`'"(<[{]+|[`'"\])>}.,;:?!*]+$/g, '');
+    const qualifiedParts = explicitToken.split(/::|[./]/).filter(Boolean);
+    const isStrongIdentifier = (value: string): boolean => {
+      const uppercaseCount = value.match(/[A-Z]/g)?.length ?? 0;
+      return /[_$]/.test(value)
+        || /[a-z][A-Z]/.test(value)
+        || (uppercaseCount >= 2 && /[a-z]/.test(value))
+        || /^[A-Z]{4,}$/.test(value)
+        || /^[A-Z][a-z][A-Za-z0-9]*$/.test(value);
+    };
+    const qualifiedIdentifier = qualifiedParts.length > 1
+      && !/\.(?:java|kt|kts|ts|tsx|js|jsx|mjs|cjs|cs|py|go|rb|php|swift|rs|cpp|cc|cxx|c|h|hpp|scala|lua|dart|vue|svelte)$/i.test(explicitToken)
+      && qualifiedParts.every((part) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(part))
+      && qualifiedParts.some(isStrongIdentifier);
     if (naturalLanguageQuery) {
-      const explicitToken = raw.replace(/^[`'"(<[{]+|[`'"\])>}.,;:?!*]+$/g, '');
-      const uppercaseCount = explicitToken.match(/[A-Z]/g)?.length ?? 0;
-      const explicitIdentifier = /[_$]/.test(explicitToken)
-        || /[a-z][A-Z]/.test(explicitToken)
-        || (uppercaseCount >= 2 && /[a-z]/.test(explicitToken))
-        || /^[A-Z]{4,}$/.test(explicitToken);
+      const explicitIdentifier = qualifiedIdentifier
+        || isStrongIdentifier(explicitToken);
       if (!explicitIdentifier) continue;
     }
-    const token = normalizeExplorePathToken(raw);
-    if (!token) continue;
-
-    const normalized = token.replace(/^#/, '');
-    if (/^[a-z_$][a-z0-9_$]*$/i.test(token)) {
-      tokens.add(token);
-    }
-    if (normalized !== token && /^[a-z_$][a-z0-9_$]*$/i.test(normalized)) {
-      tokens.add(normalized);
+    const candidates = qualifiedIdentifier ? qualifiedParts.filter(isStrongIdentifier) : [explicitToken];
+    for (const candidate of candidates) {
+      const token = normalizeExplorePathToken(candidate);
+      if (!token) continue;
+      const normalized = token.replace(/^#/, '');
+      if (/^[a-z_$][a-z0-9_$]*$/i.test(token)) tokens.add(token);
+      if (normalized !== token && /^[a-z_$][a-z0-9_$]*$/i.test(normalized)) tokens.add(normalized);
     }
     if (naturalLanguageQuery && tokens.size >= 8) break;
   }
@@ -1995,7 +2004,19 @@ export class ToolHandler {
       }
     }
 
-    const queryTerms = selectRetrievalSearchTerms(query, 10);
+    const queryTerms = selectRequiredRetrievalConcepts(query, 10);
+    const excludedQueryTerms = new Set(extractExcludedRetrievalTerms(query));
+    const matchesExcludedPath = (filePath: string): boolean => {
+      const pathTokens = new Set(
+        tokenizeCodeForSearch(normalizeExplorePathToken(filePath))
+          .map((term) => term.toLowerCase())
+          .flatMap((term) => [term, ...getStemVariants(term)]),
+      );
+      for (const term of excludedQueryTerms) {
+        if ([term, ...getStemVariants(term)].some((variant) => pathTokens.has(variant))) return true;
+      }
+      return false;
+    };
     const exactSymbolOrder = new Map([...exactSymbolTokens].map((token, index) => [token, index]));
     const hasSourcePathIntent = [...exactFileTokens.keys()].some(token => token.startsWith('source/') || token.startsWith('src/'));
     const isExactFilePathIntent = (filePath: string): boolean => {
@@ -2240,7 +2261,19 @@ export class ToolHandler {
     }
 
     // Only include files that have entry points or nodes directly connected to entry points
-    const relevantFiles = [...fileGroups.entries()].filter(([, group]) => group.score >= 3);
+    const candidateFiles = [...fileGroups.entries()].filter(([, group]) => group.score >= 3);
+    const preferProductionFiles = !isNonProductionQuery(query)
+      && candidateFiles.some(([filePath, group]) => !isTestFile(filePath) && (
+        queryTerms.some((term) => filePath.toLowerCase().includes(term))
+        || group.nodes.some((node) => queryTerms.some((term) => node.name.toLowerCase().includes(term)))
+      ));
+    const shouldExcludeExploreFile = (filePath: string): boolean => {
+      const normalizedPath = normalizeExplorePathToken(filePath);
+      return (preferProductionFiles && isTestFile(normalizedPath)) || matchesExcludedPath(normalizedPath);
+    };
+    const relevantFiles = candidateFiles.filter(([filePath]) => {
+      return !shouldExcludeExploreFile(filePath);
+    });
     const graphRankedFileScores = buildExploreGraphRankedFileScores(cg, fileGroups);
 
     // Sort files: highest relevance first, deprioritize low-value files
@@ -2349,9 +2382,12 @@ export class ToolHandler {
     ];
 
     // Relationship map — show how symbols connect
-    const significantEdges = subgraph.edges.filter(e =>
-      e.kind !== 'contains' // skip contains — it's implied by file grouping
-    );
+    const significantEdges = subgraph.edges.filter((edge) => {
+      if (edge.kind === 'contains') return false;
+      const source = subgraph.nodes.get(edge.source);
+      const target = subgraph.nodes.get(edge.target);
+      return !source || !target || (!shouldExcludeExploreFile(source.filePath) && !shouldExcludeExploreFile(target.filePath));
+    });
 
     if (budget.includeRelationships && significantEdges.length > 0) {
       lines.push('### Relationships');
@@ -2401,6 +2437,7 @@ export class ToolHandler {
     let totalChars = lines.join('\n').length;
     let filesIncluded = 0;
     const shownFilePaths = new Set<string>();
+    const shownEvidenceParts: string[] | null = excludedQueryTerms.size > 0 ? [] : null;
     let hardOutputTruncated = false;
     const fileSourceStatuses = new Map<string, ExploreFileSourceStatus>();
 
@@ -2485,6 +2522,7 @@ export class ToolHandler {
         const wholeStatus = fileSourceStatuses.get(filePath) ?? 'included';
         const wholeHeader = `#### ${filePath} [${formatExploreFileStatusLabel(wholeStatus)}] — ${omitted > 0 ? `${headerNames.join(', ')}, +${omitted} more` : headerNames.join(', ')}`;
         lines.push(wholeHeader, '', '```' + lang, wholeSection, '```', '');
+        shownEvidenceParts?.push(filePath, headerNames.join(' '), wholeSection);
         totalChars += wholeSection.length + 200;
         filesIncluded++;
         shownFilePaths.add(filePath);
@@ -2764,6 +2802,7 @@ export class ToolHandler {
         lines.push(trimmed);
         lines.push('```');
         lines.push('');
+        shownEvidenceParts?.push(filePath, headerSuffix, trimmed);
         totalChars += trimmed.length + 200;
         filesIncluded++;
         shownFilePaths.add(filePath);
@@ -2777,6 +2816,7 @@ export class ToolHandler {
       lines.push(fileSection);
       lines.push('```');
       lines.push('');
+      shownEvidenceParts?.push(filePath, headerSuffix, fileSection);
 
       totalChars += fileSection.length + 200;
       filesIncluded++;
@@ -2796,6 +2836,7 @@ export class ToolHandler {
       for (const hit of directHits) {
         const node = hit.node;
         if (node.kind === 'import' || node.kind === 'export') continue;
+        if (shouldExcludeExploreFile(node.filePath)) continue;
         const group = directQueryFileGroups.get(node.filePath) || { nodes: [], score: 0 };
         if (!group.nodes.some((existing) => existing.id === node.id)) {
           group.nodes.push(node);
@@ -2807,7 +2848,7 @@ export class ToolHandler {
 
     const remainingRelevant = sortedFiles.filter(([filePath]) => !shownFilePaths.has(filePath));
     const peripheralFiles = [...fileGroups.entries()]
-      .filter(([, group]) => group.score < 3)
+      .filter(([filePath, group]) => group.score < 3 && !shouldExcludeExploreFile(filePath))
       .sort((a, b) => b[1].score - a[1].score);
     const knownRemaining = new Set<string>([
       ...remainingRelevant.map(([filePath]) => filePath),
@@ -2917,13 +2958,19 @@ export class ToolHandler {
     const renderExploreOutput = (status: ExploreSourceCompleteness, summary: ExploreSourceStatusSummary): string => {
       const statusLabel = this.formatExploreSourceCompletenessLabel(status, summary);
       const shownNodes = [...subgraph.nodes.values()].filter((node) => shownFilePaths.has(node.filePath));
-      const flowOutput = exactFileTokens.size > 0 ? '' : this.buildFlowFromNamedSymbols(cg, query);
+      const flowOutput = exactFileTokens.size > 0 || excludedQueryTerms.size > 0 ? '' : this.buildFlowFromNamedSymbols(cg, query);
       const uncertaintyLabels: UncertaintyLabel[] = status === 'complete' ? [] : ['source_partial'];
       if (flowOutput.startsWith('Ambiguous symbol ')) uncertaintyLabels.push('ambiguous_symbol');
       if (subgraph.edges.some((edge) => edge.provenance === 'heuristic')) uncertaintyLabels.push('heuristic_edge');
+      const shownEvidenceTokens = new Set(tokenizeCodeForSearch(shownEvidenceParts?.join('\n') ?? '').map((term) => term.toLowerCase()));
+      const uncoveredQueryTerms = excludedQueryTerms.size === 0
+        ? []
+        : queryTerms.filter((term) => !isRetrievalConceptCovered(term, shownEvidenceTokens));
+      if (uncoveredQueryTerms.length > 0) uncertaintyLabels.push('missing_query_concept');
       const canAnswer = shownNodes.length > 0
         && summary.included + summary.partial > 0
-        && !uncertaintyLabels.includes('ambiguous_symbol');
+        && !uncertaintyLabels.includes('ambiguous_symbol')
+        && !uncertaintyLabels.includes('missing_query_concept');
       const note = this.formatExploreSourceCompletenessNote(status, summary, canAnswer);
       const packet = formatAnswerPacketMarkdown(buildNodeAnswerPacket({
         query,
@@ -2936,6 +2983,7 @@ export class ToolHandler {
           ...(sourceBodyEvidenceNodeIds.size > 0 ? [{ kind: 'source_body_chunk', label: `${sourceBodyEvidenceNodeIds.size} source chunk body/code-token match(es) boosted exploration`, weight: 95 } as const] : []),
           { kind: 'source_returned', label: `${summary.included} file(s) included with source`, weight: 90 },
           { kind: 'graph_relationship', label: `${significantEdges.length} relationship(s) included`, weight: 70 },
+          ...(uncoveredQueryTerms.length > 0 ? [{ kind: 'failure_boundary', label: `${uncoveredQueryTerms.length} uncovered query concept(s): ${uncoveredQueryTerms.join(', ')}`, weight: 110 } as const] : []),
         ],
         suggestedNextTools: canAnswer ? [] : ['solidkg_explore', 'solidkg_node'],
         includeReturnedEvidenceActionability: false,

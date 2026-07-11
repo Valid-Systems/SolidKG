@@ -13,8 +13,8 @@
  * - Incremental reindexing (in extraction module)
  */
 
-export { FileWatcher, WatchOptions, PendingFile } from './watcher';
-export { watchDisabledReason, detectWsl } from './watch-policy';
+export { FileWatcher, WatchOptions, PendingFile } from "./watcher";
+export { watchDisabledReason, detectWsl } from "./watch-policy";
 export {
   installGitSyncHook,
   removeGitSyncHook,
@@ -23,11 +23,11 @@ export {
   DEFAULT_SYNC_HOOKS,
   type GitHookName,
   type GitHookResult,
-} from './git-hooks';
+} from "./git-hooks";
 export {
   gitWorktreeRoot,
   detectWorktreeIndexMismatch,
   worktreeMismatchWarning,
   worktreeMismatchNotice,
   type WorktreeIndexMismatch,
-} from './worktree';
+} from "./worktree";

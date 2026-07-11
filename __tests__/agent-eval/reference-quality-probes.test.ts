@@ -77,6 +77,11 @@ describe('reference quality probe diagnostics', () => {
       statuses: { measured: 3 },
       expectationCount: 0,
       expectationMissCount: 0,
+      relevance: {
+        requiredRecall: null,
+        usefulRecall: null,
+        misleadingIntrusionRate: null,
+      },
     });
     expect(JSON.stringify(summary)).not.toContain('payloadText');
   });
@@ -97,6 +102,77 @@ describe('reference quality probe diagnostics', () => {
     )`) as { answerPacketAvailability: string; sourceCompletenessAvailability: string; rankingReasons: Array<{ kind: string; label: string }> };
     expect(evidence).toMatchObject({ answerPacketAvailability: 'available', sourceCompletenessAvailability: 'unavailable' });
     expect(evidence.rankingReasons).toEqual([{ kind: 'exact_symbol', label: 'exact match' }, { kind: 'source_body_chunk', label: 'local source body' }]);
+  });
+
+  it('grades required, useful, and misleading source evidence independently', () => {
+    const evidence = evaluate(`probes.parseToolOutput(
+      ${JSON.stringify('#### src/required.ts — run(function)\n#### src/useful.ts — helper(function)\n')},
+      [],
+      [
+        { file: 'src/required.ts', relevance: 'required' },
+        { file: 'src/useful.ts', relevance: 'useful' },
+        { file: 'test/required.test.ts', relevance: 'misleading' }
+      ]
+    )`) as {
+      relevanceResults: Array<{ file: string; relevance: string; matched: boolean }>;
+      relevance: { requiredRecall: number; usefulRecall: number; misleadingIntrusionRate: number };
+    };
+
+    expect(evidence.relevanceResults).toEqual([
+      { file: 'src/required.ts', relevance: 'required', matched: true },
+      { file: 'src/useful.ts', relevance: 'useful', matched: true },
+      { file: 'test/required.test.ts', relevance: 'misleading', matched: false },
+    ]);
+    expect(evidence.relevance).toEqual({
+      requiredRecall: 1,
+      usefulRecall: 1,
+      misleadingIntrusionRate: 0,
+    });
+  });
+
+  it('does not count peripheral file mentions as returned source evidence', () => {
+    const evidence = evaluate(`probes.parseToolOutput(
+      ${JSON.stringify('#### src/required.ts [complete] — run(function)\n### Not shown above\n- tests/required.test.ts [omitted]: testRun:4\n')},
+      [],
+      [
+        { file: 'src/required.ts', relevance: 'required' },
+        { file: 'tests/required.test.ts', relevance: 'misleading' }
+      ]
+    )`) as { relevanceResults: Array<{ file: string; matched: boolean }> };
+
+    expect(evidence.relevanceResults).toEqual([
+      { file: 'src/required.ts', relevance: 'required', matched: true },
+      { file: 'tests/required.test.ts', relevance: 'misleading', matched: false },
+    ]);
+  });
+
+  it('classifies a missing required source judgment as a miss', () => {
+    const status = evaluate(`probes.classifyProbeRepeats([{
+      status: 'measured', executeMs: 1, payloadBytes: 10, outputHash: 'same',
+      evidence: probes.parseToolOutput(
+        '#### src/other.ts — other(function)',
+        [],
+        [{ file: 'src/required.ts', relevance: 'required' }]
+      )
+    }])`);
+
+    expect(status).toBe('miss');
+  });
+
+  it('classifies a truthful partial packet with missing required source as an abstention', () => {
+    const status = evaluate(`probes.classifyProbeRepeats([{
+      status: 'measured', executeMs: 1, payloadBytes: 10, outputHash: 'same',
+      evidence: {
+        ...probes.parseToolOutput(
+          '#### src/other.ts — other(function)',
+          [],
+          [{ file: 'src/required.ts', relevance: 'required' }]
+        ),
+        sufficiency: 'partial'
+      }
+    }])`);
+
+    expect(status).toBe('abstained');
   });
 
   it('classifies an expectation miss as miss', () => {

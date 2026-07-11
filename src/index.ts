@@ -5,8 +5,8 @@
  * knowledge graph from any codebase.
  */
 
-import * as path from 'path';
-import { existsSync, readFileSync } from 'fs';
+import * as path from "path";
+import { existsSync, readFileSync } from "fs";
 import {
   Node,
   Edge,
@@ -41,9 +41,9 @@ import {
   ScipRelationshipRecord,
   ScipSymbolRecord,
   UnresolvedReference,
-} from './types';
-import { DatabaseConnection, getDatabasePath } from './db';
-import { QueryBuilder } from './db/queries';
+} from "./types";
+import { DatabaseConnection, getDatabasePath } from "./db";
+import { QueryBuilder } from "./db/queries";
 import {
   isInitialized,
   createDirectory,
@@ -52,7 +52,7 @@ import {
   ensureOwnershipMarker,
   getSolidKGDir,
   SolidKGDirectoryOptions,
-} from './directory';
+} from "./directory";
 import {
   ExtractionOrchestrator,
   IndexProgress,
@@ -63,35 +63,70 @@ import {
   ExtractionOrchestratorOptions,
   buildSourceRoots,
   extractFromSource,
-} from './extraction';
+} from "./extraction";
+import { ReferenceResolver, ResolutionResult } from "./resolution";
+import { GraphTraverser, GraphQueryManager } from "./graph";
+import type { GraphTraversalResult } from "./graph";
+import type { RelatedNodeTraversalResult } from "./graph/traversal-results";
+import { ContextBuilder, createContextBuilder } from "./context";
 import {
-  ReferenceResolver,
-  ResolutionResult,
-} from './resolution';
-import { GraphTraverser, GraphQueryManager } from './graph';
-import type { GraphTraversalResult } from './graph';
-import type { RelatedNodeTraversalResult } from './graph/traversal-results';
-import { ContextBuilder, createContextBuilder } from './context';
-import { buildOverviewTree, formatOverviewTree, type OverviewTree, type OverviewTreeOptions } from './overview';
-import { Mutex, FileLock } from './utils';
-import { FileWatcher, WatchOptions, PendingFile } from './sync';
-import { generateScipIndexes, importScipIndexes as importScipIndexesIntoDb, linkScipSymbolsToNodes } from './scip';
-import { createIndexProfile, elapsedMs, nowMs, recordResourceStats, type MutableIndexProfile } from './profiling';
-import type { CapabilityAnalysisRun, CapabilityAssertion } from './capabilities';
-import { buildSourceChunksForFile } from './source-chunks';
+  buildOverviewTree,
+  formatOverviewTree,
+  type OverviewTree,
+  type OverviewTreeOptions,
+} from "./overview";
+import { Mutex, FileLock } from "./utils";
+import { FileWatcher, WatchOptions, PendingFile } from "./sync";
+import {
+  generateScipIndexes,
+  importScipIndexes as importScipIndexesIntoDb,
+  linkScipSymbolsToNodes,
+} from "./scip";
+import {
+  createIndexProfile,
+  elapsedMs,
+  nowMs,
+  recordResourceStats,
+  type MutableIndexProfile,
+} from "./profiling";
+import type {
+  CapabilityAnalysisRun,
+  CapabilityAssertion,
+} from "./capabilities";
+import {
+  buildSourceChunksForFile,
+  estimateSourceChunkProjectionFileBytes,
+  shouldFlushSourceChunkProjectionBatch,
+} from "./source-chunks";
 
 // Re-export types for consumers
-export * from './types';
-export { getDatabasePath } from './db';
+export * from "./types";
+export { getDatabasePath } from "./db";
 export {
   getSolidKGDir,
   isInitialized,
   findNearestSolidKGRoot,
   SOLIDKG_DIR,
-} from './directory';
-export { IndexProgress, IndexIssue, IndexIssueSink, IndexResult, IndexSkippedFile, IndexSkipReason, SyncResult } from './extraction';
-export { detectLanguage, isLanguageSupported, isGrammarLoaded, getSupportedLanguages, initGrammars, loadGrammarsForLanguages, loadAllGrammars } from './extraction';
-export { ResolutionResult } from './resolution';
+} from "./directory";
+export {
+  IndexProgress,
+  IndexIssue,
+  IndexIssueSink,
+  IndexResult,
+  IndexSkippedFile,
+  IndexSkipReason,
+  SyncResult,
+} from "./extraction";
+export {
+  detectLanguage,
+  isLanguageSupported,
+  isGrammarLoaded,
+  getSupportedLanguages,
+  initGrammars,
+  loadGrammarsForLanguages,
+  loadAllGrammars,
+} from "./extraction";
+export { ResolutionResult } from "./resolution";
 export {
   SolidKGError,
   FileError,
@@ -105,14 +140,21 @@ export {
   getLogger,
   silentLogger,
   defaultLogger,
-} from './errors';
-export { Mutex, FileLock, processInBatches, debounce, throttle, MemoryMonitor } from './utils';
-export { FileWatcher, WatchOptions, PendingFile } from './sync';
-export { MCPServer } from './mcp';
-export * from './scip';
-export * from './profiling';
-export * from './capabilities';
-export * from './overview';
+} from "./errors";
+export {
+  Mutex,
+  FileLock,
+  processInBatches,
+  debounce,
+  throttle,
+  MemoryMonitor,
+} from "./utils";
+export { FileWatcher, WatchOptions, PendingFile } from "./sync";
+export { MCPServer } from "./mcp";
+export * from "./scip";
+export * from "./profiling";
+export * from "./capabilities";
+export * from "./overview";
 
 /**
  * Options for initializing a new SolidKG project
@@ -199,10 +241,26 @@ export interface SnapshotMetadata {
   hyperedgeMemberCount: number;
 }
 
-export type SnapshotNodeRecord = Omit<Node, 'updatedAt'>;
-export type SnapshotEdgeRecord = Pick<Edge, 'source' | 'target' | 'kind' | 'metadata' | 'line' | 'column' | 'provenance'>;
-export type SnapshotHyperedgeRecord = Pick<Hyperedge, 'id' | 'kind' | 'sourceFile' | 'line' | 'column' | 'provenance' | 'confidence' | 'metadata'>;
-export type SnapshotHyperedgeMemberRecord = Pick<HyperedgeMember, 'hyperedgeId' | 'nodeId' | 'role' | 'ordinal' | 'metadata'>;
+export type SnapshotNodeRecord = Omit<Node, "updatedAt">;
+export type SnapshotEdgeRecord = Pick<
+  Edge,
+  "source" | "target" | "kind" | "metadata" | "line" | "column" | "provenance"
+>;
+export type SnapshotHyperedgeRecord = Pick<
+  Hyperedge,
+  | "id"
+  | "kind"
+  | "sourceFile"
+  | "line"
+  | "column"
+  | "provenance"
+  | "confidence"
+  | "metadata"
+>;
+export type SnapshotHyperedgeMemberRecord = Pick<
+  HyperedgeMember,
+  "hyperedgeId" | "nodeId" | "role" | "ordinal" | "metadata"
+>;
 
 export interface SnapshotDiff {
   addedNodes: SnapshotNodeRecord[];
@@ -231,14 +289,14 @@ export interface AnalyzeArchitectureOptions {
 export interface ArchitecturePackage {
   name: string;
   root: string;
-  provenance: 'manifest' | 'root';
+  provenance: "manifest" | "root";
   fileCount: number;
 }
 
 export interface ArchitecturePackageLookup {
   query: string;
-  kind: 'package' | 'path';
-  resolvedBy: 'name' | 'root' | 'owning_package' | 'not_found';
+  kind: "package" | "path";
+  resolvedBy: "name" | "root" | "owning_package" | "not_found";
   package: ArchitecturePackage | null;
   matchedPath?: string;
   matchedFileCount?: number;
@@ -246,7 +304,7 @@ export interface ArchitecturePackageLookup {
 
 export interface ArchitectureLayer {
   name: string;
-  provenance: 'config_layer' | 'unassigned';
+  provenance: "config_layer" | "unassigned";
   fileCount: number;
 }
 
@@ -254,9 +312,9 @@ export interface ArchitectureFileAssignment {
   filePath: string;
   packageName: string;
   packageRoot: string;
-  packageProvenance: 'manifest' | 'root' | 'unassigned';
+  packageProvenance: "manifest" | "root" | "unassigned";
   layerName: string;
-  layerProvenance: 'config_layer' | 'unassigned';
+  layerProvenance: "config_layer" | "unassigned";
 }
 
 export interface ArchitectureDependency {
@@ -333,13 +391,13 @@ interface SnapshotGraph {
 }
 
 const ARCHITECTURE_EDGE_KINDS = new Set<EdgeKind>([
-  'imports',
-  'references',
-  'calls',
-  'extends',
-  'implements',
-  'instantiates',
-  'type_of',
+  "imports",
+  "references",
+  "calls",
+  "extends",
+  "implements",
+  "instantiates",
+  "type_of",
 ]);
 
 function snapshotNode(node: Node): SnapshotNodeRecord {
@@ -372,7 +430,9 @@ function snapshotHyperedge(hyperedge: Hyperedge): SnapshotHyperedgeRecord {
   };
 }
 
-function snapshotHyperedgeMember(member: HyperedgeMember): SnapshotHyperedgeMemberRecord {
+function snapshotHyperedgeMember(
+  member: HyperedgeMember,
+): SnapshotHyperedgeMemberRecord {
   return {
     hyperedgeId: member.hyperedgeId,
     nodeId: member.nodeId,
@@ -384,7 +444,7 @@ function snapshotHyperedgeMember(member: HyperedgeMember): SnapshotHyperedgeMemb
 
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
-  if (value && typeof value === 'object') {
+  if (value && typeof value === "object") {
     const sorted: Record<string, unknown> = {};
     for (const key of Object.keys(value).sort()) {
       const entry = (value as Record<string, unknown>)[key];
@@ -399,7 +459,17 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(stableValue(value));
 }
 
-function sourceOptionsFrom(options: Pick<InitOptions | OpenOptions | IndexOptions, 'extraRoots' | 'includeSubmodules' | 'includePatterns' | 'excludePatterns' | 'includeVendored' | 'maxFileSizeBytes'>): ExtractionOrchestratorOptions {
+function sourceOptionsFrom(
+  options: Pick<
+    InitOptions | OpenOptions | IndexOptions,
+    | "extraRoots"
+    | "includeSubmodules"
+    | "includePatterns"
+    | "excludePatterns"
+    | "includeVendored"
+    | "maxFileSizeBytes"
+  >,
+): ExtractionOrchestratorOptions {
   return {
     extraRoots: options.extraRoots,
     includeSubmodules: options.includeSubmodules,
@@ -410,9 +480,11 @@ function sourceOptionsFrom(options: Pick<InitOptions | OpenOptions | IndexOption
   };
 }
 
-const SOURCE_OPTIONS_METADATA_KEY = 'source_options';
+const SOURCE_OPTIONS_METADATA_KEY = "source_options";
 
-function readSourceOptionsMetadata(queries: QueryBuilder): ExtractionOrchestratorOptions {
+function readSourceOptionsMetadata(
+  queries: QueryBuilder,
+): ExtractionOrchestratorOptions {
   const raw = queries.getMetadata(SOURCE_OPTIONS_METADATA_KEY);
   if (!raw) return {};
   try {
@@ -430,7 +502,10 @@ function readSourceOptionsMetadata(queries: QueryBuilder): ExtractionOrchestrato
   }
 }
 
-function mergeSourceOptions(current: ExtractionOrchestratorOptions, overrides: ExtractionOrchestratorOptions): ExtractionOrchestratorOptions {
+function mergeSourceOptions(
+  current: ExtractionOrchestratorOptions,
+  overrides: ExtractionOrchestratorOptions,
+): ExtractionOrchestratorOptions {
   return {
     extraRoots: overrides.extraRoots ?? current.extraRoots,
     includeSubmodules: overrides.includeSubmodules ?? current.includeSubmodules,
@@ -441,26 +516,53 @@ function mergeSourceOptions(current: ExtractionOrchestratorOptions, overrides: E
   };
 }
 
-function hasSourceOptionOverride(options: ExtractionOrchestratorOptions): boolean {
-  return options.extraRoots !== undefined
-    || options.includeSubmodules !== undefined
-    || options.includePatterns !== undefined
-    || options.excludePatterns !== undefined
-    || options.includeVendored !== undefined
-    || options.maxFileSizeBytes !== undefined;
+function hasSourceOptionOverride(
+  options: ExtractionOrchestratorOptions,
+): boolean {
+  return (
+    options.extraRoots !== undefined ||
+    options.includeSubmodules !== undefined ||
+    options.includePatterns !== undefined ||
+    options.excludePatterns !== undefined ||
+    options.includeVendored !== undefined ||
+    options.maxFileSizeBytes !== undefined
+  );
 }
 
 function edgeKey(edge: SnapshotEdgeRecord): string {
-  return [edge.source, edge.target, edge.kind, edge.line ?? '', edge.column ?? '', edge.provenance ?? ''].join('\0');
+  return [
+    edge.source,
+    edge.target,
+    edge.kind,
+    edge.line ?? "",
+    edge.column ?? "",
+    edge.provenance ?? "",
+  ].join("\0");
 }
 
 function memberKey(member: SnapshotHyperedgeMemberRecord): string {
-  return [member.hyperedgeId, member.nodeId, member.role, member.ordinal].join('\0');
+  return [member.hyperedgeId, member.nodeId, member.role, member.ordinal].join(
+    "\0",
+  );
 }
 
-function diffRecords<T>(snapshot: T[], current: T[], keyOf: (record: T) => string): { added: T[]; removed: T[]; changed: T[] } {
-  const before = new Map(snapshot.map((record) => [keyOf(record), { record, serialized: stableStringify(record) }]));
-  const after = new Map(current.map((record) => [keyOf(record), { record, serialized: stableStringify(record) }]));
+function diffRecords<T>(
+  snapshot: T[],
+  current: T[],
+  keyOf: (record: T) => string,
+): { added: T[]; removed: T[]; changed: T[] } {
+  const before = new Map(
+    snapshot.map((record) => [
+      keyOf(record),
+      { record, serialized: stableStringify(record) },
+    ]),
+  );
+  const after = new Map(
+    current.map((record) => [
+      keyOf(record),
+      { record, serialized: stableStringify(record) },
+    ]),
+  );
   const added: T[] = [];
   const removed: T[] = [];
   const changed: T[] = [];
@@ -478,45 +580,68 @@ function diffRecords<T>(snapshot: T[], current: T[], keyOf: (record: T) => strin
 }
 
 function normalizePath(value: string): string {
-  return value.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/$/, '') || '.';
+  return (
+    value.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "") || "."
+  );
 }
 
 function pathMatchesPrefix(filePath: string, prefix: string): boolean {
   const normalizedFile = normalizePath(filePath);
   const normalizedPrefix = normalizePath(prefix);
-  if (normalizedPrefix === '.') return true;
-  if (normalizedFile === normalizedPrefix || normalizedFile.startsWith(`${normalizedPrefix}/`)) return true;
-  if (normalizedPrefix.startsWith('@')) return false;
-  const rootlessFile = normalizedFile.replace(/^@[^/]+\//, '');
-  return rootlessFile === normalizedPrefix || rootlessFile.startsWith(`${normalizedPrefix}/`);
+  if (normalizedPrefix === ".") return true;
+  if (
+    normalizedFile === normalizedPrefix ||
+    normalizedFile.startsWith(`${normalizedPrefix}/`)
+  )
+    return true;
+  if (normalizedPrefix.startsWith("@")) return false;
+  const rootlessFile = normalizedFile.replace(/^@[^/]+\//, "");
+  return (
+    rootlessFile === normalizedPrefix ||
+    rootlessFile.startsWith(`${normalizedPrefix}/`)
+  );
 }
 
 function directoryOf(filePath: string): string {
   const normalized = normalizePath(filePath);
-  const index = normalized.lastIndexOf('/');
-  return index === -1 ? '.' : normalized.slice(0, index) || '.';
+  const index = normalized.lastIndexOf("/");
+  return index === -1 ? "." : normalized.slice(0, index) || ".";
 }
 
 function parentDir(dir: string): string | null {
-  if (dir === '.') return null;
-  const index = dir.lastIndexOf('/');
-  return index === -1 ? '.' : dir.slice(0, index) || '.';
+  if (dir === ".") return null;
+  const index = dir.lastIndexOf("/");
+  return index === -1 ? "." : dir.slice(0, index) || ".";
 }
 
 function matchesLayerPath(filePath: string, pattern: string): boolean {
   const normalizedFile = normalizePath(filePath);
   const normalizedPattern = normalizePath(pattern);
-  if (normalizedPattern.endsWith('/**')) {
+  if (normalizedPattern.endsWith("/**")) {
     const prefix = normalizedPattern.slice(0, -3);
     return normalizedFile === prefix || normalizedFile.startsWith(`${prefix}/`);
   }
-  return normalizedFile === normalizedPattern || normalizedFile.startsWith(`${normalizedPattern}/`);
+  return (
+    normalizedFile === normalizedPattern ||
+    normalizedFile.startsWith(`${normalizedPattern}/`)
+  );
 }
 
-function couplingFromDependencies(names: string[], dependencies: ArchitectureDependency[]): CouplingMetric[] {
+function couplingFromDependencies(
+  names: string[],
+  dependencies: ArchitectureDependency[],
+): CouplingMetric[] {
   return names.sort().map((name) => {
-    const incoming = new Set(dependencies.filter((dep) => dep.target === name).map((dep) => dep.source));
-    const outgoing = new Set(dependencies.filter((dep) => dep.source === name).map((dep) => dep.target));
+    const incoming = new Set(
+      dependencies
+        .filter((dep) => dep.target === name)
+        .map((dep) => dep.source),
+    );
+    const outgoing = new Set(
+      dependencies
+        .filter((dep) => dep.source === name)
+        .map((dep) => dep.target),
+    );
     const Ca = incoming.size;
     const Ce = outgoing.size;
     return { name, Ca, Ce, instability: Ca + Ce === 0 ? 0 : Ce / (Ca + Ce) };
@@ -555,13 +680,17 @@ export class SolidKG {
     private dataDir: string,
     private explicitDataDir: boolean,
     private sourceOptions: ExtractionOrchestratorOptions = {},
-    private readOnly = false
+    private readOnly = false,
   ) {
     this.db = db;
     this.queries = queries;
     this.projectRoot = projectRoot;
-    this.fileLock = new FileLock(path.join(dataDir, 'solidkg.lock'));
-    this.orchestrator = new ExtractionOrchestrator(projectRoot, queries, sourceOptions);
+    this.fileLock = new FileLock(path.join(dataDir, "solidkg.lock"));
+    this.orchestrator = new ExtractionOrchestrator(
+      projectRoot,
+      queries,
+      sourceOptions,
+    );
     this.resolver = new ReferenceResolver(projectRoot, queries, sourceOptions);
     this.graphManager = new GraphQueryManager(queries);
     this.traverser = new GraphTraverser(queries);
@@ -569,19 +698,24 @@ export class SolidKG {
       projectRoot,
       queries,
       this.traverser,
-      sourceOptions
+      sourceOptions,
     );
     if (!this.readOnly) this.persistSourceOptions();
   }
 
   private assertWritable(operation: string): void {
     if (this.readOnly) {
-      throw new Error(`Cannot ${operation}: SolidKG was opened in read-only mode`);
+      throw new Error(
+        `Cannot ${operation}: SolidKG was opened in read-only mode`,
+      );
     }
   }
 
   private persistSourceOptions(): void {
-    this.queries.setMetadata(SOURCE_OPTIONS_METADATA_KEY, JSON.stringify(this.sourceOptions));
+    this.queries.setMetadata(
+      SOURCE_OPTIONS_METADATA_KEY,
+      JSON.stringify(this.sourceOptions),
+    );
   }
 
   private initializeResolver(): void {
@@ -591,7 +725,11 @@ export class SolidKG {
   }
 
   private rebuildResolver(): void {
-    this.resolver = new ReferenceResolver(this.projectRoot, this.queries, this.sourceOptions);
+    this.resolver = new ReferenceResolver(
+      this.projectRoot,
+      this.queries,
+      this.sourceOptions,
+    );
     this.resolverInitialized = false;
   }
 
@@ -600,32 +738,90 @@ export class SolidKG {
       if (!filePath.startsWith(root.prefix)) continue;
       const relativePath = filePath.slice(root.prefix.length);
       const fullPath = path.resolve(root.rootDir, relativePath);
-      if (fullPath === root.rootDir || fullPath.startsWith(`${root.rootDir}${path.sep}`)) return fullPath;
+      if (
+        fullPath === root.rootDir ||
+        fullPath.startsWith(`${root.rootDir}${path.sep}`)
+      )
+        return fullPath;
     }
     return null;
   }
 
-  private refreshSourceChunksForFile(file: FileRecord, updatedAt: number): void {
+  private buildSourceChunksForFile(
+    file: FileRecord,
+    updatedAt: number,
+  ): SourceChunkRecord[] {
     const fullPath = this.resolveIndexedFilePath(file.path);
-    this.queries.deleteSourceChunksByFile(file.path);
-    if (!fullPath || !existsSync(fullPath)) return;
-    const content = readFileSync(fullPath, 'utf-8');
+    if (!fullPath || !existsSync(fullPath)) return [];
+    const content = readFileSync(fullPath, "utf-8");
     const nodes = this.queries.getNodesByFile(file.path);
-    const chunks = buildSourceChunksForFile({ file, nodes, content, updatedAt });
-    this.queries.upsertSourceChunks(chunks);
+    return buildSourceChunksForFile({
+      file,
+      nodes,
+      content,
+      updatedAt,
+    });
   }
 
-  private refreshSourceChunksForFiles(filePaths: readonly string[] | undefined): void {
+  private refreshSourceChunksForFiles(
+    filePaths: readonly string[] | undefined,
+    onProgress?: (progress: IndexProgress) => void,
+  ): void {
     const updatedAt = Date.now();
     const files = filePaths
       ? filePaths.flatMap((filePath) => {
-        const file = this.queries.getFileByPath(filePath);
-        return file ? [file] : [];
-      })
+          const file = this.queries.getFileByPath(filePath);
+          return file ? [file] : [];
+        })
       : this.queries.getAllFiles();
+
+    onProgress?.({
+      phase: "storing",
+      detail: "source_chunks",
+      current: 0,
+      total: files.length,
+    });
+
+    let batch: FileRecord[] = [];
+    let chunks: SourceChunkRecord[] = [];
+    let batchByteLength = 0;
+    let completedFileCount = 0;
+    const flushBatch = (): void => {
+      if (batch.length === 0) return;
+      this.queries.transaction(() => {
+        for (const file of batch) {
+          this.queries.deleteSourceChunksByFile(file.path);
+        }
+        this.queries.upsertSourceChunks(chunks);
+      });
+
+      completedFileCount += batch.length;
+      onProgress?.({
+        phase: "storing",
+        detail: "source_chunks",
+        current: completedFileCount,
+        total: files.length,
+      });
+      batch = [];
+      chunks = [];
+      batchByteLength = 0;
+    };
+
     for (const file of files) {
-      this.refreshSourceChunksForFile(file, updatedAt);
+      const fileChunks = this.buildSourceChunksForFile(file, updatedAt);
+      const fileByteLength = estimateSourceChunkProjectionFileBytes(fileChunks);
+      if (shouldFlushSourceChunkProjectionBatch({
+        currentFileCount: batch.length,
+        currentByteLength: batchByteLength,
+        nextFileByteLength: fileByteLength,
+      })) {
+        flushBatch();
+      }
+      batch.push(file);
+      chunks.push(...fileChunks);
+      batchByteLength += fileByteLength;
     }
+    flushBatch();
   }
 
   // ===========================================================================
@@ -641,14 +837,21 @@ export class SolidKG {
    * @param options - Initialization options
    * @returns A new SolidKG instance
    */
-  static async init(projectRoot: string, options: InitOptions = {}): Promise<SolidKG> {
+  static async init(
+    projectRoot: string,
+    options: InitOptions = {},
+  ): Promise<SolidKG> {
     const resolvedRoot = path.resolve(projectRoot);
-    const directoryOptions: SolidKGDirectoryOptions = { dataDir: options.dataDir };
+    const directoryOptions: SolidKGDirectoryOptions = {
+      dataDir: options.dataDir,
+    };
     const dataDir = getSolidKGDir(resolvedRoot, directoryOptions);
 
     // Check if already initialized
     if (isInitialized(resolvedRoot, directoryOptions)) {
-      throw new Error(`SolidKG already initialized in ${resolvedRoot} using data directory ${dataDir}`);
+      throw new Error(
+        `SolidKG already initialized in ${resolvedRoot} using data directory ${dataDir}`,
+      );
     }
 
     // Create directory structure
@@ -657,9 +860,21 @@ export class SolidKG {
     // Initialize database
     const dbPath = getDatabasePath(resolvedRoot, directoryOptions);
     const db = DatabaseConnection.initialize(dbPath);
-    const queries = new QueryBuilder(db.getDb(), { retrieval: options.retrieval });
-    const sourceOptions = mergeSourceOptions(readSourceOptionsMetadata(queries), sourceOptionsFrom(options));
-    const instance = new SolidKG(db, queries, resolvedRoot, dataDir, options.dataDir !== undefined, sourceOptions);
+    const queries = new QueryBuilder(db.getDb(), {
+      retrieval: options.retrieval,
+    });
+    const sourceOptions = mergeSourceOptions(
+      readSourceOptionsMetadata(queries),
+      sourceOptionsFrom(options),
+    );
+    const instance = new SolidKG(
+      db,
+      queries,
+      resolvedRoot,
+      dataDir,
+      options.dataDir !== undefined,
+      sourceOptions,
+    );
 
     // Run initial indexing if requested
     if (options.index) {
@@ -680,12 +895,16 @@ export class SolidKG {
    */
   static initSync(projectRoot: string, options: InitOptions = {}): SolidKG {
     const resolvedRoot = path.resolve(projectRoot);
-    const directoryOptions: SolidKGDirectoryOptions = { dataDir: options.dataDir };
+    const directoryOptions: SolidKGDirectoryOptions = {
+      dataDir: options.dataDir,
+    };
     const dataDir = getSolidKGDir(resolvedRoot, directoryOptions);
 
     // Check if already initialized
     if (isInitialized(resolvedRoot, directoryOptions)) {
-      throw new Error(`SolidKG already initialized in ${resolvedRoot} using data directory ${dataDir}`);
+      throw new Error(
+        `SolidKG already initialized in ${resolvedRoot} using data directory ${dataDir}`,
+      );
     }
 
     // Create directory structure
@@ -694,8 +913,20 @@ export class SolidKG {
     // Initialize database
     const dbPath = getDatabasePath(resolvedRoot, directoryOptions);
     const db = DatabaseConnection.initialize(dbPath);
-    const queries = new QueryBuilder(db.getDb(), { retrieval: options.retrieval });
-    return new SolidKG(db, queries, resolvedRoot, dataDir, options.dataDir !== undefined, mergeSourceOptions(readSourceOptionsMetadata(queries), sourceOptionsFrom(options)));
+    const queries = new QueryBuilder(db.getDb(), {
+      retrieval: options.retrieval,
+    });
+    return new SolidKG(
+      db,
+      queries,
+      resolvedRoot,
+      dataDir,
+      options.dataDir !== undefined,
+      mergeSourceOptions(
+        readSourceOptionsMetadata(queries),
+        sourceOptionsFrom(options),
+      ),
+    );
   }
 
   /**
@@ -705,33 +936,58 @@ export class SolidKG {
    * @param options - Open options
    * @returns A SolidKG instance
    */
-  static async open(projectRoot: string, options: OpenOptions = {}): Promise<SolidKG> {
+  static async open(
+    projectRoot: string,
+    options: OpenOptions = {},
+  ): Promise<SolidKG> {
     const resolvedRoot = path.resolve(projectRoot);
-    const directoryOptions: SolidKGDirectoryOptions = { dataDir: options.dataDir };
+    const directoryOptions: SolidKGDirectoryOptions = {
+      dataDir: options.dataDir,
+    };
     const dataDir = getSolidKGDir(resolvedRoot, directoryOptions);
 
     // Check if initialized
     if (!isInitialized(resolvedRoot, directoryOptions)) {
-      throw new Error(`SolidKG not initialized in ${resolvedRoot} using data directory ${dataDir}. Run init() first or pass the correct dataDir.`);
+      throw new Error(
+        `SolidKG not initialized in ${resolvedRoot} using data directory ${dataDir}. Run init() first or pass the correct dataDir.`,
+      );
     }
 
     // Validate directory structure
-    const validation = validateDirectory(resolvedRoot, directoryOptions, { repair: options.readOnly !== true });
+    const validation = validateDirectory(resolvedRoot, directoryOptions, {
+      repair: options.readOnly !== true,
+    });
     if (!validation.valid) {
-      throw new Error(`Invalid SolidKG directory: ${validation.errors.join(', ')}`);
+      throw new Error(
+        `Invalid SolidKG directory: ${validation.errors.join(", ")}`,
+      );
     }
 
     // Open database
     const dbPath = getDatabasePath(resolvedRoot, directoryOptions);
     const db = DatabaseConnection.open(dbPath, { readOnly: options.readOnly });
-    const queries = new QueryBuilder(db.getDb(), { retrieval: options.retrieval });
-    if (options.dataDir !== undefined && options.readOnly !== true) ensureOwnershipMarker(resolvedRoot, directoryOptions);
-    const sourceOptions = mergeSourceOptions(readSourceOptionsMetadata(queries), sourceOptionsFrom(options));
-    const instance = new SolidKG(db, queries, resolvedRoot, dataDir, options.dataDir !== undefined, sourceOptions, options.readOnly === true);
+    const queries = new QueryBuilder(db.getDb(), {
+      retrieval: options.retrieval,
+    });
+    if (options.dataDir !== undefined && options.readOnly !== true)
+      ensureOwnershipMarker(resolvedRoot, directoryOptions);
+    const sourceOptions = mergeSourceOptions(
+      readSourceOptionsMetadata(queries),
+      sourceOptionsFrom(options),
+    );
+    const instance = new SolidKG(
+      db,
+      queries,
+      resolvedRoot,
+      dataDir,
+      options.dataDir !== undefined,
+      sourceOptions,
+      options.readOnly === true,
+    );
 
     // Sync if requested
     if (options.sync) {
-      instance.assertWritable('sync');
+      instance.assertWritable("sync");
       await instance.sync();
     }
 
@@ -743,33 +999,58 @@ export class SolidKG {
    */
   static openSync(projectRoot: string, options: OpenOptions = {}): SolidKG {
     const resolvedRoot = path.resolve(projectRoot);
-    const directoryOptions: SolidKGDirectoryOptions = { dataDir: options.dataDir };
+    const directoryOptions: SolidKGDirectoryOptions = {
+      dataDir: options.dataDir,
+    };
     const dataDir = getSolidKGDir(resolvedRoot, directoryOptions);
 
     // Check if initialized
     if (!isInitialized(resolvedRoot, directoryOptions)) {
-      throw new Error(`SolidKG not initialized in ${resolvedRoot} using data directory ${dataDir}. Run init() first or pass the correct dataDir.`);
+      throw new Error(
+        `SolidKG not initialized in ${resolvedRoot} using data directory ${dataDir}. Run init() first or pass the correct dataDir.`,
+      );
     }
 
     // Validate directory structure
-    const validation = validateDirectory(resolvedRoot, directoryOptions, { repair: options.readOnly !== true });
+    const validation = validateDirectory(resolvedRoot, directoryOptions, {
+      repair: options.readOnly !== true,
+    });
     if (!validation.valid) {
-      throw new Error(`Invalid SolidKG directory: ${validation.errors.join(', ')}`);
+      throw new Error(
+        `Invalid SolidKG directory: ${validation.errors.join(", ")}`,
+      );
     }
 
     // Open database
     const dbPath = getDatabasePath(resolvedRoot, directoryOptions);
     const db = DatabaseConnection.open(dbPath, { readOnly: options.readOnly });
-    const queries = new QueryBuilder(db.getDb(), { retrieval: options.retrieval });
-    if (options.dataDir !== undefined && options.readOnly !== true) ensureOwnershipMarker(resolvedRoot, directoryOptions);
+    const queries = new QueryBuilder(db.getDb(), {
+      retrieval: options.retrieval,
+    });
+    if (options.dataDir !== undefined && options.readOnly !== true)
+      ensureOwnershipMarker(resolvedRoot, directoryOptions);
 
-    return new SolidKG(db, queries, resolvedRoot, dataDir, options.dataDir !== undefined, mergeSourceOptions(readSourceOptionsMetadata(queries), sourceOptionsFrom(options)), options.readOnly === true);
+    return new SolidKG(
+      db,
+      queries,
+      resolvedRoot,
+      dataDir,
+      options.dataDir !== undefined,
+      mergeSourceOptions(
+        readSourceOptionsMetadata(queries),
+        sourceOptionsFrom(options),
+      ),
+      options.readOnly === true,
+    );
   }
 
   /**
    * Check if a directory has been initialized as a SolidKG project
    */
-  static isInitialized(projectRoot: string, options: SolidKGDirectoryOptions = {}): boolean {
+  static isInitialized(
+    projectRoot: string,
+    options: SolidKGDirectoryOptions = {},
+  ): boolean {
     return isInitialized(path.resolve(projectRoot), options);
   }
 
@@ -801,7 +1082,10 @@ export class SolidKG {
   }
 
   getSourceRoots(): ReturnType<typeof buildSourceRoots> {
-    return buildSourceRoots(this.projectRoot, this.sourceOptions.extraRoots ?? []);
+    return buildSourceRoots(
+      this.projectRoot,
+      this.sourceOptions.extraRoots ?? [],
+    );
   }
 
   // ===========================================================================
@@ -814,36 +1098,68 @@ export class SolidKG {
    * Uses a mutex to prevent concurrent indexing operations.
    */
   async indexAll(options: IndexOptions = {}): Promise<IndexResult> {
-    this.assertWritable('indexAll');
+    this.assertWritable("indexAll");
     return this.indexMutex.withLock(async () => {
       try {
         this.fileLock.acquire();
       } catch {
-        return { success: false, filesIndexed: 0, filesSkipped: 0, filesErrored: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
+        return {
+          success: false,
+          filesIndexed: 0,
+          filesSkipped: 0,
+          filesErrored: 0,
+          nodesCreated: 0,
+          edgesCreated: 0,
+          errors: [
+            {
+              message:
+                "Could not acquire file lock - another process may be indexing",
+              severity: "error" as const,
+            },
+          ],
+          durationMs: 0,
+        };
       }
       try {
         const profile = options.profile ? createIndexProfile() : undefined;
         if (profile) this.queries.enableStatementCounting();
         const requestedSourceOptions = sourceOptionsFrom(options);
         if (hasSourceOptionOverride(requestedSourceOptions)) {
-          this.sourceOptions = mergeSourceOptions(this.sourceOptions, requestedSourceOptions);
-          this.orchestrator = new ExtractionOrchestrator(this.projectRoot, this.queries, this.sourceOptions);
+          this.sourceOptions = mergeSourceOptions(
+            this.sourceOptions,
+            requestedSourceOptions,
+          );
+          this.orchestrator = new ExtractionOrchestrator(
+            this.projectRoot,
+            this.queries,
+            this.sourceOptions,
+          );
           this.rebuildResolver();
-          this.contextBuilder = createContextBuilder(this.projectRoot, this.queries, this.traverser, this.sourceOptions);
+          this.contextBuilder = createContextBuilder(
+            this.projectRoot,
+            this.queries,
+            this.traverser,
+            this.sourceOptions,
+          );
           this.persistSourceOptions();
         }
         const extractionStart = profile ? nowMs() : 0;
-        const result = await this.orchestrator.indexAll(options.onProgress, options.signal, options.verbose, options.onIssue);
+        const result = await this.orchestrator.indexAll(
+          options.onProgress,
+          options.signal,
+          options.verbose,
+          options.onIssue,
+        );
         if (profile) profile.timingsMs.extraction = elapsedMs(extractionStart);
         const astSucceeded = result.success;
-        const scipMode = options.scip ?? 'off';
-        const scipErrors: Array<{ message: string; severity: 'error' }> = [];
+        const scipMode = options.scip ?? "off";
+        const scipErrors: Array<{ message: string; severity: "error" }> = [];
 
         // Re-detect frameworks now that the index is populated. Framework
         // resolvers whose detect() consults indexed files need the populated
         // project before resolution runs.
         if (astSucceeded && result.filesIndexed > 0) {
-          this.refreshSourceChunksForFiles(undefined);
+          this.refreshSourceChunksForFiles(undefined, options.onProgress);
 
           this.rebuildResolver();
           this.initializeResolver();
@@ -851,7 +1167,7 @@ export class SolidKG {
 
         if (astSucceeded) {
           options.onProgress?.({
-            phase: 'scip',
+            phase: "scip",
             current: 0,
             total: 0,
           });
@@ -860,7 +1176,7 @@ export class SolidKG {
             projectRoot: this.projectRoot,
             mode: scipMode,
             indexers: options.scipIndexers,
-            outputDir: options.scipOutputDir ?? path.join(this.dataDir, 'scip'),
+            outputDir: options.scipOutputDir ?? path.join(this.dataDir, "scip"),
             storageRoot: this.dataDir,
           });
           if (profile) profile.timingsMs.scip += elapsedMs(scipStart);
@@ -875,12 +1191,16 @@ export class SolidKG {
               if (profile) profile.timingsMs.scip += elapsedMs(scipImportStart);
             } catch (err) {
               const message = `SCIP import failed: ${err instanceof Error ? err.message : String(err)}`;
-              if (scipMode === 'required') scipErrors.push({ message, severity: 'error' });
+              if (scipMode === "required")
+                scipErrors.push({ message, severity: "error" });
             }
           }
-          if (scipMode === 'required' && !scip.success) {
+          if (scipMode === "required" && !scip.success) {
             for (const error of scip.errors) {
-              scipErrors.push({ message: `SCIP ${error.language}: ${error.message}`, severity: 'error' });
+              scipErrors.push({
+                message: `SCIP ${error.language}: ${error.message}`,
+                severity: "error",
+              });
             }
           }
         }
@@ -891,26 +1211,30 @@ export class SolidKG {
           const unresolvedCount = this.queries.getUnresolvedReferencesCount();
 
           options.onProgress?.({
-            phase: 'resolving',
+            phase: "resolving",
             current: 0,
             total: unresolvedCount,
           });
 
           const resolutionStart = profile ? nowMs() : 0;
-          await this.resolveReferencesBatched((current, total) => {
-            options.onProgress?.({
-              phase: 'resolving',
-              current,
-              total,
-            });
-          }, (current, total) => {
-            options.onProgress?.({
-              phase: 'synthesis',
-              current,
-              total,
-            });
-          });
-          if (profile) profile.timingsMs.resolution += elapsedMs(resolutionStart);
+          await this.resolveReferencesBatched(
+            (current, total) => {
+              options.onProgress?.({
+                phase: "resolving",
+                current,
+                total,
+              });
+            },
+            (current, total) => {
+              options.onProgress?.({
+                phase: "synthesis",
+                current,
+                total,
+              });
+            },
+          );
+          if (profile)
+            profile.timingsMs.resolution += elapsedMs(resolutionStart);
         }
 
         // Refresh planner stats + checkpoint the WAL after bulk writes.
@@ -918,11 +1242,19 @@ export class SolidKG {
         if (astSucceeded && result.filesIndexed > 0) {
           const maintenanceStart = profile ? nowMs() : 0;
           this.db.runMaintenance();
-          if (profile) profile.timingsMs.maintenance += elapsedMs(maintenanceStart);
+          if (profile)
+            profile.timingsMs.maintenance += elapsedMs(maintenanceStart);
         }
 
         if (scipErrors.length > 0) {
-          return this.attachIndexProfile({ ...result, success: false, errors: [...result.errors, ...scipErrors] }, profile);
+          return this.attachIndexProfile(
+            {
+              ...result,
+              success: false,
+              errors: [...result.errors, ...scipErrors],
+            },
+            profile,
+          );
         }
 
         return this.attachIndexProfile(result, profile);
@@ -933,7 +1265,10 @@ export class SolidKG {
     });
   }
 
-  private attachIndexProfile(result: IndexResult, profile: MutableIndexProfile | undefined): IndexResult {
+  private attachIndexProfile(
+    result: IndexResult,
+    profile: MutableIndexProfile | undefined,
+  ): IndexResult {
     if (!profile) return result;
     const stats = this.getStats();
     const finishedAtMs = Date.now();
@@ -941,13 +1276,15 @@ export class SolidKG {
     profile.durationMs = Math.max(0, finishedAtMs - profile.startedAtMs);
     profile.timingsMs.total = elapsedMs(profile.markStartedAt);
     profile.counts = {
-      filesScanned: result.filesIndexed + result.filesSkipped + result.filesErrored,
+      filesScanned:
+        result.filesIndexed + result.filesSkipped + result.filesErrored,
       filesIndexed: result.filesIndexed,
       filesSkipped: result.filesSkipped,
       filesErrored: result.filesErrored,
       nodesCreated: result.nodesCreated,
       edgesCreated: result.edgesCreated,
-      unresolvedReferencesRemaining: this.queries.getUnresolvedReferencesCount(),
+      unresolvedReferencesRemaining:
+        this.queries.getUnresolvedReferencesCount(),
       semanticRelations: stats.hyperedgeCount ?? 0,
     };
     profile.dbStatements.byGroup = this.queries.getStatementCounts();
@@ -961,12 +1298,27 @@ export class SolidKG {
    * Uses a mutex to prevent concurrent indexing operations.
    */
   async indexFiles(filePaths: string[]): Promise<IndexResult> {
-    this.assertWritable('indexFiles');
+    this.assertWritable("indexFiles");
     return this.indexMutex.withLock(async () => {
       try {
         this.fileLock.acquire();
       } catch {
-        return { success: false, filesIndexed: 0, filesSkipped: 0, filesErrored: 0, nodesCreated: 0, edgesCreated: 0, errors: [{ message: 'Could not acquire file lock - another process may be indexing', severity: 'error' as const }], durationMs: 0 };
+        return {
+          success: false,
+          filesIndexed: 0,
+          filesSkipped: 0,
+          filesErrored: 0,
+          nodesCreated: 0,
+          edgesCreated: 0,
+          errors: [
+            {
+              message:
+                "Could not acquire file lock - another process may be indexing",
+              severity: "error" as const,
+            },
+          ],
+          durationMs: 0,
+        };
       }
       try {
         const result = await this.orchestrator.indexFiles(filePaths);
@@ -975,8 +1327,13 @@ export class SolidKG {
           this.rebuildResolver();
           this.initializeResolver();
           const unresolvedRefsByKey = new Map<string, UnresolvedReference>();
-          for (const ref of this.queries.getUnresolvedReferencesByFiles(filePaths)) {
-            unresolvedRefsByKey.set(`${ref.id ?? ''}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`, ref);
+          for (const ref of this.queries.getUnresolvedReferencesByFiles(
+            filePaths,
+          )) {
+            unresolvedRefsByKey.set(
+              `${ref.id ?? ""}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`,
+              ref,
+            );
           }
           const indexedNames = new Set<string>();
           for (const filePath of filePaths) {
@@ -986,12 +1343,19 @@ export class SolidKG {
           }
           for (const name of indexedNames) {
             for (const ref of this.queries.getUnresolvedByName(name)) {
-              unresolvedRefsByKey.set(`${ref.id ?? ''}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`, ref);
+              unresolvedRefsByKey.set(
+                `${ref.id ?? ""}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`,
+                ref,
+              );
             }
           }
           const unresolvedRefs = Array.from(unresolvedRefsByKey.values());
           if (unresolvedRefs.length > 0) {
-            this.resolver.resolveAndPersist(unresolvedRefs, undefined, filePaths);
+            this.resolver.resolveAndPersist(
+              unresolvedRefs,
+              undefined,
+              filePaths,
+            );
           }
           this.db.runMaintenance();
         }
@@ -1008,26 +1372,43 @@ export class SolidKG {
    * Uses a mutex to prevent concurrent indexing operations.
    */
   async sync(options: IndexOptions = {}): Promise<SyncResult> {
-    this.assertWritable('sync');
+    this.assertWritable("sync");
     return this.indexMutex.withLock(async () => {
       try {
         this.fileLock.acquire();
       } catch (error) {
-        const detail = error instanceof Error ? `: ${error.message}` : '';
-        throw new Error(`Could not acquire file lock - another process may be indexing${detail}`);
+        const detail = error instanceof Error ? `: ${error.message}` : "";
+        throw new Error(
+          `Could not acquire file lock - another process may be indexing${detail}`,
+        );
       }
       try {
         const requestedSourceOptions = sourceOptionsFrom(options);
         if (hasSourceOptionOverride(requestedSourceOptions)) {
-          this.sourceOptions = mergeSourceOptions(this.sourceOptions, requestedSourceOptions);
-          this.orchestrator = new ExtractionOrchestrator(this.projectRoot, this.queries, this.sourceOptions);
+          this.sourceOptions = mergeSourceOptions(
+            this.sourceOptions,
+            requestedSourceOptions,
+          );
+          this.orchestrator = new ExtractionOrchestrator(
+            this.projectRoot,
+            this.queries,
+            this.sourceOptions,
+          );
           this.rebuildResolver();
-          this.contextBuilder = createContextBuilder(this.projectRoot, this.queries, this.traverser, this.sourceOptions);
+          this.contextBuilder = createContextBuilder(
+            this.projectRoot,
+            this.queries,
+            this.traverser,
+            this.sourceOptions,
+          );
           this.persistSourceOptions();
         }
         const result = await this.orchestrator.sync(options.onProgress);
 
-        if ((result.filesAdded > 0 || result.filesModified > 0) && result.changedFilePaths) {
+        if (
+          (result.filesAdded > 0 || result.filesModified > 0) &&
+          result.changedFilePaths
+        ) {
           this.refreshSourceChunksForFiles(result.changedFilePaths);
         }
 
@@ -1038,8 +1419,13 @@ export class SolidKG {
           if (result.changedFilePaths) {
             // Scope resolution to changed files (git fast path — bounded set)
             const unresolvedRefsByKey = new Map<string, UnresolvedReference>();
-            for (const ref of this.queries.getUnresolvedReferencesByFiles(result.changedFilePaths)) {
-              unresolvedRefsByKey.set(`${ref.id ?? ''}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`, ref);
+            for (const ref of this.queries.getUnresolvedReferencesByFiles(
+              result.changedFilePaths,
+            )) {
+              unresolvedRefsByKey.set(
+                `${ref.id ?? ""}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`,
+                ref,
+              );
             }
             const changedNames = new Set<string>();
             for (const filePath of result.changedFilePaths) {
@@ -1049,58 +1435,73 @@ export class SolidKG {
             }
             for (const name of changedNames) {
               for (const ref of this.queries.getUnresolvedByName(name)) {
-                unresolvedRefsByKey.set(`${ref.id ?? ''}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`, ref);
+                unresolvedRefsByKey.set(
+                  `${ref.id ?? ""}:${ref.fromNodeId}:${ref.referenceName}:${ref.referenceKind}:${ref.line}:${ref.column}`,
+                  ref,
+                );
               }
             }
             const unresolvedRefs = Array.from(unresolvedRefsByKey.values());
 
             options.onProgress?.({
-              phase: 'resolving',
+              phase: "resolving",
               current: 0,
               total: unresolvedRefs.length,
             });
 
-            this.resolver.resolveAndPersist(unresolvedRefs, (current, total) => {
-              options.onProgress?.({
-                phase: 'resolving',
-                current,
-                total,
-              });
-            }, result.changedFilePaths, (current, total) => {
-              options.onProgress?.({
-                phase: 'synthesis',
-                current,
-                total,
-              });
-            });
+            this.resolver.resolveAndPersist(
+              unresolvedRefs,
+              (current, total) => {
+                options.onProgress?.({
+                  phase: "resolving",
+                  current,
+                  total,
+                });
+              },
+              result.changedFilePaths,
+              (current, total) => {
+                options.onProgress?.({
+                  phase: "synthesis",
+                  current,
+                  total,
+                });
+              },
+            );
           } else {
             // No git info — use batched resolution to avoid OOM
             const unresolvedCount = this.queries.getUnresolvedReferencesCount();
 
             options.onProgress?.({
-              phase: 'resolving',
+              phase: "resolving",
               current: 0,
               total: unresolvedCount,
             });
 
-            await this.resolveReferencesBatched((current, total) => {
-              options.onProgress?.({
-                phase: 'resolving',
-                current,
-                total,
-              });
-            }, (current, total) => {
-              options.onProgress?.({
-                phase: 'synthesis',
-                current,
-                total,
-              });
-            });
+            await this.resolveReferencesBatched(
+              (current, total) => {
+                options.onProgress?.({
+                  phase: "resolving",
+                  current,
+                  total,
+                });
+              },
+              (current, total) => {
+                options.onProgress?.({
+                  phase: "synthesis",
+                  current,
+                  total,
+                });
+              },
+            );
           }
         }
 
         // Refresh planner stats + checkpoint the WAL after bulk writes.
-        if (result.filesAdded > 0 || result.filesModified > 0 || result.filesRemoved > 0) {
+        if (
+          result.filesAdded > 0 ||
+          result.filesModified > 0 ||
+          result.filesRemoved > 0
+        ) {
           this.db.runMaintenance();
         }
 
@@ -1132,17 +1533,18 @@ export class SolidKG {
    * @returns true if watching started successfully
    */
   watch(options: WatchOptions = {}): boolean {
-    this.assertWritable('watch');
+    this.assertWritable("watch");
     if (this.watcher?.isActive()) return true;
 
     this.watcher = new FileWatcher(
       this.projectRoot,
       async () => {
         const result = await this.sync();
-        const filesChanged = result.filesAdded + result.filesModified + result.filesRemoved;
+        const filesChanged =
+          result.filesAdded + result.filesModified + result.filesRemoved;
         return { filesChanged, durationMs: result.durationMs };
       },
-      options
+      options,
     );
 
     return this.watcher.start();
@@ -1195,13 +1597,19 @@ export class SolidKG {
    * `getPendingFiles()`. Resolves immediately when no watcher is active.
    */
   waitUntilWatcherReady(timeoutMs?: number): Promise<void> {
-    return this.watcher ? this.watcher.waitUntilReady(timeoutMs) : Promise.resolve();
+    return this.watcher
+      ? this.watcher.waitUntilReady(timeoutMs)
+      : Promise.resolve();
   }
 
   /**
    * Get files that have changed since last index
    */
-  getChangedFiles(): { added: string[]; modified: string[]; removed: string[] } {
+  getChangedFiles(): {
+    added: string[];
+    modified: string[];
+    removed: string[];
+  } {
     return this.orchestrator.getChangedFiles();
   }
 
@@ -1225,8 +1633,10 @@ export class SolidKG {
    * - Import-based resolution
    * - Name-based symbol matching
    */
-  resolveReferences(onProgress?: (current: number, total: number) => void): ResolutionResult {
-    this.assertWritable('resolveReferences');
+  resolveReferences(
+    onProgress?: (current: number, total: number) => void,
+  ): ResolutionResult {
+    this.assertWritable("resolveReferences");
     this.initializeResolver();
     // Get all unresolved references from the database
     const unresolvedRefs = this.queries.getUnresolvedReferences();
@@ -1239,11 +1649,15 @@ export class SolidKG {
    */
   async resolveReferencesBatched(
     onProgress?: (current: number, total: number) => void,
-    onSynthesisProgress?: (current: number, total: number) => void
+    onSynthesisProgress?: (current: number, total: number) => void,
   ): Promise<ResolutionResult> {
-    this.assertWritable('resolveReferencesBatched');
+    this.assertWritable("resolveReferencesBatched");
     this.initializeResolver();
-    return this.resolver.resolveAndPersistBatched(onProgress, undefined, onSynthesisProgress);
+    return this.resolver.resolveAndPersistBatched(
+      onProgress,
+      undefined,
+      onSynthesisProgress,
+    );
   }
 
   /**
@@ -1255,7 +1669,7 @@ export class SolidKG {
   }
 
   async importScipIndexes(indexFiles: string[]): Promise<ScipImportStats> {
-    this.assertWritable('importScipIndexes');
+    this.assertWritable("importScipIndexes");
     await importScipIndexesIntoDb(this.queries, {
       projectRoot: this.projectRoot,
       indexFiles,
@@ -1264,30 +1678,38 @@ export class SolidKG {
     return this.queries.getScipStats();
   }
 
-  async generateScipIndexes(options: {
-    mode?: ScipMode;
-    indexers?: Record<string, ScipIndexerConfig>;
-    languages?: string[];
-    outputDir?: string;
-  } = {}) {
-    this.assertWritable('generateScipIndexes');
+  async generateScipIndexes(
+    options: {
+      mode?: ScipMode;
+      indexers?: Record<string, ScipIndexerConfig>;
+      languages?: string[];
+      outputDir?: string;
+    } = {},
+  ) {
+    this.assertWritable("generateScipIndexes");
     return generateScipIndexes(this.queries, {
       projectRoot: this.projectRoot,
       mode: options.mode,
       indexers: options.indexers,
       languages: options.languages,
-      outputDir: options.outputDir ?? path.join(this.dataDir, 'scip'),
+      outputDir: options.outputDir ?? path.join(this.dataDir, "scip"),
       storageRoot: this.dataDir,
     });
   }
 
-  getPreciseRefs(nodeId: string, limit?: number): Array<ScipOccurrenceRecord & { document: ScipDocumentRecord }> {
+  getPreciseRefs(
+    nodeId: string,
+    limit?: number,
+  ): Array<ScipOccurrenceRecord & { document: ScipDocumentRecord }> {
     const symbol = this.queries.getNodeById(nodeId)?.scipSymbol;
     if (!symbol) return [];
     return this.queries.getScipOccurrencesWithDocuments(symbol, limit);
   }
 
-  getPreciseRefsForSymbol(symbol: string, limit?: number): Array<{
+  getPreciseRefsForSymbol(
+    symbol: string,
+    limit?: number,
+  ): Array<{
     symbol: ScipSymbolRecord;
     node?: Node;
     occurrences: Array<ScipOccurrenceRecord & { document: ScipDocumentRecord }>;
@@ -1306,17 +1728,27 @@ export class SolidKG {
     }
 
     return [...symbols.values()].map((scipSymbol) => {
-      const node = this.queries.getNodeByScipSymbol(scipSymbol.symbol) ?? undefined;
+      const node =
+        this.queries.getNodeByScipSymbol(scipSymbol.symbol) ?? undefined;
       return {
         symbol: scipSymbol,
         node,
-        occurrences: this.queries.getScipOccurrencesWithDocuments(scipSymbol.symbol, limit),
-        relationships: this.queries.getScipRelationshipsForSymbol(scipSymbol.symbol, limit),
+        occurrences: this.queries.getScipOccurrencesWithDocuments(
+          scipSymbol.symbol,
+          limit,
+        ),
+        relationships: this.queries.getScipRelationshipsForSymbol(
+          scipSymbol.symbol,
+          limit,
+        ),
       };
     });
   }
 
-  findPreciseSymbols(symbol: string, limit = 10): Array<{ symbol: ScipSymbolRecord; node?: Node }> {
+  findPreciseSymbols(
+    symbol: string,
+    limit = 10,
+  ): Array<{ symbol: ScipSymbolRecord; node?: Node }> {
     const symbols = new Map<string, ScipSymbolRecord>();
     const exact = this.queries.getScipSymbol(symbol);
     if (exact) symbols.set(exact.symbol, exact);
@@ -1336,8 +1768,8 @@ export class SolidKG {
 
   getPreciseOccurrencesForSymbol(
     symbol: string,
-    role: 'definition' | 'reference',
-    limit?: number
+    role: "definition" | "reference",
+    limit?: number,
   ): Array<ScipOccurrenceRecord & { document: ScipDocumentRecord }> {
     return this.queries.getScipOccurrencesWithDocuments(symbol, limit, role);
   }
@@ -1345,7 +1777,7 @@ export class SolidKG {
   getPreciseRelationshipsForSymbol(
     symbol: string,
     limit?: number,
-    kind?: 'implementation' | 'typeDefinition'
+    kind?: "implementation" | "typeDefinition",
   ): ScipRelationshipRecord[] {
     return this.queries.getScipRelationshipsForSymbol(symbol, limit, kind);
   }
@@ -1354,7 +1786,7 @@ export class SolidKG {
    * Re-initialize the resolver (useful after adding new files)
    */
   reinitializeResolver(): void {
-    this.assertWritable('reinitializeResolver');
+    this.assertWritable("reinitializeResolver");
     this.initializeResolver();
   }
 
@@ -1371,11 +1803,15 @@ export class SolidKG {
     return stats;
   }
 
-  getCapabilityAssertionsByNodeIds(nodeIds: readonly string[]): CapabilityAssertion[] {
+  getCapabilityAssertionsByNodeIds(
+    nodeIds: readonly string[],
+  ): CapabilityAssertion[] {
     return this.queries.getCapabilityAssertionsByNodeIds(nodeIds);
   }
 
-  getCapabilityAnalysisRuns(filePaths?: readonly string[]): CapabilityAnalysisRun[] {
+  getCapabilityAnalysisRuns(
+    filePaths?: readonly string[],
+  ): CapabilityAnalysisRun[] {
     return this.queries.getCapabilityAnalysisRuns(filePaths);
   }
 
@@ -1384,7 +1820,7 @@ export class SolidKG {
    * built-in real-SQLite module). Surfaced via `solidkg status` and the
    * `solidkg_status` MCP tool alongside the effective journal mode.
    */
-  getBackend(): import('./db').SqliteBackend {
+  getBackend(): import("./db").SqliteBackend {
     return this.db.getBackend();
   }
 
@@ -1419,7 +1855,7 @@ export class SolidKG {
   /**
    * Get all nodes of a specific kind
    */
-  getNodesByKind(kind: Node['kind']): Node[] {
+  getNodesByKind(kind: Node["kind"]): Node[] {
     return this.queries.getNodesByKind(kind);
   }
 
@@ -1430,7 +1866,10 @@ export class SolidKG {
     return this.queries.searchNodes(query, options);
   }
 
-  searchSourceChunks(query: string, options?: SourceChunkSearchOptions): SourceChunkSearchResult[] {
+  searchSourceChunks(
+    query: string,
+    options?: SourceChunkSearchOptions,
+  ): SourceChunkSearchResult[] {
     return this.queries.searchSourceChunks(query, options);
   }
 
@@ -1468,7 +1907,10 @@ export class SolidKG {
     return this.queries.getHyperedgesByNode(nodeId);
   }
 
-  findHyperedgesBetweenNodes(nodeIds: string[], kinds?: HyperedgeKind[]): HyperedgeRelation[] {
+  findHyperedgesBetweenNodes(
+    nodeIds: string[],
+    kinds?: HyperedgeKind[],
+  ): HyperedgeRelation[] {
     return this.queries.findHyperedgesBetweenNodes(nodeIds, kinds);
   }
 
@@ -1491,20 +1933,29 @@ export class SolidKG {
   }
 
   getOverviewTree(options: OverviewTreeOptions = {}): OverviewTree {
-    const architecture = options.includeMetadata === false ? undefined : this.queries.getArchitectureReport() ?? undefined;
-    return buildOverviewTree({
-      files: this.queries.getAllFiles(),
-      nodes: this.queries.getAllNodes(),
-      architectureAssignments: architecture?.fileAssignments,
-    }, options);
+    const architecture =
+      options.includeMetadata === false
+        ? undefined
+        : (this.queries.getArchitectureReport() ?? undefined);
+    return buildOverviewTree(
+      {
+        files: this.queries.getAllFiles(),
+        nodes: this.queries.getAllNodes(),
+        architectureAssignments: architecture?.fileAssignments,
+      },
+      options,
+    );
   }
 
   getOverviewText(options: OverviewTreeOptions = {}): string {
     return formatOverviewTree(this.getOverviewTree(options), options);
   }
 
-  async createSnapshot(label: string, input: SnapshotMetadataInput = {}): Promise<SnapshotMetadata> {
-    this.assertWritable('createSnapshot');
+  async createSnapshot(
+    label: string,
+    input: SnapshotMetadataInput = {},
+  ): Promise<SnapshotMetadata> {
+    this.assertWritable("createSnapshot");
     const graph = this.captureSnapshotGraph();
     const metadata: SnapshotMetadata = {
       label,
@@ -1525,7 +1976,7 @@ export class SolidKG {
   }
 
   async deleteSnapshot(label: string): Promise<boolean> {
-    this.assertWritable('deleteSnapshot');
+    this.assertWritable("deleteSnapshot");
     return this.queries.deleteSnapshot(label);
   }
 
@@ -1533,10 +1984,22 @@ export class SolidKG {
     const snapshot = this.queries.getSnapshot(label);
     if (!snapshot) throw new Error(`Snapshot "${label}" not found`);
     const current = this.captureSnapshotGraph();
-    const nodes = diffRecords(snapshot.graph.nodes, current.nodes, (node) => node.id);
+    const nodes = diffRecords(
+      snapshot.graph.nodes,
+      current.nodes,
+      (node) => node.id,
+    );
     const edges = diffRecords(snapshot.graph.edges, current.edges, edgeKey);
-    const hyperedges = diffRecords(snapshot.graph.hyperedges, current.hyperedges, (hyperedge) => hyperedge.id);
-    const members = diffRecords(snapshot.graph.hyperedgeMembers, current.hyperedgeMembers, memberKey);
+    const hyperedges = diffRecords(
+      snapshot.graph.hyperedges,
+      current.hyperedges,
+      (hyperedge) => hyperedge.id,
+    );
+    const members = diffRecords(
+      snapshot.graph.hyperedgeMembers,
+      current.hyperedgeMembers,
+      memberKey,
+    );
     return {
       addedNodes: nodes.added,
       removedNodes: nodes.removed,
@@ -1553,15 +2016,22 @@ export class SolidKG {
     };
   }
 
-  analyzeArchitecture(options: AnalyzeArchitectureOptions = {}): ArchitectureReport {
-    this.assertWritable('analyzeArchitecture');
-    const files = this.queries.getAllFiles().filter((file) => !file.path.endsWith('/package.json'));
+  analyzeArchitecture(
+    options: AnalyzeArchitectureOptions = {},
+  ): ArchitectureReport {
+    this.assertWritable("analyzeArchitecture");
+    const files = this.queries
+      .getAllFiles()
+      .filter((file) => !file.path.endsWith("/package.json"));
     const nodes = this.queries.getAllNodes();
     const nodesById = new Map(nodes.map((node) => [node.id, node]));
     const assignments = new Map<string, ArchitectureFileAssignment>();
 
     for (const file of files) {
-      assignments.set(file.path, this.assignArchitectureFile(file.path, options.layers ?? []));
+      assignments.set(
+        file.path,
+        this.assignArchitectureFile(file.path, options.layers ?? []),
+      );
     }
 
     const packageDependencies = new Map<string, Set<EdgeKind>>();
@@ -1576,14 +2046,26 @@ export class SolidKG {
       if (!source || !target) continue;
 
       if (source.packageName !== target.packageName) {
-        this.addDependencyKind(packageDependencies, source.packageName, target.packageName, edge.kind);
+        this.addDependencyKind(
+          packageDependencies,
+          source.packageName,
+          target.packageName,
+          edge.kind,
+        );
       }
       if (source.layerName !== target.layerName) {
-        this.addDependencyKind(layerDependencies, source.layerName, target.layerName, edge.kind);
+        this.addDependencyKind(
+          layerDependencies,
+          source.layerName,
+          target.layerName,
+          edge.kind,
+        );
       }
     }
 
-    const fileAssignments = [...assignments.values()].sort((a, b) => a.filePath.localeCompare(b.filePath));
+    const fileAssignments = [...assignments.values()].sort((a, b) =>
+      a.filePath.localeCompare(b.filePath),
+    );
     const packages = this.buildPackages(fileAssignments);
     const layers = this.buildLayers(fileAssignments, options.layers ?? []);
     const packageDependencyList = this.dependencyMapToList(packageDependencies);
@@ -1595,8 +2077,14 @@ export class SolidKG {
       packageDependencies: packageDependencyList,
       layerDependencies: layerDependencyList,
       coupling: {
-        packages: couplingFromDependencies(packages.map((pkg) => pkg.name), packageDependencyList),
-        layers: couplingFromDependencies(layers.map((layer) => layer.name), layerDependencyList),
+        packages: couplingFromDependencies(
+          packages.map((pkg) => pkg.name),
+          packageDependencyList,
+        ),
+        layers: couplingFromDependencies(
+          layers.map((layer) => layer.name),
+          layerDependencyList,
+        ),
       },
     };
     this.queries.saveArchitectureReport(report);
@@ -1615,32 +2103,68 @@ export class SolidKG {
     const report = this.getArchitecture();
     const normalized = normalizePath(nameOrPath);
     const exactName = report.packages.find((pkg) => pkg.name === nameOrPath);
-    if (exactName) return { query: nameOrPath, kind: 'package', resolvedBy: 'name', package: exactName };
+    if (exactName)
+      return {
+        query: nameOrPath,
+        kind: "package",
+        resolvedBy: "name",
+        package: exactName,
+      };
     const exactRoot = report.packages.find((pkg) => pkg.root === normalized);
-    if (exactRoot) return { query: nameOrPath, kind: 'package', resolvedBy: 'root', package: exactRoot };
-    const pathLike = normalized.includes('/') || normalized.startsWith('@') || /\.[^/]+$/.test(normalized);
-    if (!pathLike) return { query: nameOrPath, kind: 'package', resolvedBy: 'not_found', package: null };
-    const matchingAssignments = report.fileAssignments.filter((assignment) => pathMatchesPrefix(assignment.filePath, normalized));
+    if (exactRoot)
+      return {
+        query: nameOrPath,
+        kind: "package",
+        resolvedBy: "root",
+        package: exactRoot,
+      };
+    const pathLike =
+      normalized.includes("/") ||
+      normalized.startsWith("@") ||
+      /\.[^/]+$/.test(normalized);
+    if (!pathLike)
+      return {
+        query: nameOrPath,
+        kind: "package",
+        resolvedBy: "not_found",
+        package: null,
+      };
+    const matchingAssignments = report.fileAssignments.filter((assignment) =>
+      pathMatchesPrefix(assignment.filePath, normalized),
+    );
     if (matchingAssignments.length === 0) {
-      return { query: nameOrPath, kind: 'path', resolvedBy: 'not_found', package: null, matchedPath: normalized, matchedFileCount: 0 };
+      return {
+        query: nameOrPath,
+        kind: "path",
+        resolvedBy: "not_found",
+        package: null,
+        matchedPath: normalized,
+        matchedFileCount: 0,
+      };
     }
     const assignmentPackageKeys = new Set(
-      matchingAssignments.map((assignment) => `${assignment.packageName}\0${assignment.packageRoot}`)
+      matchingAssignments.map(
+        (assignment) => `${assignment.packageName}\0${assignment.packageRoot}`,
+      ),
     );
     const containing = report.packages
       .filter((pkg) => assignmentPackageKeys.has(`${pkg.name}\0${pkg.root}`))
-      .sort((a, b) => (b.root === '.' ? 0 : b.root.length) - (a.root === '.' ? 0 : a.root.length));
+      .sort(
+        (a, b) =>
+          (b.root === "." ? 0 : b.root.length) -
+          (a.root === "." ? 0 : a.root.length),
+      );
     return {
       query: nameOrPath,
-      kind: 'path',
-      resolvedBy: containing[0] ? 'owning_package' : 'not_found',
+      kind: "path",
+      resolvedBy: containing[0] ? "owning_package" : "not_found",
       package: containing[0] ?? null,
       matchedPath: normalized,
       matchedFileCount: matchingAssignments.length,
     };
   }
 
-  getCoupling(): ArchitectureReport['coupling'] {
+  getCoupling(): ArchitectureReport["coupling"] {
     return this.getArchitecture().coupling;
   }
 
@@ -1649,8 +2173,13 @@ export class SolidKG {
     const hyperedgeRelations = this.queries.getAllHyperedgeRelations();
     return {
       nodes: nodes.map(snapshotNode).sort((a, b) => a.id.localeCompare(b.id)),
-      edges: this.queries.getAllEdges().map(snapshotEdge).sort((a, b) => edgeKey(a).localeCompare(edgeKey(b))),
-      hyperedges: hyperedgeRelations.map((relation) => snapshotHyperedge(relation.hyperedge)),
+      edges: this.queries
+        .getAllEdges()
+        .map(snapshotEdge)
+        .sort((a, b) => edgeKey(a).localeCompare(edgeKey(b))),
+      hyperedges: hyperedgeRelations.map((relation) =>
+        snapshotHyperedge(relation.hyperedge),
+      ),
       hyperedgeMembers: hyperedgeRelations
         .flatMap((relation) => relation.members.map(snapshotHyperedgeMember))
         .sort((a, b) => memberKey(a).localeCompare(memberKey(b))),
@@ -1668,59 +2197,100 @@ export class SolidKG {
     return [...edges.values()];
   }
 
-  private assignArchitectureFile(filePath: string, layerRules: ArchitectureLayerRule[]): ArchitectureFileAssignment {
+  private assignArchitectureFile(
+    filePath: string,
+    layerRules: ArchitectureLayerRule[],
+  ): ArchitectureFileAssignment {
     const packageInfo = this.findPackageForFile(filePath);
-    const layerRule = layerRules.find((rule) => rule.paths.some((pattern) => matchesLayerPath(filePath, pattern)));
+    const layerRule = layerRules.find((rule) =>
+      rule.paths.some((pattern) => matchesLayerPath(filePath, pattern)),
+    );
     return {
       filePath,
       packageName: packageInfo.name,
       packageRoot: packageInfo.root,
       packageProvenance: packageInfo.provenance,
-      layerName: layerRule?.name ?? 'unassigned',
-      layerProvenance: layerRule ? 'config_layer' : 'unassigned',
+      layerName: layerRule?.name ?? "unassigned",
+      layerProvenance: layerRule ? "config_layer" : "unassigned",
     };
   }
 
-  private findPackageForFile(filePath: string): { name: string; root: string; provenance: 'manifest' | 'root' } {
+  private findPackageForFile(filePath: string): {
+    name: string;
+    root: string;
+    provenance: "manifest" | "root";
+  } {
     let dir: string | null = directoryOf(filePath);
     while (dir !== null) {
-      const manifestPath = path.join(this.projectRoot, dir === '.' ? '' : dir, 'package.json');
+      const manifestPath = path.join(
+        this.projectRoot,
+        dir === "." ? "" : dir,
+        "package.json",
+      );
       if (existsSync(manifestPath)) {
-        return { name: this.packageNameFromManifest(manifestPath, dir), root: dir, provenance: 'manifest' };
+        return {
+          name: this.packageNameFromManifest(manifestPath, dir),
+          root: dir,
+          provenance: "manifest",
+        };
       }
       dir = parentDir(dir);
     }
-    return { name: path.basename(this.projectRoot), root: '.', provenance: 'root' };
+    return {
+      name: path.basename(this.projectRoot),
+      root: ".",
+      provenance: "root",
+    };
   }
 
   private packageNameFromManifest(manifestPath: string, root: string): string {
-    const fallback = root === '.' ? path.basename(this.projectRoot) : path.basename(root);
+    const fallback =
+      root === "." ? path.basename(this.projectRoot) : path.basename(root);
     try {
-      const parsed = JSON.parse(readFileSync(manifestPath, 'utf-8')) as { name?: unknown };
-      if (typeof parsed.name === 'string' && parsed.name.length > 0) return parsed.name;
+      const parsed = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
+        name?: unknown;
+      };
+      if (typeof parsed.name === "string" && parsed.name.length > 0)
+        return parsed.name;
     } catch {
       return fallback;
     }
     return fallback;
   }
 
-  private addDependencyKind(map: Map<string, Set<EdgeKind>>, source: string, target: string, kind: EdgeKind): void {
+  private addDependencyKind(
+    map: Map<string, Set<EdgeKind>>,
+    source: string,
+    target: string,
+    kind: EdgeKind,
+  ): void {
     const key = `${source}\0${target}`;
     const kinds = map.get(key) ?? new Set<EdgeKind>();
     kinds.add(kind);
     map.set(key, kinds);
   }
 
-  private dependencyMapToList(map: Map<string, Set<EdgeKind>>): ArchitectureDependency[] {
+  private dependencyMapToList(
+    map: Map<string, Set<EdgeKind>>,
+  ): ArchitectureDependency[] {
     return [...map.entries()]
       .map(([key, kinds]) => {
-        const [source, target] = key.split('\0');
-        return { source: source!, target: target!, edgeKinds: [...kinds].sort() };
+        const [source, target] = key.split("\0");
+        return {
+          source: source!,
+          target: target!,
+          edgeKinds: [...kinds].sort(),
+        };
       })
-      .sort((a, b) => a.source.localeCompare(b.source) || a.target.localeCompare(b.target));
+      .sort(
+        (a, b) =>
+          a.source.localeCompare(b.source) || a.target.localeCompare(b.target),
+      );
   }
 
-  private buildPackages(assignments: ArchitectureFileAssignment[]): ArchitecturePackage[] {
+  private buildPackages(
+    assignments: ArchitectureFileAssignment[],
+  ): ArchitecturePackage[] {
     const byName = new Map<string, ArchitecturePackage>();
     for (const assignment of assignments) {
       const existing = byName.get(assignment.packageName);
@@ -1729,7 +2299,8 @@ export class SolidKG {
         byName.set(assignment.packageName, {
           name: assignment.packageName,
           root: assignment.packageRoot,
-          provenance: assignment.packageProvenance === 'manifest' ? 'manifest' : 'root',
+          provenance:
+            assignment.packageProvenance === "manifest" ? "manifest" : "root",
           fileCount: 1,
         });
       }
@@ -1737,10 +2308,17 @@ export class SolidKG {
     return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  private buildLayers(assignments: ArchitectureFileAssignment[], rules: ArchitectureLayerRule[]): ArchitectureLayer[] {
+  private buildLayers(
+    assignments: ArchitectureFileAssignment[],
+    rules: ArchitectureLayerRule[],
+  ): ArchitectureLayer[] {
     const byName = new Map<string, ArchitectureLayer>();
     for (const rule of rules) {
-      byName.set(rule.name, { name: rule.name, provenance: 'config_layer', fileCount: 0 });
+      byName.set(rule.name, {
+        name: rule.name,
+        provenance: "config_layer",
+        fileCount: 0,
+      });
     }
     for (const assignment of assignments) {
       const existing = byName.get(assignment.layerName);
@@ -1754,7 +2332,7 @@ export class SolidKG {
       }
     }
     return [...byName.values()]
-      .filter((layer) => layer.fileCount > 0 || layer.name !== 'unassigned')
+      .filter((layer) => layer.fileCount > 0 || layer.name !== "unassigned")
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -1837,11 +2415,17 @@ export class SolidKG {
    * @param maxDepth - Maximum depth to traverse (default: 1)
    * @returns Array of nodes that call this function
    */
-  getCallers(nodeId: string, maxDepth: number = 1): Array<{ node: Node; edge: Edge }> {
+  getCallers(
+    nodeId: string,
+    maxDepth: number = 1,
+  ): Array<{ node: Node; edge: Edge }> {
     return this.traverser.getCallers(nodeId, maxDepth);
   }
 
-  getCallersDetailed(nodeId: string, maxDepth: number = 1): RelatedNodeTraversalResult {
+  getCallersDetailed(
+    nodeId: string,
+    maxDepth: number = 1,
+  ): RelatedNodeTraversalResult {
     return this.traverser.getCallersDetailed(nodeId, maxDepth);
   }
 
@@ -1852,11 +2436,17 @@ export class SolidKG {
    * @param maxDepth - Maximum depth to traverse (default: 1)
    * @returns Array of nodes called by this function
    */
-  getCallees(nodeId: string, maxDepth: number = 1): Array<{ node: Node; edge: Edge }> {
+  getCallees(
+    nodeId: string,
+    maxDepth: number = 1,
+  ): Array<{ node: Node; edge: Edge }> {
     return this.traverser.getCallees(nodeId, maxDepth);
   }
 
-  getCalleesDetailed(nodeId: string, maxDepth: number = 1): RelatedNodeTraversalResult {
+  getCalleesDetailed(
+    nodeId: string,
+    maxDepth: number = 1,
+  ): RelatedNodeTraversalResult {
     return this.traverser.getCalleesDetailed(nodeId, maxDepth);
   }
 
@@ -1873,7 +2463,10 @@ export class SolidKG {
     return this.traverser.getImpactRadius(nodeId, maxDepth);
   }
 
-  getImpactTraversal(nodeId: string, maxDepth: number = 3): GraphTraversalResult {
+  getImpactTraversal(
+    nodeId: string,
+    maxDepth: number = 3,
+  ): GraphTraversalResult {
     return this.traverser.getImpactTraversal(nodeId, maxDepth);
   }
 
@@ -1888,7 +2481,7 @@ export class SolidKG {
   findPath(
     fromId: string,
     toId: string,
-    edgeKinds?: Edge['kind'][]
+    edgeKinds?: Edge["kind"][],
   ): Array<{ node: Node; edge: Edge | null }> | null {
     return this.traverser.findPath(fromId, toId, edgeKinds);
   }
@@ -1948,7 +2541,7 @@ export class SolidKG {
    * @param kinds - Node kinds to check (default: functions, methods, classes)
    * @returns Array of unreferenced nodes
    */
-  findDeadCode(kinds?: Node['kind'][]): Node[] {
+  findDeadCode(kinds?: Node["kind"][]): Node[] {
     return this.graphManager.findDeadCode(kinds);
   }
 
@@ -1997,7 +2590,7 @@ export class SolidKG {
    */
   async findRelevantContext(
     query: string,
-    options?: FindRelevantContextOptions
+    options?: FindRelevantContextOptions,
   ): Promise<Subgraph> {
     return this.contextBuilder.findRelevantContext(query, options);
   }
@@ -2017,7 +2610,7 @@ export class SolidKG {
    */
   async buildContext(
     input: TaskInput,
-    options?: BuildContextOptions
+    options?: BuildContextOptions,
   ): Promise<TaskContext | string> {
     return this.contextBuilder.buildContext(input, options);
   }
@@ -2030,7 +2623,7 @@ export class SolidKG {
    * Optimize the database (vacuum and analyze)
    */
   optimize(): void {
-    this.assertWritable('optimize');
+    this.assertWritable("optimize");
     this.db.optimize();
   }
 
@@ -2038,7 +2631,7 @@ export class SolidKG {
    * Clear all data from the graph
    */
   clear(): void {
-    this.assertWritable('clear');
+    this.assertWritable("clear");
     this.queries.clear();
   }
 
@@ -2057,9 +2650,11 @@ export class SolidKG {
    * WARNING: This permanently deletes all SolidKG data for the project.
    */
   uninitialize(): void {
-    this.assertWritable('uninitialize');
+    this.assertWritable("uninitialize");
     this.close();
-    removeDirectory(this.projectRoot, { dataDir: this.explicitDataDir ? this.dataDir : undefined });
+    removeDirectory(this.projectRoot, {
+      dataDir: this.explicitDataDir ? this.dataDir : undefined,
+    });
   }
 }
 

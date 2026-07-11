@@ -4,9 +4,9 @@
  * Shared module for search term extraction and scoring.
  */
 
-import * as path from 'path';
-import { Node } from '../types';
-import { isGeneratedFile, isGeneratedFileQuery } from './path-classifiers';
+import * as path from "path";
+import { Node } from "../types";
+import { isGeneratedFile, isGeneratedFileQuery } from "./path-classifiers";
 
 /**
  * Common stop words to filter from search queries.
@@ -14,24 +14,122 @@ import { isGeneratedFile, isGeneratedFileQuery } from './path-classifiers';
  */
 export const STOP_WORDS = new Set([
   // English
-  'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-  'of', 'with', 'by', 'from', 'is', 'it', 'that', 'this', 'are', 'was',
-  'be', 'has', 'had', 'have', 'do', 'does', 'did', 'will', 'would', 'could',
-  'should', 'may', 'might', 'can', 'shall', 'not', 'no', 'all', 'each',
-  'every', 'how', 'what', 'where', 'when', 'who', 'which', 'why',
-  'i', 'me', 'my', 'we', 'our', 'you', 'your', 'he', 'she', 'they',
-  'show', 'give', 'tell',
-  'been', 'done', 'made', 'used', 'using', 'work', 'works', 'found',
-  'also', 'into', 'then', 'than', 'just', 'more', 'some', 'such',
-  'over', 'only', 'out', 'its', 'so', 'up', 'as', 'if',
-  'look', 'need', 'needs', 'want', 'happen', 'happens',
-  'affect', 'affected', 'break', 'breaks', 'failing',
-  'implemented', 'implement',
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "of",
+  "with",
+  "by",
+  "from",
+  "is",
+  "it",
+  "that",
+  "this",
+  "are",
+  "was",
+  "be",
+  "has",
+  "had",
+  "have",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "could",
+  "should",
+  "may",
+  "might",
+  "can",
+  "shall",
+  "not",
+  "no",
+  "all",
+  "each",
+  "every",
+  "how",
+  "what",
+  "where",
+  "when",
+  "who",
+  "which",
+  "why",
+  "i",
+  "me",
+  "my",
+  "we",
+  "our",
+  "you",
+  "your",
+  "he",
+  "she",
+  "they",
+  "show",
+  "give",
+  "tell",
+  "been",
+  "done",
+  "made",
+  "used",
+  "using",
+  "work",
+  "works",
+  "found",
+  "also",
+  "into",
+  "then",
+  "than",
+  "just",
+  "more",
+  "some",
+  "such",
+  "over",
+  "only",
+  "out",
+  "its",
+  "so",
+  "up",
+  "as",
+  "if",
+  "look",
+  "need",
+  "needs",
+  "want",
+  "happen",
+  "happens",
+  "affect",
+  "affected",
+  "break",
+  "breaks",
+  "failing",
+  "implemented",
+  "implement",
   // Code-specific noise (avoid filtering common symbol names like get/set/add/build/find/list)
-  'code', 'file', 'files', 'function', 'method', 'class', 'type',
-  'fix', 'bug', 'called',
-  'path', 'paths', 'solidkg',
-  'source', 'sources', 'snippet', 'snippets',
+  "code",
+  "file",
+  "files",
+  "function",
+  "method",
+  "class",
+  "type",
+  "fix",
+  "bug",
+  "called",
+  "path",
+  "paths",
+  "solidkg",
+  "source",
+  "sources",
+  "snippet",
+  "snippets",
 ]);
 
 /**
@@ -44,62 +142,95 @@ export function getStemVariants(term: string): string[] {
   const t = term.toLowerCase();
 
   // -ing: caching→cach/cache, handling→handl/handle, running→run
-  if (t.endsWith('ing') && t.length > 5) {
+  if (t.endsWith("ing") && t.length > 5) {
     const base = t.slice(0, -3);
     variants.add(base);
-    variants.add(base + 'e');
+    variants.add(base + "e");
     if (base.length >= 2 && base[base.length - 1] === base[base.length - 2]) {
       variants.add(base.slice(0, -1));
     }
   }
 
   // -tion/-sion: eviction→evict, expression→express
-  if ((t.endsWith('tion') || t.endsWith('sion')) && t.length > 5) {
+  if ((t.endsWith("tion") || t.endsWith("sion")) && t.length > 5) {
     variants.add(t.slice(0, -3));
   }
 
   // -ment: management→manage
-  if (t.endsWith('ment') && t.length > 6) {
+  if (t.endsWith("ment") && t.length > 6) {
     variants.add(t.slice(0, -4));
   }
 
   // -ies: entries→entry
-  if (t.endsWith('ies') && t.length > 4) {
-    variants.add(t.slice(0, -3) + 'y');
+  if (t.endsWith("ies") && t.length > 4) {
+    variants.add(t.slice(0, -3) + "y");
   }
   // -es: processes→process, classes→class
-  else if (t.endsWith('es') && t.length > 4) {
+  else if (t.endsWith("es") && t.length > 4) {
     variants.add(t.slice(0, -2));
   }
   // -s: errors→error (skip -ss endings like "class")
-  else if (t.endsWith('s') && !t.endsWith('ss') && t.length > 4) {
+  else if (t.endsWith("s") && !t.endsWith("ss") && t.length > 4) {
     variants.add(t.slice(0, -1));
   }
 
   // -ed: handled→handle, propagated→propagate, carried→carry
-  if (t.endsWith('ed') && !t.endsWith('eed') && t.length > 4) {
+  if (t.endsWith("ed") && !t.endsWith("eed") && t.length > 4) {
     variants.add(t.slice(0, -1));
     variants.add(t.slice(0, -2));
-    if (t.endsWith('ied') && t.length > 5) {
-      variants.add(t.slice(0, -3) + 'y');
+    if (t.endsWith("ied") && t.length > 5) {
+      variants.add(t.slice(0, -3) + "y");
     }
   }
 
   // -er: builder→build/builde, handler→handl/handle, getter→get
-  if (t.endsWith('er') && t.length > 4) {
+  if (t.endsWith("er") && t.length > 4) {
     const base = t.slice(0, -2);
     variants.add(base);
-    variants.add(base + 'e');
+    variants.add(base + "e");
     if (base.length >= 2 && base[base.length - 1] === base[base.length - 2]) {
       variants.add(base.slice(0, -1));
     }
   }
 
-  return [...variants].filter(v => v.length >= 3 && v !== t);
+  return [...variants].filter((v) => v.length >= 3 && v !== t);
 }
 
-const CODE_TOKEN_PATTERN = /@?[A-Za-z_$][A-Za-z0-9_$]*(?:(?:::|[._\/-])[A-Za-z0-9_$]+)*/g;
-const FTS_OPERATORS = new Set(['AND', 'OR', 'NOT', 'NEAR']);
+const CODE_TOKEN_PATTERN =
+  /@?[A-Za-z_$][A-Za-z0-9_$]*(?:(?:::|[._\/-])[A-Za-z0-9_$]+)*/g;
+const FTS_OPERATORS = new Set(["AND", "OR", "NOT", "NEAR"]);
+const RETRIEVAL_INTENT_TERMS = new Set([
+  "exclude",
+  "excluding",
+  "implementation",
+  "production",
+  "rather",
+  "without",
+]);
+const EXCLUSION_NOISE_TERMS = new Set(["api", "command"]);
+const NON_PRODUCTION_TERMS = new Set([
+  "benchmark",
+  "benchmarks",
+  "demo",
+  "demos",
+  "example",
+  "examples",
+  "fixture",
+  "fixtures",
+  "generated",
+  "sample",
+  "samples",
+  "spec",
+  "specs",
+  "test",
+  "tests",
+]);
+const EXPLICIT_EXCLUSION_CLAUSE_PATTERN =
+  /\b(?:excluding|exclude|rather\s+than)\b([^,.;?]*?)(?=\bbut\b|[,.;?]|$)/gi;
+const WITHOUT_SOURCE_EXCLUSION_PATTERN =
+  /\bwithout\b([^,.;?]*\b(?:tests?|specs?|fixtures?|generated|metadata|models?|examples?|samples?|benchmarks?|demos?|snapshots?)\b[^,.;?]*?)(?=\bbut\b|[,.;?]|$)/gi;
+const SOURCE_NOUN_EXCLUSION_PATTERN =
+  /\bnot\s+(?!only\b)((?:the\s+)?(?:api\s+)?(?:generated\s+)?(?:models?|metadata|tests?|specs?|examples?|samples?|fixtures?|benchmarks?|demos?)(?:\s+or\s+(?:its\s+)?(?:models?|metadata|tests?|specs?|examples?|samples?|fixtures?|benchmarks?|demos?))*)/gi;
 
 function addToken(tokens: Set<string>, token: string): void {
   const trimmed = token.trim();
@@ -107,7 +238,7 @@ function addToken(tokens: Set<string>, token: string): void {
 }
 
 function addSplitParts(tokens: Set<string>, token: string): void {
-  const withoutDecorator = token.startsWith('@') ? token.slice(1) : token;
+  const withoutDecorator = token.startsWith("@") ? token.slice(1) : token;
   addToken(tokens, withoutDecorator);
   addToken(tokens, withoutDecorator.toLowerCase());
 
@@ -121,8 +252,8 @@ function addSplitParts(tokens: Set<string>, token: string): void {
       addToken(tokens, segment.toLowerCase());
 
       const spaced = segment
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2");
       for (const part of spaced.split(/[^A-Za-z0-9]+/)) {
         addToken(tokens, part.toLowerCase());
       }
@@ -132,7 +263,7 @@ function addSplitParts(tokens: Set<string>, token: string): void {
 
 export function tokenizeCodeForSearch(source: string): string[] {
   const tokens = new Set<string>();
-  const normalized = source.replace(/\\/g, '/');
+  const normalized = source.replace(/\\/g, "/");
   for (const match of normalized.matchAll(CODE_TOKEN_PATTERN)) {
     const token = match[0];
     addToken(tokens, token);
@@ -142,18 +273,71 @@ export function tokenizeCodeForSearch(source: string): string[] {
 }
 
 export function buildSourceChunkCodeTokenText(source: string): string {
-  return tokenizeCodeForSearch(source).join(' ');
+  return tokenizeCodeForSearch(source).join(" ");
 }
 
 export function buildSourceChunkFtsQuery(query: string): string {
   return selectRetrievalSearchTerms(query)
     .map((term) => `"${term.replace(/"/g, '""')}"*`)
-    .join(' OR ');
+    .join(" OR ");
 }
 
-export function selectRetrievalSearchTerms(query: string, maxTerms = 6): string[] {
+function extractExclusionClauseTerms(query: string): string[] {
+  const terms = new Set<string>();
+  for (const pattern of [
+    EXPLICIT_EXCLUSION_CLAUSE_PATTERN,
+    WITHOUT_SOURCE_EXCLUSION_PATTERN,
+    SOURCE_NOUN_EXCLUSION_PATTERN,
+  ]) {
+    for (const match of query.matchAll(pattern)) {
+      for (const token of tokenizeCodeForSearch(match[1] ?? "")) {
+        const lower = token.toLowerCase();
+        if (
+          lower.length < 3 ||
+          STOP_WORDS.has(lower) ||
+          RETRIEVAL_INTENT_TERMS.has(lower)
+        )
+          continue;
+        terms.add(lower);
+      }
+    }
+  }
+  return [...terms];
+}
+
+export function extractExcludedRetrievalTerms(query: string): string[] {
+  return extractExclusionClauseTerms(query).filter(
+    (term) => !EXCLUSION_NOISE_TERMS.has(term),
+  );
+}
+
+export function isNonProductionQuery(query: string): boolean {
+  const positiveTerms = new Set(selectRetrievalSearchTerms(query, 100));
+  return [...NON_PRODUCTION_TERMS].some((term) => positiveTerms.has(term));
+}
+
+export function hasProductionRetrievalIntent(query: string): boolean {
+  if (/\bproduction\b/i.test(query)) return true;
+  return (
+    !isNonProductionQuery(query) &&
+    extractExcludedRetrievalTerms(query).some((term) =>
+      NON_PRODUCTION_TERMS.has(term),
+    )
+  );
+}
+
+export function selectRetrievalSearchTerms(
+  query: string,
+  maxTerms = 6,
+): string[] {
+  const excluded = new Set(extractExclusionClauseTerms(query));
+  const imperativeFind =
+    /^\s*find\b/i.test(query) &&
+    extractSearchTerms(query, { stems: false }).length > 1;
   return extractSearchTerms(query, { stems: false })
     .filter((term) => !FTS_OPERATORS.has(term.toUpperCase()))
+    .filter((term) => !RETRIEVAL_INTENT_TERMS.has(term) && !excluded.has(term))
+    .filter((term) => term !== "find" || !imperativeFind)
     .slice(0, maxTerms);
 }
 
@@ -169,7 +353,10 @@ export function selectRetrievalSearchTerms(query: string, maxTerms = 6): string[
  * Also generates stem variants (e.g., "caching"→"cache", "eviction"→"evict")
  * so FTS prefix matching can find related code symbols.
  */
-export function extractSearchTerms(query: string, options?: { stems?: boolean }): string[] {
+export function extractSearchTerms(
+  query: string,
+  options?: { stems?: boolean },
+): string[] {
   const includeStems = options?.stems !== false;
   const tokens = new Set<string>();
 
@@ -226,15 +413,27 @@ export function scorePathRelevance(filePath: string, query: string): number {
   }
 
   // Deprioritize test files unless the query is explicitly about tests
-  const queryLower = query.toLowerCase();
-  const isTestQuery = queryLower.includes('test') || queryLower.includes('spec');
+  const excludedTerms = extractExcludedRetrievalTerms(query);
+  const excluded = new Set(excludedTerms);
+  const productionIntent = hasProductionRetrievalIntent(query);
+  const isTestQuery = isNonProductionQuery(query);
   if (!isTestQuery && isTestFile(filePath)) {
     score -= 15;
   }
 
-  if (!isGeneratedFileQuery(query) && isGeneratedFile(filePath)) {
+  const generatedIntent =
+    !excluded.has("generated") && isGeneratedFileQuery(query);
+  if (!generatedIntent && isGeneratedFile(filePath)) {
     score -= 20;
   }
+
+  for (const term of excludedTerms) {
+    if (fileName.includes(term)) score -= 12;
+    else if (pathLower.includes(term)) score -= 6;
+  }
+
+  if (productionIntent && !isTestFile(filePath) && !isGeneratedFile(filePath))
+    score += 8;
 
   return score;
 }
@@ -244,13 +443,13 @@ export function scorePathRelevance(filePath: string, query: string): number {
  */
 export function isTestFile(filePath: string): boolean {
   const lower = filePath.toLowerCase();
-  const fileName = path.basename(filePath);   // original case — needed for camelCase boundaries
+  const fileName = path.basename(filePath); // original case — needed for camelCase boundaries
   const lowerName = fileName.toLowerCase();
 
   // --- Filename patterns ---
   if (
-    lowerName.startsWith('test_') ||                              // python: test_foo.py
-    lowerName.startsWith('test.') ||
+    lowerName.startsWith("test_") || // python: test_foo.py
+    lowerName.startsWith("test.") ||
     // separator-delimited: foo_test.go, foo.test.ts, foo-spec.rb, bar_spec.py
     /[._-](test|tests|spec|specs)\.[a-z0-9]+$/.test(lowerName) ||
     // CamelCase suffix (Java/Kotlin/Swift/C#/Scala): FooTest.kt, BarTests.swift,
@@ -263,12 +462,17 @@ export function isTestFile(filePath: string): boolean {
 
   // --- Directory patterns ---
   if (
-    lower.includes('/tests/') || lower.includes('/test/') ||
-    lower.includes('/__tests__/') || lower.includes('/spec/') ||
-    lower.includes('/specs/') || lower.includes('/testlib/') ||
-    lower.includes('/testing/') ||
-    lower.startsWith('test/') || lower.startsWith('tests/') ||
-    lower.startsWith('spec/') || lower.startsWith('specs/') ||
+    lower.includes("/tests/") ||
+    lower.includes("/test/") ||
+    lower.includes("/__tests__/") ||
+    lower.includes("/spec/") ||
+    lower.includes("/specs/") ||
+    lower.includes("/testlib/") ||
+    lower.includes("/testing/") ||
+    lower.startsWith("test/") ||
+    lower.startsWith("tests/") ||
+    lower.startsWith("spec/") ||
+    lower.startsWith("specs/") ||
     // CamelCase test source-set dirs (Kotlin Multiplatform / Gradle / Xcode):
     // jvmTest/, commonTest/, androidTest/, iosTest/, integrationTest/. Capital-led
     // so "latest/" / "manifest/" are not matched.
@@ -289,11 +493,23 @@ export function isTestFile(filePath: string): boolean {
  */
 function matchesNonProductionDir(lowerPath: string): boolean {
   const dirs = [
-    'integration', 'sample', 'samples', 'example', 'examples',
-    'fixture', 'fixtures', 'benchmark', 'benchmarks', 'demo', 'demos',
+    "integration",
+    "sample",
+    "samples",
+    "example",
+    "examples",
+    "fixture",
+    "fixtures",
+    "benchmark",
+    "benchmarks",
+    "demo",
+    "demos",
   ];
   for (const dir of dirs) {
-    if (lowerPath.includes('/' + dir + '/') || lowerPath.startsWith(dir + '/')) {
+    if (
+      lowerPath.includes("/" + dir + "/") ||
+      lowerPath.startsWith(dir + "/")
+    ) {
       return true;
     }
   }
@@ -310,16 +526,19 @@ export function nameMatchBonus(nodeName: string, query: string): number {
 
   // Split query into word-level terms (handles "CacheBuilder build" → ["cache","builder","build"])
   const rawTerms = query
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .split(/[\s_.\-]+/)
-    .map(t => t.toLowerCase())
-    .filter(t => t.length >= 2);
+    .map((t) => t.toLowerCase())
+    .filter((t) => t.length >= 2);
 
   // Also keep original space-separated tokens for exact-term matching
-  const queryTokens = query.split(/\s+/).map(t => t.toLowerCase()).filter(t => t.length >= 2);
+  const queryTokens = query
+    .split(/\s+/)
+    .map((t) => t.toLowerCase())
+    .filter((t) => t.length >= 2);
 
   // Full query as a single token (for compound identifiers like "CacheBuilder")
-  const queryLower = query.replace(/[\s]+/g, '').toLowerCase();
+  const queryLower = query.replace(/[\s]+/g, "").toLowerCase();
 
   // Exact match: query exactly equals the node name
   if (nameLower === queryLower) return 80;
@@ -336,7 +555,7 @@ export function nameMatchBonus(nodeName: string, query: string): number {
 
   // All camelCase-split terms appear in the name
   if (rawTerms.length > 1) {
-    const allMatch = rawTerms.every(t => nameLower.includes(t));
+    const allMatch = rawTerms.every((t) => nameLower.includes(t));
     if (allMatch) return 15;
   }
 
@@ -350,7 +569,7 @@ export function nameMatchBonus(nodeName: string, query: string): number {
  * Kind-based bonus for search ranking
  * Functions and classes are typically more relevant than variables/imports
  */
-export function kindBonus(kind: Node['kind']): number {
+export function kindBonus(kind: Node["kind"]): number {
   const bonuses: Record<string, number> = {
     function: 10,
     method: 10,

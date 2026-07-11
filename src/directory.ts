@@ -4,25 +4,25 @@
  * Manages the .solidkg/ directory structure for SolidKG data.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * SolidKG directory name
  */
-export const SOLIDKG_DIR = '.solidkg';
-const OWNERSHIP_MARKER = '.solidkg-owned';
+export const SOLIDKG_DIR = ".solidkg";
+const OWNERSHIP_MARKER = ".solidkg-owned";
 const KNOWN_SOLIDKG_FILES = new Set([
-  'solidkg.db',
-  'solidkg.db-wal',
-  'solidkg.db-shm',
-  'solidkg.lock',
-  'daemon.pid',
-  'daemon.log',
-  '.gitignore',
+  "solidkg.db",
+  "solidkg.db-wal",
+  "solidkg.db-shm",
+  "solidkg.lock",
+  "daemon.pid",
+  "daemon.log",
+  ".gitignore",
   OWNERSHIP_MARKER,
 ]);
-const KNOWN_SOLIDKG_DIRS = new Set(['scip']);
+const KNOWN_SOLIDKG_DIRS = new Set(["scip"]);
 
 export interface SolidKGDirectoryOptions {
   dataDir?: string;
@@ -40,21 +40,29 @@ const SOLIDKG_GITIGNORE_CONTENT = `# SolidKG local data directory
 /**
  * Get the .solidkg directory path for a project
  */
-export function getSolidKGDir(projectRoot: string, options: SolidKGDirectoryOptions = {}): string {
-  return options.dataDir ? path.resolve(options.dataDir) : path.join(projectRoot, SOLIDKG_DIR);
+export function getSolidKGDir(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): string {
+  return options.dataDir
+    ? path.resolve(options.dataDir)
+    : path.join(projectRoot, SOLIDKG_DIR);
 }
 
 /**
  * Check if a project has been initialized with SolidKG
  * Requires both .solidkg/ directory AND solidkg.db to exist
  */
-export function isInitialized(projectRoot: string, options: SolidKGDirectoryOptions = {}): boolean {
+export function isInitialized(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): boolean {
   const solidkgDir = getSolidKGDir(projectRoot, options);
   if (!fs.existsSync(solidkgDir) || !fs.statSync(solidkgDir).isDirectory()) {
     return false;
   }
   // Must have solidkg.db, not just .solidkg folder
-  const dbPath = path.join(solidkgDir, 'solidkg.db');
+  const dbPath = path.join(solidkgDir, "solidkg.db");
   return fs.existsSync(dbPath);
 }
 
@@ -67,7 +75,10 @@ export function isInitialized(projectRoot: string, options: SolidKGDirectoryOpti
  * @param startPath - Directory to start searching from
  * @returns The project root containing .solidkg/, or null if not found
  */
-export function findNearestSolidKGRoot(startPath: string, options: SolidKGDirectoryOptions = {}): string | null {
+export function findNearestSolidKGRoot(
+  startPath: string,
+  options: SolidKGDirectoryOptions = {},
+): string | null {
   if (options.dataDir) {
     const resolved = path.resolve(startPath);
     return isInitialized(resolved, options) ? resolved : null;
@@ -97,9 +108,12 @@ export function findNearestSolidKGRoot(startPath: string, options: SolidKGDirect
  * Create the .solidkg directory structure
  * Note: Only throws if solidkg.db already exists, not just if .solidkg/ exists.
  */
-export function createDirectory(projectRoot: string, options: SolidKGDirectoryOptions = {}): void {
+export function createDirectory(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): void {
   const solidkgDir = getSolidKGDir(projectRoot, options);
-  const dbPath = path.join(solidkgDir, 'solidkg.db');
+  const dbPath = path.join(solidkgDir, "solidkg.db");
 
   // Only throw if SolidKG is actually initialized (db exists)
   // .solidkg/ folder alone is fine
@@ -111,29 +125,49 @@ export function createDirectory(projectRoot: string, options: SolidKGDirectoryOp
   fs.mkdirSync(solidkgDir, { recursive: true });
 
   // Create .gitignore inside .solidkg (if it doesn't exist)
-  const gitignorePath = path.join(solidkgDir, '.gitignore');
+  const gitignorePath = path.join(solidkgDir, ".gitignore");
   if (!fs.existsSync(gitignorePath)) {
-    fs.writeFileSync(gitignorePath, SOLIDKG_GITIGNORE_CONTENT, 'utf-8');
+    fs.writeFileSync(gitignorePath, SOLIDKG_GITIGNORE_CONTENT, "utf-8");
   }
 
   const markerPath = path.join(solidkgDir, OWNERSHIP_MARKER);
   if (!fs.existsSync(markerPath)) {
-    fs.writeFileSync(markerPath, JSON.stringify({ owner: 'solidkg', projectRoot: path.resolve(projectRoot) }) + '\n', 'utf-8');
+    fs.writeFileSync(
+      markerPath,
+      JSON.stringify({
+        owner: "solidkg",
+        projectRoot: path.resolve(projectRoot),
+      }) + "\n",
+      "utf-8",
+    );
   }
 }
 
-export function ensureOwnershipMarker(projectRoot: string, options: SolidKGDirectoryOptions = {}): void {
+export function ensureOwnershipMarker(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): void {
   const solidkgDir = getSolidKGDir(projectRoot, options);
   const markerPath = path.join(solidkgDir, OWNERSHIP_MARKER);
   if (!fs.existsSync(markerPath)) {
-    fs.writeFileSync(markerPath, JSON.stringify({ owner: 'solidkg', projectRoot: path.resolve(projectRoot) }) + '\n', 'utf-8');
+    fs.writeFileSync(
+      markerPath,
+      JSON.stringify({
+        owner: "solidkg",
+        projectRoot: path.resolve(projectRoot),
+      }) + "\n",
+      "utf-8",
+    );
   }
 }
 
 /**
  * Remove the .solidkg directory
  */
-export function removeDirectory(projectRoot: string, options: SolidKGDirectoryOptions = {}): void {
+export function removeDirectory(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): void {
   const solidkgDir = getSolidKGDir(projectRoot, options);
 
   if (!fs.existsSync(solidkgDir)) {
@@ -156,7 +190,9 @@ export function removeDirectory(projectRoot: string, options: SolidKGDirectoryOp
 
   const markerPath = path.join(solidkgDir, OWNERSHIP_MARKER);
   if (options.dataDir && !fs.existsSync(markerPath)) {
-    throw new Error(`Refusing to remove external data directory without SolidKG ownership marker: ${solidkgDir}`);
+    throw new Error(
+      `Refusing to remove external data directory without SolidKG ownership marker: ${solidkgDir}`,
+    );
   }
 
   if (options.dataDir) {
@@ -164,10 +200,12 @@ export function removeDirectory(projectRoot: string, options: SolidKGDirectoryOp
       const entryPath = path.join(solidkgDir, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
-        if (KNOWN_SOLIDKG_DIRS.has(entry.name)) fs.rmSync(entryPath, { recursive: true, force: true });
+        if (KNOWN_SOLIDKG_DIRS.has(entry.name))
+          fs.rmSync(entryPath, { recursive: true, force: true });
         continue;
       }
-      if (KNOWN_SOLIDKG_FILES.has(entry.name)) fs.rmSync(entryPath, { force: true });
+      if (KNOWN_SOLIDKG_FILES.has(entry.name))
+        fs.rmSync(entryPath, { force: true });
     }
     return;
   }
@@ -179,7 +217,10 @@ export function removeDirectory(projectRoot: string, options: SolidKGDirectoryOp
 /**
  * Get all files in the .solidkg directory
  */
-export function listDirectoryContents(projectRoot: string, options: SolidKGDirectoryOptions = {}): string[] {
+export function listDirectoryContents(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): string[] {
   const solidkgDir = getSolidKGDir(projectRoot, options);
 
   if (!fs.existsSync(solidkgDir)) {
@@ -188,7 +229,7 @@ export function listDirectoryContents(projectRoot: string, options: SolidKGDirec
 
   const files: string[] = [];
 
-  function walkDir(dir: string, prefix: string = ''): void {
+  function walkDir(dir: string, prefix: string = ""): void {
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
@@ -214,7 +255,10 @@ export function listDirectoryContents(projectRoot: string, options: SolidKGDirec
 /**
  * Get the total size of the .solidkg directory in bytes
  */
-export function getDirectorySize(projectRoot: string, options: SolidKGDirectoryOptions = {}): number {
+export function getDirectorySize(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+): number {
   const solidkgDir = getSolidKGDir(projectRoot, options);
 
   if (!fs.existsSync(solidkgDir)) {
@@ -250,8 +294,16 @@ export function getDirectorySize(projectRoot: string, options: SolidKGDirectoryO
 /**
  * Ensure a subdirectory exists within .solidkg
  */
-export function ensureSubdirectory(projectRoot: string, subdirName: string, options: SolidKGDirectoryOptions = {}): string {
-  if (subdirName.includes('..') || subdirName.includes(path.sep) || subdirName.includes('/')) {
+export function ensureSubdirectory(
+  projectRoot: string,
+  subdirName: string,
+  options: SolidKGDirectoryOptions = {},
+): string {
+  if (
+    subdirName.includes("..") ||
+    subdirName.includes(path.sep) ||
+    subdirName.includes("/")
+  ) {
     throw new Error(`Invalid subdirectory name: ${subdirName}`);
   }
 
@@ -267,7 +319,11 @@ export function ensureSubdirectory(projectRoot: string, subdirName: string, opti
 /**
  * Check if the .solidkg directory has valid structure
  */
-export function validateDirectory(projectRoot: string, options: SolidKGDirectoryOptions = {}, validateOptions: ValidateDirectoryOptions = {}): {
+export function validateDirectory(
+  projectRoot: string,
+  options: SolidKGDirectoryOptions = {},
+  validateOptions: ValidateDirectoryOptions = {},
+): {
   valid: boolean;
   errors: string[];
 } {
@@ -276,22 +332,24 @@ export function validateDirectory(projectRoot: string, options: SolidKGDirectory
   const repair = validateOptions.repair !== false;
 
   if (!fs.existsSync(solidkgDir)) {
-    errors.push('SolidKG directory does not exist');
+    errors.push("SolidKG directory does not exist");
     return { valid: false, errors };
   }
 
   if (!fs.statSync(solidkgDir).isDirectory()) {
-    errors.push('.solidkg exists but is not a directory');
+    errors.push(".solidkg exists but is not a directory");
     return { valid: false, errors };
   }
 
-  const gitignorePath = path.join(solidkgDir, '.gitignore');
+  const gitignorePath = path.join(solidkgDir, ".gitignore");
   if (repair && !fs.existsSync(gitignorePath)) {
     try {
-      fs.writeFileSync(gitignorePath, SOLIDKG_GITIGNORE_CONTENT, 'utf-8');
+      fs.writeFileSync(gitignorePath, SOLIDKG_GITIGNORE_CONTENT, "utf-8");
     } catch {
       // Non-fatal: warn but don't block
-      errors.push('.gitignore missing in .solidkg directory and could not be created');
+      errors.push(
+        ".gitignore missing in .solidkg directory and could not be created",
+      );
     }
   }
 

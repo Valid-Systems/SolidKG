@@ -14,14 +14,14 @@
  * .gitignore (#407), which a .gitignore-only filter would miss.
  */
 
-import * as path from 'path';
-import type { Stats } from 'fs';
-import chokidar, { FSWatcher } from 'chokidar';
-import type { Ignore } from 'ignore';
-import { isSourceFile, buildDefaultIgnore } from '../extraction';
-import { logDebug, logWarn } from '../errors';
-import { normalizePath } from '../utils';
-import { watchDisabledReason } from './watch-policy';
+import * as path from "path";
+import type { Stats } from "fs";
+import chokidar, { FSWatcher } from "chokidar";
+import type { Ignore } from "ignore";
+import { isSourceFile, buildDefaultIgnore } from "../extraction";
+import { logDebug, logWarn } from "../errors";
+import { normalizePath } from "../utils";
+import { watchDisabledReason } from "./watch-policy";
 
 /**
  * Options for the file watcher
@@ -37,7 +37,10 @@ export interface WatchOptions {
   /**
    * Callback when a sync completes (for logging/diagnostics).
    */
-  onSyncComplete?: (result: { filesChanged: number; durationMs: number }) => void;
+  onSyncComplete?: (result: {
+    filesChanged: number;
+    durationMs: number;
+  }) => void;
 
   /**
    * Callback when a sync errors (for logging/diagnostics).
@@ -88,7 +91,10 @@ export class FileWatcher {
    * same project-relative POSIX path the rest of the codebase uses, so a
    * caller can intersect tool-response file paths against this map cheaply.
    */
-  private pendingFiles = new Map<string, { firstSeenMs: number; lastSeenMs: number }>();
+  private pendingFiles = new Map<
+    string,
+    { firstSeenMs: number; lastSeenMs: number }
+  >();
   /**
    * Wall-clock ms at which the in-flight sync began. Combined with
    * {@link pendingFiles}'s `lastSeenMs`, this distinguishes "still in the
@@ -119,14 +125,17 @@ export class FileWatcher {
 
   private readonly projectRoot: string;
   private readonly debounceMs: number;
-  private readonly syncFn: () => Promise<{ filesChanged: number; durationMs: number }>;
-  private readonly onSyncComplete?: WatchOptions['onSyncComplete'];
-  private readonly onSyncError?: WatchOptions['onSyncError'];
+  private readonly syncFn: () => Promise<{
+    filesChanged: number;
+    durationMs: number;
+  }>;
+  private readonly onSyncComplete?: WatchOptions["onSyncComplete"];
+  private readonly onSyncError?: WatchOptions["onSyncError"];
 
   constructor(
     projectRoot: string,
     syncFn: () => Promise<{ filesChanged: number; durationMs: number }>,
-    options: WatchOptions = {}
+    options: WatchOptions = {},
   ) {
     this.projectRoot = projectRoot;
     this.syncFn = syncFn;
@@ -149,7 +158,10 @@ export class FileWatcher {
     // there; callers fall back to manual `solidkg sync` or git sync hooks.
     const disabledReason = watchDisabledReason(this.projectRoot);
     if (disabledReason) {
-      logDebug('File watcher disabled', { reason: disabledReason, projectRoot: this.projectRoot });
+      logDebug("File watcher disabled", {
+        reason: disabledReason,
+        projectRoot: this.projectRoot,
+      });
       return false;
     }
 
@@ -163,7 +175,8 @@ export class FileWatcher {
         // chokidar calls this for every path it encounters and only watches
         // those that pass — so excluded trees (node_modules/, dist/, .git/, …)
         // never get an inotify watch in the first place.
-        ignored: (testPath: string, stats?: Stats) => this.shouldIgnore(testPath, stats),
+        ignored: (testPath: string, stats?: Stats) =>
+          this.shouldIgnore(testPath, stats),
       });
 
       // Chokidar emits `add` for every pre-existing source file during its
@@ -179,7 +192,7 @@ export class FileWatcher {
       // `ready` callback runs (observed under test-parallelism load).
       // Clearing once at ready guarantees a clean baseline; real subsequent
       // edits repopulate the set normally.
-      this.watcher.on('ready', () => {
+      this.watcher.on("ready", () => {
         this.chokidarReady = true;
         this.pendingFiles.clear();
         for (const cb of this.readyWaiters) cb();
@@ -187,17 +200,19 @@ export class FileWatcher {
       });
 
       // chokidar emits 'all' for every event type; we only sync source files.
-      this.watcher.on('all', (_event: string, filePath: string) => {
+      this.watcher.on("all", (_event: string, filePath: string) => {
         if (this.stopped) return;
 
-        const normalized = normalizePath(path.relative(this.projectRoot, filePath));
+        const normalized = normalizePath(
+          path.relative(this.projectRoot, filePath),
+        );
 
         // Defense in depth: `ignored` should already keep these out, but events
         // can still arrive during setup or via symlink traversal.
         if (this.isAlwaysIgnored(normalized)) return;
         if (!isSourceFile(normalized)) return;
 
-        logDebug('File change detected', { file: normalized });
+        logDebug("File change detected", { file: normalized });
         // Only track events from after chokidar's initial scan as pending
         // edits — pre-existing files on disk are already represented by
         // (or about to be reconciled by) the index, not a user edit.
@@ -213,15 +228,18 @@ export class FileWatcher {
       });
 
       // Handle watcher errors gracefully — don't crash, the user can restart.
-      this.watcher.on('error', (err: unknown) => {
-        logWarn('File watcher error', { error: String(err) });
+      this.watcher.on("error", (err: unknown) => {
+        logWarn("File watcher error", { error: String(err) });
       });
 
-      logDebug('File watcher started', { projectRoot: this.projectRoot, debounceMs: this.debounceMs });
+      logDebug("File watcher started", {
+        projectRoot: this.projectRoot,
+        debounceMs: this.debounceMs,
+      });
       return true;
     } catch (err) {
       // Watcher setup failed (e.g., permission denied, missing directory).
-      logWarn('Could not start file watcher', { error: String(err) });
+      logWarn("Could not start file watcher", { error: String(err) });
       return false;
     }
   }
@@ -229,8 +247,10 @@ export class FileWatcher {
   /** Our own dirs are always ignored, regardless of .gitignore. */
   private isAlwaysIgnored(rel: string): boolean {
     return (
-      rel === '.solidkg' || rel.startsWith('.solidkg/') ||
-      rel === '.git' || rel.startsWith('.git/')
+      rel === ".solidkg" ||
+      rel.startsWith(".solidkg/") ||
+      rel === ".git" ||
+      rel.startsWith(".git/")
     );
   }
 
@@ -241,14 +261,16 @@ export class FileWatcher {
    */
   private shouldIgnore(testPath: string, stats?: Stats): boolean {
     const rel = normalizePath(path.relative(this.projectRoot, testPath));
-    if (!rel || rel === '.' || rel.startsWith('..')) return false; // root / outside
+    if (!rel || rel === "." || rel.startsWith("..")) return false; // root / outside
     if (this.isAlwaysIgnored(rel)) return true;
     if (!this.ignoreMatcher) return false;
     if (stats) {
-      return this.ignoreMatcher.ignores(stats.isDirectory() ? rel + '/' : rel);
+      return this.ignoreMatcher.ignores(stats.isDirectory() ? rel + "/" : rel);
     }
     // Stats unknown: test both forms so a directory match isn't missed.
-    return this.ignoreMatcher.ignores(rel) || this.ignoreMatcher.ignores(rel + '/');
+    return (
+      this.ignoreMatcher.ignores(rel) || this.ignoreMatcher.ignores(rel + "/")
+    );
   }
 
   /**
@@ -277,10 +299,14 @@ export class FileWatcher {
     this.ignoreMatcher = null;
 
     if (watcher) {
-      try { await watcher.close(); } catch { /* best-effort close */ }
+      try {
+        await watcher.close();
+      } catch {
+        /* best-effort close */
+      }
     }
 
-    logDebug('File watcher stopped');
+    logDebug("File watcher stopped");
   }
 
   /**
@@ -307,9 +333,16 @@ export class FileWatcher {
       const t = setTimeout(() => {
         const idx = this.readyWaiters.indexOf(handler);
         if (idx >= 0) this.readyWaiters.splice(idx, 1);
-        reject(new Error(`FileWatcher.waitUntilReady timed out after ${timeoutMs}ms`));
+        reject(
+          new Error(
+            `FileWatcher.waitUntilReady timed out after ${timeoutMs}ms`,
+          ),
+        );
       }, timeoutMs);
-      const handler = () => { clearTimeout(t); resolve(); };
+      const handler = () => {
+        clearTimeout(t);
+        resolve();
+      };
       this.readyWaiters.push(handler);
     });
   }
@@ -363,7 +396,7 @@ export class FileWatcher {
       this.onSyncComplete?.(result);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      logWarn('Watch sync failed', { error: error.message });
+      logWarn("Watch sync failed", { error: error.message });
       // Failure: leave pendingFiles untouched. Every edit it tracks is
       // still unindexed; the rescheduled sync sees the same set.
       this.onSyncError?.(error);

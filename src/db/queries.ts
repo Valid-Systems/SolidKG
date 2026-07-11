@@ -721,6 +721,7 @@ export class QueryBuilder {
   private db: SqliteDatabase;
   private statementCounts: Map<string, number> | null = null;
   private readonly retrievalExtensionStatus: RetrievalExtensionStatus;
+  private transactionDepth = 0;
 
   // Node cache for frequently accessed nodes (LRU-style, max 1000 entries)
   private nodeCache: Map<string, Node> = new Map();
@@ -728,7 +729,14 @@ export class QueryBuilder {
   private readonly preservedScipFieldsByNodeId = new Map<string, PreservedScipNodeFields>();
 
   transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn)();
+    return this.db.transaction(() => {
+      this.transactionDepth++;
+      try {
+        return fn();
+      } finally {
+        this.transactionDepth--;
+      }
+    })();
   }
 
   // Prepared statements (lazily initialized)
@@ -2012,7 +2020,7 @@ export class QueryBuilder {
       `);
     }
     const stmt = this.stmts.upsertSourceChunk;
-    this.db.transaction(() => {
+    const upsertChunks = (): void => {
       for (const chunk of chunks) {
         stmt.run({
           id: chunk.id,
@@ -2033,7 +2041,12 @@ export class QueryBuilder {
           updatedAt: chunk.updatedAt,
         });
       }
-    })();
+    };
+    if (this.transactionDepth === 0) {
+      this.transaction(upsertChunks);
+    } else {
+      upsertChunks();
+    }
     this.countStatement('source_chunks.write', chunks.length);
   }
 

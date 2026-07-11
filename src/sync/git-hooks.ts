@@ -13,18 +13,22 @@
  * is idempotent and removal preserves any user-authored hook content.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { execFileSync } from 'child_process';
-import { hiddenExecFileSyncOptions } from '../platform/child-process';
+import * as fs from "fs";
+import * as path from "path";
+import { execFileSync } from "child_process";
+import { hiddenExecFileSyncOptions } from "../platform/child-process";
 
-const MARKER_BEGIN = '# >>> solidkg sync hook >>>';
-const MARKER_END = '# <<< solidkg sync hook <<<';
+const MARKER_BEGIN = "# >>> solidkg sync hook >>>";
+const MARKER_END = "# <<< solidkg sync hook <<<";
 
-export type GitHookName = 'post-commit' | 'post-merge' | 'post-checkout';
+export type GitHookName = "post-commit" | "post-merge" | "post-checkout";
 
 /** Hooks installed by default: commit, merge (git pull), and checkout. */
-export const DEFAULT_SYNC_HOOKS: GitHookName[] = ['post-commit', 'post-merge', 'post-checkout'];
+export const DEFAULT_SYNC_HOOKS: GitHookName[] = [
+  "post-commit",
+  "post-merge",
+  "post-checkout",
+];
 
 export interface GitHookResult {
   /** Hook names that were created or updated. */
@@ -41,12 +45,16 @@ export interface GitHookResult {
  */
 export function isGitRepo(projectRoot: string): boolean {
   try {
-    const out = execFileSync('git', ['rev-parse', '--is-inside-work-tree'], hiddenExecFileSyncOptions({
-      cwd: projectRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })).trim();
-    return out === 'true';
+    const out = execFileSync(
+      "git",
+      ["rev-parse", "--is-inside-work-tree"],
+      hiddenExecFileSyncOptions({
+        cwd: projectRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }),
+    ).trim();
+    return out === "true";
   } catch {
     return false;
   }
@@ -58,11 +66,15 @@ export function isGitRepo(projectRoot: string): boolean {
  */
 function gitHooksDir(projectRoot: string): string | null {
   try {
-    const out = execFileSync('git', ['rev-parse', '--git-path', 'hooks'], hiddenExecFileSyncOptions({
-      cwd: projectRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })).trim();
+    const out = execFileSync(
+      "git",
+      ["rev-parse", "--git-path", "hooks"],
+      hiddenExecFileSyncOptions({
+        cwd: projectRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }),
+    ).trim();
     if (!out) return null;
     return path.isAbsolute(out) ? out : path.resolve(projectRoot, out);
   } catch {
@@ -74,36 +86,42 @@ function gitHooksDir(projectRoot: string): string | null {
 function markerBlock(): string {
   return [
     MARKER_BEGIN,
-    '# Keeps the SolidKG index fresh while the live file watcher is off',
-    '# (e.g. WSL2 /mnt drives). Runs in the background so it never blocks git.',
-    '# Managed by solidkg; remove with `solidkg uninit` or delete this block.',
-    'if command -v solidkg >/dev/null 2>&1; then',
-    '  ( solidkg sync >/dev/null 2>&1 & ) >/dev/null 2>&1',
-    'fi',
+    "# Keeps the SolidKG index fresh while the live file watcher is off",
+    "# (e.g. WSL2 /mnt drives). Runs in the background so it never blocks git.",
+    "# Managed by solidkg; remove with `solidkg uninit` or delete this block.",
+    "if command -v solidkg >/dev/null 2>&1; then",
+    "  ( solidkg sync >/dev/null 2>&1 & ) >/dev/null 2>&1",
+    "fi",
     MARKER_END,
-  ].join('\n');
+  ].join("\n");
 }
 
 /** Remove our marker block (and the marker lines) from hook content. */
 function stripMarkerBlock(content: string): string {
-  const lines = content.split('\n');
+  const lines = content.split("\n");
   const kept: string[] = [];
   let inBlock = false;
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed === MARKER_BEGIN) { inBlock = true; continue; }
-    if (trimmed === MARKER_END) { inBlock = false; continue; }
+    if (trimmed === MARKER_BEGIN) {
+      inBlock = true;
+      continue;
+    }
+    if (trimmed === MARKER_END) {
+      inBlock = false;
+      continue;
+    }
     if (!inBlock) kept.push(line);
   }
-  return kept.join('\n');
+  return kept.join("\n");
 }
 
 /** Whether a hook body is just a shebang / blank lines (i.e. only ever ours). */
 function isEffectivelyEmpty(content: string): boolean {
   return content
-    .split('\n')
+    .split("\n")
     .map((l) => l.trim())
-    .every((l) => l.length === 0 || l.startsWith('#!'));
+    .every((l) => l.length === 0 || l.startsWith("#!"));
 }
 
 function chmodExecutable(file: string): void {
@@ -125,13 +143,17 @@ export function installGitSyncHook(
 ): GitHookResult {
   const hooksDir = gitHooksDir(projectRoot);
   if (!hooksDir) {
-    return { installed: [], hooksDir: null, skipped: 'not a git repository' };
+    return { installed: [], hooksDir: null, skipped: "not a git repository" };
   }
 
   try {
     fs.mkdirSync(hooksDir, { recursive: true });
   } catch {
-    return { installed: [], hooksDir, skipped: 'could not access the git hooks directory' };
+    return {
+      installed: [],
+      hooksDir,
+      skipped: "could not access the git hooks directory",
+    };
   }
 
   const block = markerBlock();
@@ -143,10 +165,12 @@ export function installGitSyncHook(
 
     if (fs.existsSync(file)) {
       // Strip any prior block, then re-append the current one.
-      const base = stripMarkerBlock(fs.readFileSync(file, 'utf8')).replace(/\s*$/, '');
-      content = base.length > 0
-        ? `${base}\n\n${block}\n`
-        : `#!/bin/sh\n${block}\n`;
+      const base = stripMarkerBlock(fs.readFileSync(file, "utf8")).replace(
+        /\s*$/,
+        "",
+      );
+      content =
+        base.length > 0 ? `${base}\n\n${block}\n` : `#!/bin/sh\n${block}\n`;
     } else {
       content = `#!/bin/sh\n${block}\n`;
     }
@@ -170,7 +194,7 @@ export function removeGitSyncHook(
 ): GitHookResult {
   const hooksDir = gitHooksDir(projectRoot);
   if (!hooksDir) {
-    return { installed: [], hooksDir: null, skipped: 'not a git repository' };
+    return { installed: [], hooksDir: null, skipped: "not a git repository" };
   }
 
   const removed: GitHookName[] = [];
@@ -179,14 +203,14 @@ export function removeGitSyncHook(
     const file = path.join(hooksDir, hook);
     if (!fs.existsSync(file)) continue;
 
-    const original = fs.readFileSync(file, 'utf8');
+    const original = fs.readFileSync(file, "utf8");
     if (!original.includes(MARKER_BEGIN)) continue;
 
     const stripped = stripMarkerBlock(original);
     if (isEffectivelyEmpty(stripped)) {
       fs.unlinkSync(file);
     } else {
-      fs.writeFileSync(file, `${stripped.replace(/\s*$/, '')}\n`);
+      fs.writeFileSync(file, `${stripped.replace(/\s*$/, "")}\n`);
       chmodExecutable(file);
     }
     removed.push(hook);
@@ -204,6 +228,9 @@ export function isSyncHookInstalled(
   if (!hooksDir) return false;
   return hooks.some((hook) => {
     const file = path.join(hooksDir, hook);
-    return fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes(MARKER_BEGIN);
+    return (
+      fs.existsSync(file) &&
+      fs.readFileSync(file, "utf8").includes(MARKER_BEGIN)
+    );
   });
 }

@@ -64,6 +64,58 @@ describe('reference quality sweep CLI', () => {
     }
   });
 
+  it('rejects non-portable graded evidence judgments at the manifest boundary', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'solidkg-reference-cli-'));
+    try {
+      const manifest = path.join(root, 'probes.json');
+      writeFileSync(manifest, JSON.stringify({
+        schemaName: 'solidkg.reference-quality.probes.v1',
+        probes: [{
+          id: 'bad', repoId: 'missing', tool: 'solidkg_explore', arguments: { query: 'bad' },
+          expectedFiles: [], expectations: [],
+          evidenceJudgments: [{ file: 'C:\\private\\source.ts', relevance: 'required' }],
+        }],
+      }));
+      const result = spawnSync(process.execPath, [scriptPath, '--root', root, '--out', path.join(root, 'out'), '--probe-manifest', manifest], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      });
+
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('evidenceJudgments');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects Windows and POSIX absolute paths plus separator-normalized duplicate judgments', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'solidkg-reference-cli-'));
+    try {
+      for (const [id, evidenceJudgments] of [
+        ['windows', [{ file: 'C:\\private\\source.ts', relevance: 'required' }]],
+        ['posix', [{ file: '/private/source.ts', relevance: 'required' }]],
+        ['duplicate', [
+          { file: 'src\\source.ts', relevance: 'required' },
+          { file: 'src/source.ts', relevance: 'useful' },
+        ]],
+      ] as const) {
+        const manifest = path.join(root, `${id}.json`);
+        writeFileSync(manifest, JSON.stringify({
+          schemaName: 'solidkg.reference-quality.probes.v1',
+          probes: [{ id, repoId: 'missing', tool: 'solidkg_explore', arguments: { query: id }, expectedFiles: [], expectations: [], evidenceJudgments }],
+        }));
+        const result = spawnSync(process.execPath, [scriptPath, '--root', root, '--out', path.join(root, 'out'), '--probe-manifest', manifest], {
+          cwd: repoRoot,
+          encoding: 'utf8',
+        });
+        expect(result.status).toBe(2);
+        expect(result.stderr).toContain('evidenceJudgments');
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('cleans parent-owned disposable copies after a hard worker timeout', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'solidkg-reference-cli-'));
     const repo = path.join(root, 'fixture');

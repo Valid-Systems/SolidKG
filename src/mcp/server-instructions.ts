@@ -34,6 +34,10 @@ Source-completeness fields are returned-source coverage only, not answer/path/ru
 correctness, confidence, query quality, or global false-path guarantees.
 When the answer packet says the selected evidence is sufficient, answer from it
 even if peripheral candidates were omitted or source windows were bounded.
+Explicit exclusions such as "not tests" or "excluding generated metadata" are
+retrieval constraints, not positive search terms. A \`missing_query_concept\`
+uncertainty label means the returned source did not cover every explicit
+counterfactual concept, so the packet is intentionally partial.
 Do not follow up solely because candidate coverage is partial, omitted, or
 truncated. Prefer SolidKG over broad grep/read loops. Fall back to targeted Read
 only when the answer packet is insufficient because required source is stale,
@@ -96,6 +100,7 @@ or permission strings; do not add another \`solidkg_\` prefix when calling tools
 - **Repository orientation**: call \`solidkg_files\` with \`format: "overview"\` before reading directories manually. The overview is derived from the index and stays budgeted with \`maxDepth\`, \`expandPaths\`, and \`maxEntries\`.
 - **Source completeness interpretation**: \`solidkg_context\` and \`solidkg_explore\` source-completeness fields describe returned source coverage only. They are not answer/path/runtime correctness, confidence, query-quality, or global false-path guarantees.
 - **Answer packet interpretation**: answer packets are deterministic returned-context metadata: evidence anchors, ranking reasons, binary sufficiency, suggested next SolidKG tools, and bounded uncertainty labels. Ranking reasons may include \`source_body_chunk\` when persisted source-body/code-token chunks seeded or boosted a result; exact symbol/path/trace evidence remains higher-salience than body-only evidence. When an answer packet says the returned context is sufficient, answer from that context instead of drilling further. Use them to decide whether to answer or make a focused SolidKG follow-up; they are not proof of runtime correctness.
+- **Counterfactual query constraints**: phrases such as "not tests" and "excluding generated metadata" are treated as exclusions rather than positive retrieval terms. When returned source misses an explicit concept in that kind of query, \`solidkg_explore\` returns a partial packet with \`missing_query_concept\` instead of claiming sufficiency.
 - **Capability footprint interpretation**: when \`solidkg_trace\` or \`solidkg_node\` includes a Capability footprint section, treat it as evidence about may-read/write/guard/emit/subscribe/send/mutate behavior, not proof of runtime execution. Coverage states (\`complete\`, \`partial\`, \`unsupported\`, \`failed\`, \`not_run\`, \`stale\`) describe capability-producer coverage for the returned files; empty assertions do not prove no capability exists.
 - **Calibrated trust**: source-completeness fields are coverage metadata. When the packet is sufficient, answer even if peripheral candidates were omitted or windows were bounded. Do not follow up solely because coverage is partial, omitted, or truncated.
 - **When evidence is insufficient**: use one focused advanced call only for missing required anchors, stale/unreadable required source, no results/path, or explicit endpoint ambiguity. Fall back to targeted Read only when required source is stale, unreadable, or absent.

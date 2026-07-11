@@ -17,19 +17,22 @@
  * it reports "no mismatch" and callers carry on unchanged.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { execFileSync } from 'child_process';
-import { hiddenExecFileSyncOptions } from '../platform/child-process';
+import * as fs from "fs";
+import * as path from "path";
+import { execFileSync } from "child_process";
+import { hiddenExecFileSyncOptions } from "../platform/child-process";
 
 const TRUSTED_GIT_EXECUTABLE = (() => {
-  const names = process.platform === 'win32' ? ['git.exe'] : ['git'];
-  for (const directory of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
-    const trustedDirectory = directory.replace(/^"|"$/g, '');
+  const names = process.platform === "win32" ? ["git.exe"] : ["git"];
+  for (const directory of (process.env.PATH ?? "")
+    .split(path.delimiter)
+    .filter(Boolean)) {
+    const trustedDirectory = directory.replace(/^"|"$/g, "");
     if (!path.isAbsolute(trustedDirectory)) continue;
     for (const name of names) {
       const candidate = path.resolve(trustedDirectory, name);
-      if (fs.existsSync(candidate) && fs.lstatSync(candidate).isFile()) return candidate;
+      if (fs.existsSync(candidate) && fs.lstatSync(candidate).isFile())
+        return candidate;
     }
   }
   return null;
@@ -46,12 +49,23 @@ const TRUSTED_GIT_EXECUTABLE = (() => {
 export function gitWorktreeRoot(dir: string): string | null {
   if (!TRUSTED_GIT_EXECUTABLE) return null;
   try {
-    const out = execFileSync(TRUSTED_GIT_EXECUTABLE, ['-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=', 'rev-parse', '--show-toplevel'], hiddenExecFileSyncOptions({
-      cwd: dir,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
-    })).trim();
+    const out = execFileSync(
+      TRUSTED_GIT_EXECUTABLE,
+      [
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        "core.hooksPath=",
+        "rev-parse",
+        "--show-toplevel",
+      ],
+      hiddenExecFileSyncOptions({
+        cwd: dir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      }),
+    ).trim();
     return out ? realpath(out) : null;
   } catch {
     return null;

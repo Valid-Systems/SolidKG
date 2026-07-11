@@ -191,6 +191,37 @@ describe('solidkg_explore output respects the adaptive budget', () => {
 `
     );
 
+    fs.mkdirSync(path.join(srcDir, 'production'));
+    fs.writeFileSync(
+      path.join(srcDir, 'production', 'request-command.ts'),
+      `export class InvokeRestMethodCommand {
+  validateParameters(): boolean { return true; }
+  initializeServiceClient(): string { return 'azure-rest-client'; }
+  executeCmdlet(): string { return this.sendRequest(); }
+  private sendRequest(): string { return 'sent arbitrary Azure REST request'; }
+}
+`
+    );
+    fs.mkdirSync(path.join(srcDir, 'metadata'));
+    fs.writeFileSync(
+      path.join(srcDir, 'metadata', 'serialized-command-metadata.ts'),
+      `export const serializedCommandMetadata = 'Azure REST request command metadata';\n`
+    );
+    fs.mkdirSync(path.join(testDir, 'tests'));
+    fs.writeFileSync(
+      path.join(testDir, 'tests', 'request-command.test.ts'),
+      `import { InvokeRestMethodCommand } from '../src/production/request-command';\nexport function testSerializedCommandMetadata(): string { return new InvokeRestMethodCommand().executeCmdlet(); }\n`
+    );
+    fs.mkdirSync(path.join(srcDir, 'generated'));
+    fs.writeFileSync(
+      path.join(srcDir, 'generated', 'rest-client.ts'),
+      `export class GeneratedRestClient { sendGeneratedRequest(): string { return 'generated client'; } }\n`
+    );
+    fs.writeFileSync(
+      path.join(srcDir, 'event-loop.ts'),
+      `export function runSchedulerTasks(): string { return 'run tasks without blocking the event loop'; }\n`
+    );
+
     cg = SolidKG.initSync(testDir, {
       config: { include: ['**/*.ts'], exclude: [] },
     });
@@ -253,6 +284,77 @@ describe('solidkg_explore output respects the adaptive budget', () => {
     expect(text).toContain('source_body_chunk:');
     expect(text).toContain('src/body-behavior.ts');
     expect(text).toContain('carrier manifest quarantine reconciliation');
+  });
+
+  it('honors production and exclusion intent instead of retrieving the excluded metadata or tests', async () => {
+    const result = await handler.execute('solidkg_explore', {
+      query: 'Find the production implementation that sends Azure REST requests, excluding serialized command metadata',
+      maxFiles: 3,
+    });
+    const text = result.content?.[0]?.text ?? '';
+
+    expect(text).toContain('src/production/request-command.ts');
+    expect(text).not.toContain('src/metadata/serialized-command-metadata.ts');
+    expect(text).not.toContain('tests/request-command.test.ts');
+    expect(text).not.toContain('testSerializedCommandMetadata');
+    expect(text).toContain('Binary sufficiency: sufficient');
+  });
+
+  it('does not require generic flow prose as counterfactual source concepts', async () => {
+    const result = await handler.execute('solidkg_explore', {
+      query: 'Trace how InvokeRestMethodCommand builds, sends, and validates Azure REST requests through the production flow, excluding metadata',
+      maxFiles: 3,
+    });
+    const text = result.content?.[0]?.text ?? '';
+
+    expect(text).toContain('src/production/request-command.ts');
+    expect(text).toContain('Binary sufficiency: sufficient');
+    expect(text).not.toContain('Uncertainty: missing_query_concept');
+  });
+
+  it('does not claim sufficiency when explicit counterfactual concepts are absent from returned evidence', async () => {
+    const result = await handler.execute('solidkg_explore', {
+      query: 'Find the production implementation that encrypts and sends Azure REST requests, excluding metadata',
+      maxFiles: 3,
+    });
+    const text = result.content?.[0]?.text ?? '';
+
+    expect(text).toContain('src/production/request-command.ts');
+    expect(text).toContain('Binary sufficiency: partial');
+    expect(text).toContain('Uncertainty: missing_query_concept');
+    expect(text).toContain('uncovered query concept');
+  });
+
+  it('preserves requested tests while enforcing their explicit exclusions', async () => {
+    const result = await handler.execute('solidkg_explore', {
+      query: 'Show Azure REST request tests excluding metadata',
+      maxFiles: 3,
+    });
+    const text = result.content?.[0]?.text ?? '';
+
+    expect(text).toContain('tests/request-command.test.ts');
+    expect(text).not.toContain('src/metadata/serialized-command-metadata.ts');
+  });
+
+  it('preserves requested generated source while excluding test fixtures', async () => {
+    const result = await handler.execute('solidkg_explore', {
+      query: 'Inspect generated REST clients without test fixtures',
+      maxFiles: 3,
+    });
+    const text = result.content?.[0]?.text ?? '';
+
+    expect(text).toContain('src/generated/rest-client.ts');
+    expect(text).not.toContain('tests/request-command.test.ts');
+  });
+
+  it('keeps behavioral without-phrases as positive retrieval concepts', async () => {
+    const result = await handler.execute('solidkg_explore', {
+      query: 'How does the scheduler run tasks without blocking the event loop?',
+      maxFiles: 2,
+    });
+    const text = result.content?.[0]?.text ?? '';
+
+    expect(text).toContain('src/event-loop.ts');
   });
 
   it('does not suggest serial node drilling when explore source is sufficient', async () => {

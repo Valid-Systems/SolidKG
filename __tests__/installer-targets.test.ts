@@ -446,6 +446,22 @@ describe('Installer instructions template', () => {
     }
   });
 
+  it('documents exclusion constraints and missing query concepts consistently', () => {
+    const guidanceSurfaces = {
+      serverInstructions: fs.readFileSync(path.join(process.cwd(), 'src', 'mcp', 'server-instructions.ts'), 'utf-8'),
+      installerTemplate: fs.readFileSync(path.join(process.cwd(), 'src', 'installer', 'instructions-template.ts'), 'utf-8'),
+      agents: fs.readFileSync(path.join(process.cwd(), 'AGENTS.md'), 'utf-8'),
+      cursorRules: fs.readFileSync(path.join(process.cwd(), '.cursor', 'rules', 'solidkg.mdc'), 'utf-8'),
+      readme: fs.readFileSync(path.join(process.cwd(), 'README.md'), 'utf-8'),
+      siteMcpDocs: fs.readFileSync(path.join(process.cwd(), 'site', 'src', 'content', 'docs', 'reference', 'mcp-server.md'), 'utf-8'),
+    };
+
+    for (const [surface, content] of Object.entries(guidanceSurfaces)) {
+      expect.soft(content, `${surface} should treat exclusions as constraints`).toMatch(/exclusions?[\s\S]{0,120}(?:retrieval )?constraints/i);
+      expect.soft(content, `${surface} should define missing-query calibration`).toContain('missing_query_concept');
+    }
+  });
+
   it('documents overview guidance consistently on public guidance surfaces', () => {
     const guidanceSurfaces = {
       serverInstructions: fs.readFileSync(path.join(process.cwd(), 'src', 'mcp', 'server-instructions.ts'), 'utf-8'),

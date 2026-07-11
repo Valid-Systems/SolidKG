@@ -95,4 +95,75 @@ describe.skipIf(!nodeSqliteAvailable)('node:sqlite transaction wrapper', () => {
       db.close();
     }
   });
+
+  it('preserves an automatic rollback FULL error from an outer transaction', () => {
+    const { db } = createDatabase(':memory:');
+    try {
+      // Given a database with no pages available for a large insert.
+      db.exec('PRAGMA page_size = 512');
+      db.exec('VACUUM');
+      db.exec('CREATE TABLE items (payload BLOB NOT NULL)');
+      const pageCount = db.pragma('page_count', { simple: true });
+      db.exec(`PRAGMA max_page_count = ${pageCount}`);
+      const writePastCapacity = db.transaction(() => {
+        db.prepare('INSERT INTO items (payload) VALUES (?)').run(Buffer.alloc(1024));
+      });
+      let transactionError: Error | undefined;
+
+      // When SQLite automatically rolls back the failed transaction.
+      try {
+        writePastCapacity();
+      } catch (error) {
+        if (error instanceof Error) {
+          transactionError = error;
+        } else {
+          throw error;
+        }
+      }
+
+      // Then the original error survives and the wrapper can start another transaction.
+      const readAfterUnwind = db.transaction(() => db.prepare('SELECT 1 AS value').get());
+      expect(readAfterUnwind()).toEqual({ value: 1 });
+      expect(transactionError?.message).toContain('database or disk is full');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('preserves an automatic rollback FULL error from a nested transaction', () => {
+    const { db } = createDatabase(':memory:');
+    try {
+      // Given a nested transaction whose inner write exceeds the database capacity.
+      db.exec('PRAGMA page_size = 512');
+      db.exec('VACUUM');
+      db.exec('CREATE TABLE items (payload BLOB NOT NULL)');
+      const pageCount = db.pragma('page_count', { simple: true });
+      db.exec(`PRAGMA max_page_count = ${pageCount}`);
+      const writePastCapacity = db.transaction(() => {
+        const innerWrite = db.transaction(() => {
+          db.prepare('INSERT INTO items (payload) VALUES (?)').run(Buffer.alloc(1024));
+        });
+        innerWrite();
+      });
+      let transactionError: Error | undefined;
+
+      // When SQLite automatically rolls back the outer transaction during the inner write.
+      try {
+        writePastCapacity();
+      } catch (error) {
+        if (error instanceof Error) {
+          transactionError = error;
+        } else {
+          throw error;
+        }
+      }
+
+      // Then the original error survives and nesting state is reset for a new transaction.
+      const readAfterUnwind = db.transaction(() => db.prepare('SELECT 1 AS value').get());
+      expect(readAfterUnwind()).toEqual({ value: 1 });
+      expect(transactionError?.message).toContain('database or disk is full');
+    } finally {
+      db.close();
+    }
+  });
 });

@@ -36,6 +36,10 @@ import { NODE_KINDS, type Edge, type EdgeKind, type NodeKind } from '../types';
 import type { OverviewTreeOptions } from '../overview';
 import { buildGraphTraversalPacket, formatGraphTraversalPacketMarkdown, type GraphTraversalDirection, type GraphTraversalLimit, type GraphTraversalResult } from '../graph';
 import { mergeTraversalResults, relationCountsForEdges } from '../graph/traversal-results';
+import { IndexLifecycleDiagnostics } from '../index-lifecycle-diagnostics';
+import type SolidKG from '../index';
+import type { IndexProgress } from '../extraction';
+import { logWarn } from '../errors';
 
 import { buildNode25BlockBanner, buildNodeTooOldBanner, MIN_NODE_MAJOR } from './node-version-check';
 import { relaunchWithWasmRuntimeFlagsIfNeeded } from '../extraction/wasm-runtime-flags';
@@ -388,18 +392,19 @@ function parseContextDetail(value: string): 'standard' | 'minimal' {
  * Create a plain-text progress callback for --verbose mode.
  * No animations, no ANSI tricks — just timestamped lines through the presenter.
  */
-function createVerboseProgress(presenter: TerminalPresenter): (progress: { phase: string; current: number; total: number; currentFile?: string }) => void {
+function createVerboseProgress(presenter: TerminalPresenter): (progress: IndexProgress) => void {
   let lastPhase = '';
   let lastPct = -1;
   const startTime = Date.now();
 
   return (progress) => {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const progressLabel = progress.detail ?? progress.phase;
 
-    if (progress.phase !== lastPhase) {
-      lastPhase = progress.phase;
+    if (progressLabel !== lastPhase) {
+      lastPhase = progressLabel;
       lastPct = -1;
-      presenter.status(`[${elapsed}s] ${PROGRESS_PHASE_LABELS[progress.phase] ?? progress.phase}`);
+      presenter.status(`[${elapsed}s] ${PROGRESS_PHASE_LABELS[progressLabel] ?? progressLabel}`);
     }
 
     if (progress.total > 0) {
@@ -470,6 +475,57 @@ type IndexingControlOptions = {
   includeVendored?: boolean;
   maxFileSize?: string;
 };
+
+function lifecycleCounts(result: IndexResult): {
+  filesScanned: number;
+  filesIndexed: number;
+  filesSkipped: number;
+  filesErrored: number;
+  nodesCreated: number;
+  edgesCreated: number;
+} {
+  return {
+    filesScanned: result.filesIndexed + result.filesSkipped + result.filesErrored,
+    filesIndexed: result.filesIndexed,
+    filesSkipped: result.filesSkipped,
+    filesErrored: result.filesErrored,
+    nodesCreated: result.nodesCreated,
+    edgesCreated: result.edgesCreated,
+  };
+}
+
+function resultFailure(result: IndexResult): Error {
+  const cause = result.errors[0];
+  const causeError = cause ? new Error(cause.message) : undefined;
+  return new Error('Indexing completed with a failure result', causeError ? { cause: causeError } : undefined);
+}
+
+function trackIndexProgress(
+  diagnostics: IndexLifecycleDiagnostics,
+  onProgress?: (progress: IndexProgress) => void,
+): (progress: IndexProgress) => void {
+  return (progress) => {
+    diagnostics.transition(progress);
+    onProgress?.(progress);
+  };
+}
+
+function destroyIndexGraph(cg: SolidKG | undefined): void {
+  try {
+    cg?.destroy();
+  } catch {
+    const warning = 'Graph cleanup failed; continuing after the primary result.';
+    try {
+      logWarn(warning);
+    } catch {
+      try {
+        process.stderr.write(`${warning}\n`);
+      } catch {
+        return;
+      }
+    }
+  }
+}
 
 function parseByteSize(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
@@ -789,6 +845,8 @@ program
     const dataDir = resolveDataDir(options.dataDir);
     const presenter = createTerminalPresenter();
     const terseInitIndex = options.index === true && options.verbose !== true;
+    let cg: SolidKG | undefined;
+    let diagnostics: IndexLifecycleDiagnostics | undefined;
 
     if (!terseInitIndex) {
       presenter.intro('Initializing SolidKG');
@@ -818,7 +876,7 @@ program
       }
 
       const { default: SolidKG } = await loadSolidKG();
-      const cg = await SolidKG.init(projectPath, { index: false, dataDir, extraRoots: options.extraRoot, includeSubmodules: options.recurseSubmodules, ...controls });
+      cg = await SolidKG.init(projectPath, { index: false, dataDir, extraRoots: options.extraRoot, includeSubmodules: options.recurseSubmodules, ...controls });
       if (!terseInitIndex) {
         presenter.success(`Initialized in ${projectPath}`);
         presenter.status(`Data directory: ${cg.getDataDir()}`);
@@ -841,12 +899,17 @@ program
       }
 
       if (options.index) {
+        diagnostics = new IndexLifecycleDiagnostics({
+          dataDir: cg.getDataDir(),
+          operation: 'indexAll',
+        });
+        diagnostics.start({ phase: 'scanning', current: 0, total: 0 });
         let result: IndexResult;
         let progressSettled = false;
 
         if (options.verbose) {
           result = await cg.indexAll({
-            onProgress: createVerboseProgress(presenter),
+            onProgress: trackIndexProgress(diagnostics, createVerboseProgress(presenter)),
             verbose: true,
             scip: 'auto',
             extraRoots: options.extraRoot,
@@ -856,7 +919,7 @@ program
         } else {
           const progress = createInteractiveProgress(presenter);
           result = await cg.indexAll({
-            ...(progress ? { onProgress: progress.onProgress } : {}),
+            onProgress: trackIndexProgress(diagnostics, progress?.onProgress),
             scip: 'auto',
             extraRoots: options.extraRoot,
             includeSubmodules: options.recurseSubmodules,
@@ -874,6 +937,15 @@ program
           successPrefix: 'SolidKG initialized and indexed',
           suppressPrimary: progressSettled,
         } : undefined);
+
+        if (!result.success) {
+          diagnostics.fail(resultFailure(result));
+          destroyIndexGraph(cg);
+          cg = undefined;
+          process.exit(1);
+        }
+
+        diagnostics.succeed(lifecycleCounts(result));
       } else {
         presenter.status('Run "solidkg index" to index the project');
       }
@@ -886,8 +958,11 @@ program
       if (!terseInitIndex) {
         presenter.outro('Done');
       }
-      cg.destroy();
+      destroyIndexGraph(cg);
+      cg = undefined;
     } catch (err) {
+      diagnostics?.fail(err instanceof Error ? err : new Error(String(err)));
+      destroyIndexGraph(cg);
       presenter.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
@@ -972,6 +1047,8 @@ program
     const projectPath = resolveProjectPath(pathArg, dataDir);
     const presenter = createTerminalPresenter({ quiet: options.quiet });
     const terseIndex = options.verbose !== true;
+    let cg: SolidKG | undefined;
+    let diagnostics: IndexLifecycleDiagnostics | undefined;
 
     try {
       const controls = indexingControls(options);
@@ -982,14 +1059,33 @@ program
       }
 
       const { default: SolidKG } = await loadSolidKG();
-      const cg = await SolidKG.open(projectPath, { dataDir, extraRoots: options.extraRoot, includeSubmodules: options.recurseSubmodules, ...controls });
+      cg = await SolidKG.open(projectPath, { dataDir, extraRoots: options.extraRoot, includeSubmodules: options.recurseSubmodules, ...controls });
       const scip = parseScipMode(options.scip ?? 'off');
+      diagnostics = new IndexLifecycleDiagnostics({
+        dataDir: cg.getDataDir(),
+        operation: 'indexAll',
+      });
+      diagnostics.start({ phase: 'scanning', current: 0, total: 0 });
 
       if (options.profileJson) {
         if (options.force) cg.clear();
-        const result = await cg.indexAll({ profile: true, scip, extraRoots: options.extraRoot, includeSubmodules: options.recurseSubmodules, ...controls });
+        const result = await cg.indexAll({
+          profile: true,
+          onProgress: trackIndexProgress(diagnostics),
+          scip,
+          extraRoots: options.extraRoot,
+          includeSubmodules: options.recurseSubmodules,
+          ...controls,
+        });
+        if (!result.success) {
+          diagnostics.fail(resultFailure(result));
+          destroyIndexGraph(cg);
+          cg = undefined;
+          process.exit(1);
+        }
+        diagnostics.succeed(lifecycleCounts(result));
         cg.destroy();
-        if (!result.success) process.exit(1);
+        cg = undefined;
         process.stdout.write(`${JSON.stringify(result)}\n`);
         return;
       }
@@ -997,9 +1093,22 @@ program
       if (options.quiet) {
         // Quiet mode: no UI, just run
         if (options.force) cg.clear();
-        const result = await cg.indexAll({ scip, extraRoots: options.extraRoot, includeSubmodules: options.recurseSubmodules, ...controls });
-        if (!result.success) process.exit(1);
+        const result = await cg.indexAll({
+          onProgress: trackIndexProgress(diagnostics),
+          scip,
+          extraRoots: options.extraRoot,
+          includeSubmodules: options.recurseSubmodules,
+          ...controls,
+        });
+        if (!result.success) {
+          diagnostics.fail(resultFailure(result));
+          destroyIndexGraph(cg);
+          cg = undefined;
+          process.exit(1);
+        }
+        diagnostics.succeed(lifecycleCounts(result));
         cg.destroy();
+        cg = undefined;
         return;
       }
 
@@ -1019,7 +1128,7 @@ program
 
       if (options.verbose) {
         result = await cg.indexAll({
-          onProgress: createVerboseProgress(presenter),
+          onProgress: trackIndexProgress(diagnostics, createVerboseProgress(presenter)),
           verbose: true,
           scip,
           extraRoots: options.extraRoot,
@@ -1029,7 +1138,7 @@ program
       } else {
         const progress = createInteractiveProgress(presenter);
         result = await cg.indexAll({
-          ...(progress ? { onProgress: progress.onProgress } : {}),
+          onProgress: trackIndexProgress(diagnostics, progress?.onProgress),
           scip,
           extraRoots: options.extraRoot,
           includeSubmodules: options.recurseSubmodules,
@@ -1048,14 +1157,21 @@ program
       } : undefined);
 
       if (!result.success) {
+        diagnostics.fail(resultFailure(result));
+        destroyIndexGraph(cg);
+        cg = undefined;
         process.exit(1);
       }
 
       if (!terseIndex) {
         presenter.outro('Done');
       }
+      diagnostics.succeed(lifecycleCounts(result));
       cg.destroy();
+      cg = undefined;
     } catch (err) {
+      diagnostics?.fail(err instanceof Error ? err : new Error(String(err)));
+      destroyIndexGraph(cg);
       if (options.profileJson) {
         console.error(`Failed to index: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);

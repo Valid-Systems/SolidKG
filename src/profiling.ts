@@ -1,8 +1,8 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { performance } from 'perf_hooks';
+import * as fs from "fs";
+import * as path from "path";
+import { performance } from "perf_hooks";
 
-export const INDEX_PROFILE_SCHEMA_VERSION = 'solidkg.indexProfile.v1';
+export const INDEX_PROFILE_SCHEMA_VERSION = "solidkg.indexProfile.v1";
 
 export interface IndexProfile {
   schemaVersion: typeof INDEX_PROFILE_SCHEMA_VERSION;
@@ -88,9 +88,12 @@ export function elapsedMs(startedAt: number): number {
   return Math.max(0, performance.now() - startedAt);
 }
 
-export function recordResourceStats(profile: MutableIndexProfile, dataDir: string): void {
+export function recordResourceStats(
+  profile: MutableIndexProfile,
+  dataDir: string,
+): void {
   const memory = process.memoryUsage();
-  const dbPath = path.join(dataDir, 'solidkg.db');
+  const dbPath = path.join(dataDir, "solidkg.db");
   const walPath = `${dbPath}-wal`;
   profile.resources = {
     rssBytes: memory.rss,

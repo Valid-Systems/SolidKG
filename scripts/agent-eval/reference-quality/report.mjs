@@ -7,7 +7,7 @@ const RATIO_LANES = Object.freeze([
   { id: 'scipLinkedNode', repo: (value) => value.optional?.scip?.linkedNodeCoverage, aggregate: (value) => value.lanes.scipLinkedNode }, { id: 'capabilityComplete', repo: (value) => value.optional?.capabilities?.completeRate, aggregate: (value) => value.lanes.capabilityComplete },
 ]);
 const REPO_STATUSES = new Set(['measured', 'empty', 'incompatible_schema', 'corrupt']);
-const PROBE_STATUSES = new Set(['measured', 'miss', 'nondeterministic', 'error', 'unavailable', 'stale', 'timeout']);
+const PROBE_STATUSES = new Set(['measured', 'miss', 'abstained', 'nondeterministic', 'error', 'unavailable', 'stale', 'timeout']);
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
 
 function median(values) {
@@ -71,6 +71,20 @@ function buildAggregate(repos) {
   };
 }
 
+function buildProbeQuality(probes) {
+  const graded = probes.filter((probe) => {
+    if (!['measured', 'miss', 'abstained'].includes(probe.status) || !isObject(probe.summary?.relevance)) return false;
+    return ['requiredRecall', 'usefulRecall', 'misleadingIntrusionRate']
+      .some((metric) => probe.summary.relevance[metric] !== null && probe.summary.relevance[metric] !== undefined);
+  });
+  return {
+    gradedProbeCount: graded.length,
+    requiredRecallMedian: median(graded.map((probe) => probe.summary.relevance.requiredRecall)),
+    usefulRecallMedian: median(graded.map((probe) => probe.summary.relevance.usefulRecall)),
+    misleadingIntrusionRateMedian: median(graded.map((probe) => probe.summary.relevance.misleadingIntrusionRate)),
+  };
+}
+
 export function buildReferenceQualityReport(input) {
   const repos = [...input.repos].sort((left, right) => left.repoId.localeCompare(right.repoId));
   const fingerprints = new Map(repos.map((repo) => [repo.repoId, repo.indexFingerprint ?? null]));
@@ -79,7 +93,7 @@ export function buildReferenceQualityReport(input) {
   return {
     schemaName: REPORT_SCHEMA, metricPolicyVersion: METRIC_POLICY_VERSION,
     claimBoundary: 'Diagnostic reference-index snapshot. Mixed historical indexes do not prove current-build extraction quality or universal superiority.',
-    generatedAt: input.generatedAt, provenance: input.provenance, aggregate: buildAggregate(repos), probes, repos,
+    generatedAt: input.generatedAt, provenance: input.provenance, aggregate: buildAggregate(repos), probeQuality: buildProbeQuality(probes), probes, repos,
   };
 }
 
@@ -111,14 +125,19 @@ export function renderMarkdown(report) {
     `- No-declaration exclusions: ${report.aggregate.noDeclarationExclusions}`, `- File errors: ${report.aggregate.burdens.fileErrors}`,
     `- Dangling edges: ${report.aggregate.burdens.danglingEdges}`, `- Duplicate canonical repositories: ${report.aggregate.duplicateCanonicalRepos.length}`,
     `- Schema versions: ${JSON.stringify(report.aggregate.schemaVersionDistribution)}`, `- Producer versions: ${JSON.stringify(report.aggregate.producerVersionDistribution)}`,
+    '', '## Graded probe relevance', '',
+    `- Graded probes: ${report.probeQuality?.gradedProbeCount ?? 0}`,
+    `- Required recall median: ${pct(report.probeQuality?.requiredRecallMedian ?? null)}`,
+    `- Useful recall median: ${pct(report.probeQuality?.usefulRecallMedian ?? null)}`,
+    `- Misleading intrusion median: ${pct(report.probeQuality?.misleadingIntrusionRateMedian ?? null)}`,
     '', '### Optional feature availability', '',
     ...Object.entries(report.aggregate.featureAvailability).map(([name, statuses]) => `- ${name}: ${JSON.stringify(statuses)}`),
     '', '## Repository results', '', '| Repository | Status | Schema | Files | Fair any | Fair semantic | Unresolved / 1k |', '|---|---|---:|---:|---:|---:|---:|',
   ];
   for (const repo of report.repos) lines.push(`| ${repo.repoId} | ${repo.status} | ${repo.schemaVersion ?? 'n/a'} | ${repo.counts?.files ?? 'n/a'} | ${pct(repo.coverage?.fair?.any?.rate ?? null)} | ${pct(repo.coverage?.fair?.semantic?.rate ?? null)} | ${repo.health?.unresolvedPerThousand ?? 'n/a'} |`); lines.push('', '## Status distribution', '');
   for (const [status, count] of Object.entries(report.aggregate.statusDistribution)) lines.push(`- ${status}: ${count}`);
-  lines.push('', '## Probe diagnostics', '', '| Probe | Status | Repeats | p50 ms | Payload bytes | Expectation misses |', '|---|---|---:|---:|---:|---:|');
-  for (const probe of report.probes) lines.push(`| ${probe.repoId}/${probe.probeId} | ${probe.status} | ${probe.summary?.repeatCount ?? 'n/a'} | ${probe.summary?.latencyMs?.p50 ?? 'n/a'} | ${probe.summary?.payloadBytes ?? 'n/a'} | ${probe.summary?.expectationMissCount ?? 'n/a'} |`);
+  lines.push('', '## Probe diagnostics', '', '| Probe | Status | Repeats | p50 ms | Payload bytes | Required recall | Misleading intrusion | Expectation misses |', '|---|---|---:|---:|---:|---:|---:|---:|');
+  for (const probe of report.probes) lines.push(`| ${probe.repoId}/${probe.probeId} | ${probe.status} | ${probe.summary?.repeatCount ?? 'n/a'} | ${probe.summary?.latencyMs?.p50 ?? 'n/a'} | ${probe.summary?.payloadBytes ?? 'n/a'} | ${pct(probe.summary?.relevance?.requiredRecall ?? null)} | ${pct(probe.summary?.relevance?.misleadingIntrusionRate ?? null)} | ${probe.summary?.expectationMissCount ?? 'n/a'} |`);
   lines.push('', '## Claim boundary', '', report.claimBoundary, ''); return lines.join('\n');
 }
 
@@ -237,7 +256,13 @@ function isAggregate(value) {
     && Array.isArray(value.provenanceDistribution) && Array.isArray(value.synthesizedFamilies);
 }
 
-function isProbeSummary(value) { return isObject(value) && Number.isInteger(value.repeatCount) && isObject(value.latencyMs) && ['p50', 'min', 'max'].every((key) => value.latencyMs[key] === null || isNumber(value.latencyMs[key])) && Number.isInteger(value.payloadBytes) && Array.isArray(value.outputHashes) && value.outputHashes.every((hash) => typeof hash === 'string') && typeof value.deterministic === 'boolean' && isDistribution(value.statuses) && Number.isInteger(value.expectationCount) && Number.isInteger(value.expectationMissCount); }
+function isNullableRate(value) { return value === null || isNumber(value) && value >= 0 && value <= 1; }
+
+function isProbeRelevance(value) { return isObject(value) && ['requiredRecall', 'usefulRecall', 'misleadingIntrusionRate'].every((key) => isNullableRate(value[key])); }
+
+function isProbeQuality(value) { return isObject(value) && Number.isInteger(value.gradedProbeCount) && value.gradedProbeCount >= 0 && ['requiredRecallMedian', 'usefulRecallMedian', 'misleadingIntrusionRateMedian'].every((key) => isNullableRate(value[key])); }
+
+function isProbeSummary(value) { return isObject(value) && Number.isInteger(value.repeatCount) && isObject(value.latencyMs) && ['p50', 'min', 'max'].every((key) => value.latencyMs[key] === null || isNumber(value.latencyMs[key])) && Number.isInteger(value.payloadBytes) && Array.isArray(value.outputHashes) && value.outputHashes.every((hash) => typeof hash === 'string') && typeof value.deterministic === 'boolean' && isDistribution(value.statuses) && Number.isInteger(value.expectationCount) && Number.isInteger(value.expectationMissCount) && (value.relevance === undefined || isProbeRelevance(value.relevance)); }
 
 function isProbe(value) { return isObject(value) && typeof value.repoId === 'string' && typeof value.probeId === 'string' && PROBE_STATUSES.has(value.status) && (value.indexFingerprint == null || typeof value.indexFingerprint === 'string') && (value.summary === undefined || isProbeSummary(value.summary)) && (value.status !== 'measured' || isProbeSummary(value.summary)); }
 
@@ -246,6 +271,7 @@ function isProvenance(value, probesExist) { return isObject(value) && HASH_PATTE
 export function isReferenceQualityReport(value) {
   return Boolean(isObject(value) && value.schemaName === REPORT_SCHEMA && value.metricPolicyVersion === METRIC_POLICY_VERSION && typeof value.generatedAt === 'string' && Number.isFinite(Date.parse(value.generatedAt)) && typeof value.claimBoundary === 'string'
     && isAggregate(value.aggregate) && Array.isArray(value.repos) && value.repos.every(isRepo) && new Set(value.repos.map((repo) => repo.repoId)).size === value.repos.length
+    && (value.probeQuality === undefined || isProbeQuality(value.probeQuality))
     && Array.isArray(value.probes) && isProvenance(value.provenance, value.probes.length > 0) && value.probes.every(isProbe) && new Set(value.probes.map((probe) => `${probe.repoId}/${probe.probeId}`)).size === value.probes.length);
 }
 
