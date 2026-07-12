@@ -6,7 +6,7 @@
 
 SolidKG turns a source repository into a local SQLite knowledge graph for AI coding agents, CLI workflows, and other tools. It stores deterministic AST-derived facts: files, symbols, calls, imports, references, semantic hyperedges, source snippets, and optional SCIP precise-reference data.
 
-It is inspired by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), and [Cartog](https://github.com/jrollin/cartog).
+It is inspired by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), [Cartog](https://github.com/jrollin/cartog), and the Source Code Intelligence Protocol (SCIP).
 
 ## Why use it
 
@@ -34,9 +34,29 @@ This is a feature-scope comparison, not a universal ranking. It was verified on 
 
 ## Measured results
 
+### Seven-arm matched benchmark
+
+The most complete local diagnostic used `openai/gpt-5.6-sol` on ten repositories, seven arms, and four repeats per repository-arm cell: 280 scheduled sessions, 276 completed answers, two independent blinded reviews per answer, and separate adjudication of scored-field disagreements. Its raw trajectories and source snapshots are not versioned here, so treat the exact figures as bounded local evidence rather than independently reproducible results.
+
+| Arm | Mean answer F1 | Mean tokens | Tools/task | Direct retrieval p50 (cold / warm) |
+|---|---:|---:|---:|---:|
+| Baseline | 97.5% | 96,050 | 15.1 | - |
+| SolidKG core | 97.1% | 72,755 | **4.8** | 5,022 / 1,212 ms |
+| SolidKG + SCIP | 97.2% | 84,166 | **4.0** | 5,402 / 1,081 ms |
+| CodeGraph | 98.0% | 89,552 | 13.8 | 7,290 / 2,349 ms |
+| Sverklo | 98.1% | 109,315 | 15.1 | **200 / 100 ms** |
+| Cartog | 97.4% | 124,735 | 15.9 | 1,351 / **37 ms** |
+| Tilth | 98.1% | 107,748 | 14.2 | 14,844 / 239 ms |
+
+Quality was near ceiling and paired median F1 differences from baseline were zero, so this does not support a universal answer-quality winner. SolidKG's clearest descriptive signal was tool economy: core used 70.0% fewer paired tool calls than baseline and SolidKG + SCIP used 71.0% fewer. The raw exact sign-flip p-value was 0.00195, but the predeclared Holm-adjusted value was 0.140625, so the report does not present this as a multiplicity-adjusted statistical finding. Tokens and end-to-end session time varied by repository and did not show a general SolidKG reduction. Sverklo and Cartog had the fastest direct retrieval medians; direct MCP latency and complete model-session time are different endpoints.
+
+CodeGraph completed 36/40 cells because its four .NET Runtime indexing cells were terminal unavailable in this frozen setup. Sverklo remained available across the corpus; its documented support uses different parser tiers, including tree-sitter-capable support for TS/TSX/JS/Python/Go/Rust/C# and regex fallback for PHP/Java/Ruby and other registered languages.
+
+See [`docs/benchmarks/opencode-seven-arm-2026-07-12.md`](docs/benchmarks/opencode-seven-arm-2026-07-12.md) for paired uncertainty, availability, latency, review methodology, repository effects, provenance, and limitations.
+
 ### SolidKG vs CodeGraph: matched OpenCode comparison
 
-The latest OpenAI-only comparison used OpenCode with `openai/gpt-5.6-sol`, the same seven repositories and architecture questions for both products, current local builds, and four successful repeats per repository/product cell. Lower is better.
+The dedicated two-product OpenAI comparison used OpenCode with `openai/gpt-5.6-sol`, the same seven repositories and architecture questions for both products, current local builds, and four successful repeats per repository/product cell. Lower is better.
 
 | Equal-repository aggregate | SolidKG relative to CodeGraph |
 |---|---:|
@@ -289,7 +309,7 @@ If indexing stops or appears stalled, inspect the lifecycle diagnostic in the in
 <data-dir>/index-lifecycle.json
 ```
 
-`index` and the initial index run by `init -i` update this record through a random exclusive temporary file followed by atomic replacement. Phase, detail, completion, and terminal success or failure are persisted immediately. Counts during a running index are periodically checkpointed, with an intended lag of at most about two seconds, so they reflect the latest checkpoint rather than the instant you inspect the file. Where POSIX modes apply, it is owner-only. It can include absolute paths and stack traces, so treat it as sensitive diagnostic output and review it before sharing.
+`index` and the initial index run by `init -i` attempt to update this record immediately through a random exclusive temporary file followed by atomic replacement. On successful publication, phase, detail, completion, and terminal state replace the previous record atomically. Counts during a running index are periodically checkpointed, so they reflect the latest successful checkpoint rather than the instant you inspect the file. Where POSIX modes apply, it is owner-only. It can include absolute paths and stack traces, so treat it as sensitive diagnostic output and review it before sharing.
 
 On Windows network drives or SMB shares, put `--data-dir` on a local disk to avoid SQLite locking issues.
 

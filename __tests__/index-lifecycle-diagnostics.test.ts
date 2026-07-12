@@ -1,12 +1,22 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLogger, setLogger, type Logger } from '../src/errors';
 import { writeAtomicLifecycleFile } from '../src/index-lifecycle-atomic-file';
 import { IndexLifecycleDiagnostics } from '../src/index-lifecycle-diagnostics';
 
 const randomBytes = vi.hoisted(() => vi.fn());
+const renameSync = vi.hoisted(() => vi.fn());
+const nativeRenameSync = vi.hoisted(() => vi.fn());
+const atomicsWait = vi.hoisted(() => vi.fn(() => 'timed-out' as const));
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  nativeRenameSync.mockImplementation(actual.renameSync);
+  renameSync.mockImplementation(nativeRenameSync);
+  return { ...actual, renameSync };
+});
 
 vi.mock('crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('crypto')>();
@@ -16,6 +26,10 @@ vi.mock('crypto', async (importOriginal) => {
 
 const DIAGNOSTIC_FILENAME = 'index-lifecycle.json';
 const tempDirs: string[] = [];
+
+beforeEach(() => {
+  vi.spyOn(Atomics, 'wait').mockImplementation(atomicsWait);
+});
 
 function createTempDir(prefix: string): string {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -54,6 +68,9 @@ afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   randomBytes.mockClear();
+  renameSync.mockReset();
+  renameSync.mockImplementation(nativeRenameSync);
+  atomicsWait.mockClear();
   while (tempDirs.length > 0) {
     const directory = tempDirs.pop();
     if (directory) fs.rmSync(directory, { recursive: true, force: true });
@@ -218,6 +235,96 @@ describe('index lifecycle diagnostics', () => {
     expect(fs.readFileSync(collisionPath, 'utf8')).toBe('preserve collision content');
     expect(fs.readFileSync(diagnosticPath, 'utf8')).toBe('replacement diagnostic\n');
     expect(fs.existsSync(`${diagnosticPath}.${secondRandomBytes.toString('hex')}.tmp`)).toBe(false);
+  });
+
+  it('retries a transient Windows rename failure with the same owned temporary file', () => {
+    // Given: the atomic writer owns one temporary file and its first publish attempt gets EPERM.
+    const dataDir = createTempDir('solidkg-index-lifecycle-rename-retry-');
+    const diagnosticPath = path.join(dataDir, DIAGNOSTIC_FILENAME);
+    const temporaryBytes = Buffer.alloc(16, 0x33);
+    randomBytes.mockReturnValue(temporaryBytes);
+    const renameError = Object.assign(new Error('rename is temporarily blocked'), { code: 'EPERM' });
+    renameSync
+      .mockImplementationOnce(() => {
+        throw renameError;
+      })
+      .mockImplementation(nativeRenameSync);
+
+    // When: lifecycle persistence publishes the diagnostic.
+    const diagnostics = new IndexLifecycleDiagnostics({
+      dataDir,
+      operation: 'indexAll',
+      activeResources: ['solidkg.db'],
+    });
+    diagnostics.start({ phase: 'scanning', current: 1, total: 2 });
+
+    // Then: it retries the exact owned temp path, publishes the final record, and leaves no temp.
+    const temporaryPath = `${diagnosticPath}.${temporaryBytes.toString('hex')}.tmp`;
+    expect(randomBytes).toHaveBeenCalledTimes(1);
+    expect(renameSync).toHaveBeenCalledTimes(2);
+    expect(renameSync.mock.calls.map(([source, destination]) => [source, destination])).toEqual([
+      [temporaryPath, diagnosticPath],
+      [temporaryPath, diagnosticPath],
+    ]);
+    expect(readDiagnostic(dataDir)).toMatchObject({
+      status: 'running',
+      phase: 'scanning',
+      progress: { current: 1, total: 2 },
+    });
+    expect(fs.existsSync(temporaryPath)).toBe(false);
+  });
+
+  it('bounds persistent Windows rename retries and removes the owned temporary file', () => {
+    // Given: every publish attempt receives a persistent EPERM.
+    const dataDir = createTempDir('solidkg-index-lifecycle-rename-failure-');
+    const diagnosticPath = path.join(dataDir, DIAGNOSTIC_FILENAME);
+    const temporaryBytes = Buffer.alloc(16, 0x44);
+    randomBytes.mockReturnValue(temporaryBytes);
+    const renameError = Object.assign(new Error('rename remains blocked'), { code: 'EPERM' });
+    renameSync.mockImplementation(() => {
+      throw renameError;
+    });
+
+    // When: atomic persistence is attempted.
+    const temporaryPath = `${diagnosticPath}.${temporaryBytes.toString('hex')}.tmp`;
+    expect(() => writeAtomicLifecycleFile(diagnosticPath, 'blocked diagnostic\n')).toThrow(renameError);
+
+    // Then: retries are bounded, the owned temp is cleaned, and no destination is published.
+    expect(renameSync).toHaveBeenCalledTimes(8);
+    expect(atomicsWait.mock.calls.map((call) => call[3])).toEqual([25, 50, 100, 150, 150, 150, 150]);
+    expect(renameSync.mock.calls.every(([source, destination]) => source === temporaryPath && destination === diagnosticPath)).toBe(true);
+    expect(fs.existsSync(temporaryPath)).toBe(false);
+    expect(fs.existsSync(diagnosticPath)).toBe(false);
+  });
+
+  it.each(['EACCES', 'EBUSY'] as const)('retries transient %s rename failures', (code) => {
+    const dataDir = createTempDir(`solidkg-index-lifecycle-${code.toLowerCase()}-`);
+    const diagnosticPath = path.join(dataDir, DIAGNOSTIC_FILENAME);
+    renameSync
+      .mockImplementationOnce(() => {
+        throw Object.assign(new Error('transient rename failure'), { code });
+      })
+      .mockImplementation(nativeRenameSync);
+
+    writeAtomicLifecycleFile(diagnosticPath, 'diagnostic\n');
+
+    expect(renameSync).toHaveBeenCalledTimes(2);
+    expect(atomicsWait.mock.calls.map((call) => call[3])).toEqual([25]);
+    expect(fs.readFileSync(diagnosticPath, 'utf8')).toBe('diagnostic\n');
+  });
+
+  it('does not retry a non-transient rename failure', () => {
+    const dataDir = createTempDir('solidkg-index-lifecycle-non-transient-');
+    const diagnosticPath = path.join(dataDir, DIAGNOSTIC_FILENAME);
+    const renameError = Object.assign(new Error('invalid destination'), { code: 'EINVAL' });
+    renameSync.mockImplementation(() => {
+      throw renameError;
+    });
+
+    expect(() => writeAtomicLifecycleFile(diagnosticPath, 'diagnostic\n')).toThrow(renameError);
+
+    expect(renameSync).toHaveBeenCalledTimes(1);
+    expect(atomicsWait).not.toHaveBeenCalled();
   });
 
   it.runIf(process.platform !== 'win32')(
