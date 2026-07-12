@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Results from a seven-arm matched OpenCode benchmark.">
+  <title>Seven-arm OpenCode benchmark results</title>
+  <style>
+    :root { --bg: #fafaf8; --paper: #ffffff; --ink: #202522; --muted: #5f6964; --line: #d9ddd9; --accent: #0f6652; --positive: #0f6652; --negative: #9a3f32; --soft: #f2f6f3; --mono: ui-monospace, "Cascadia Code", Consolas, monospace; --sans: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html { background: var(--bg); color: var(--ink); font-family: var(--sans); }
+    body { margin: 0; font-size: 16px; line-height: 1.55; }
+    main { max-width: 1100px; margin: 0 auto; padding: 48px 28px 64px; }
+    header { border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(28px, 4vw, 32px); line-height: 1.18; letter-spacing: -.025em; font-weight: 650; }
+    h2 { margin-top: 42px; padding-top: 6px; font-size: clamp(20px, 3vw, 24px); line-height: 1.25; letter-spacing: -.015em; }
+    h3 { font-size: 16px; margin-top: 18px; }
+    p { margin-top: 12px; }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+    .lede { max-width: 800px; color: var(--muted); }
+    .meta, .note, footer { color: var(--muted); font-size: 13px; }
+    .meta { margin-top: 10px; font-family: var(--mono); }
+    .findings { margin: 16px 0 0; padding: 0 0 0 20px; }
+    .findings li { margin: 6px 0; }
+    .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); background: var(--paper); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.35; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; white-space: nowrap; }
+    th { background: #f5f7f5; color: var(--muted); font: 700 11px/1.25 var(--mono); letter-spacing: .03em; text-transform: uppercase; }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .row-accent { background: var(--soft); }
+    .good { color: var(--positive); font-weight: 650; }
+    .bad { color: var(--negative); font-weight: 650; }
+    .definition-table td:first-child { width: 180px; font-weight: 650; }
+    .compact-table { font-size: 12px; }
+    .compact-table th, .compact-table td { padding: 6px 7px; }
+    .callout { margin-top: 14px; padding: 12px 14px; border-left: 3px solid var(--accent); background: #f4f8f5; font-size: 14px; }
+    footer { margin-top: 42px; padding-top: 18px; border-top: 1px solid var(--line); }
+    @media (max-width: 680px) {
+      main { padding: 28px 16px 44px; }
+      h2 { margin-top: 32px; }
+      .table-wrap { overflow: visible; border: 0; background: transparent; }
+      .report-table, .report-table tbody, .report-table tr, .report-table td { display: block; width: 100%; }
+      .report-table thead { display: none; }
+      .report-table tr { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--line); background: var(--paper); }
+      .report-table tr.row-accent { background: var(--soft); }
+      .report-table td { display: grid; grid-template-columns: minmax(110px, 42%) minmax(0, 58%); gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); text-align: right; white-space: normal; overflow-wrap: anywhere; }
+      .report-table td::before { content: attr(data-label); color: var(--muted); font: 700 10px/1.25 var(--mono); letter-spacing: .03em; text-align: left; text-transform: uppercase; }
+      .report-table td:last-child { border-bottom: 0; }
+      .report-table td:first-child { font-weight: 650; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Seven-arm OpenCode benchmark results</h1>
+      <p class="lede">Matched architecture-explanation sessions across baseline OpenCode, SolidKG core, SolidKG + SCIP, CodeGraph, Sverklo, Cartog, and Tilth.</p>
+      <p class="meta">10 repositories · 7 arms · 4 repeats per repository-arm cell · 276 completed answers</p>
+    </header>
+
+    <section aria-labelledby="findings">
+      <h2 id="findings">What the results say</h2>
+      <ul class="findings">
+        <li>Baseline had the fastest observed end-to-end sessions, at 57.9 mean seconds.</li>
+        <li>SolidKG core and SolidKG + SCIP used about 70–71% fewer paired tool calls than baseline.</li>
+        <li>SolidKG core had the lowest mean token usage and lowest estimated GPT-5.6 Sol API-equivalent cost.</li>
+        <li>Mechanism F1 was near-identical across arms, from 97.09% to 98.12%.</li>
+        <li>Sverklo and Cartog had the fastest direct MCP calls, but slower complete sessions and higher estimated API costs than baseline.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="definitions">
+      <h2 id="definitions">Metric definitions</h2>
+      <p>Use these definitions to distinguish answer quality, observed agent burden, direct transport timing, and API-equivalent token cost.</p>
+      <div class="table-wrap"><table class="report-table definition-table"><thead><tr><th>Metric</th><th>Definition</th></tr></thead><tbody>
+        <tr><td data-label="Metric">Mechanism F1</td><td data-label="Definition">Harmonic mean of source-grounded mechanism precision and recall against the frozen expected rubric.</td></tr>
+        <tr><td data-label="Metric">Mean tokens</td><td data-label="Definition">Mean total observed tokens per completed task.</td></tr>
+        <tr><td data-label="Metric">Tools/task</td><td data-label="Definition">Mean agent tool calls per completed task.</td></tr>
+        <tr><td data-label="Metric">End-to-end session</td><td data-label="Definition">Observed model wall time for the complete task, not a developer-productivity measure.</td></tr>
+        <tr><td data-label="Metric">Paired difference vs baseline</td><td data-label="Definition">Paired median percentage difference by repository and repeat; negative means fewer or faster.</td></tr>
+        <tr><td data-label="Metric">MCP cold / warm</td><td data-label="Definition">Direct first-retrieval and warm-retrieval p50 latency, measured separately from complete sessions.</td></tr>
+        <tr><td data-label="Metric">Availability</td><td data-label="Definition">Completed scheduled cells divided by scheduled cells.</td></tr>
+        <tr><td data-label="Metric">API-equivalent cost</td><td data-label="Definition">Estimate from observed token categories using GPT-5.6 Sol Standard short-context API rates.</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section aria-labelledby="comparison">
+      <h2 id="comparison">Arm comparison</h2>
+      <p>The table compares absolute means. Lower is better for tokens, tools, session seconds, and API cost; F1 is an answer-quality measure rather than a speed measure.</p>
+      <div class="table-wrap"><table class="report-table compact-table"><thead><tr><th>Arm</th><th>F1</th><th>Mean tokens</th><th>Tools/task</th><th>Mean session</th><th>API cost</th><th>Cost vs baseline</th><th>Availability</th></tr></thead><tbody>
+        <tr><td data-label="Arm">Baseline</td><td data-label="F1">97.46%</td><td data-label="Mean tokens">96,050</td><td data-label="Tools/task">15.1</td><td data-label="Mean session">57.9 s</td><td data-label="API cost">$0.2316</td><td data-label="Cost vs baseline">baseline</td><td data-label="Availability">100% (40/40)</td></tr>
+        <tr class="row-accent"><td data-label="Arm">SolidKG core</td><td data-label="F1">97.09%</td><td data-label="Mean tokens">72,755</td><td data-label="Tools/task">4.8</td><td data-label="Mean session">67.4 s</td><td data-label="API cost">$0.2124</td><td data-label="Cost vs baseline" class="good">−8.31%</td><td data-label="Availability">100% (40/40)</td></tr>
+        <tr class="row-accent"><td data-label="Arm">SolidKG + SCIP</td><td data-label="F1">97.18%</td><td data-label="Mean tokens">84,166</td><td data-label="Tools/task">4.0</td><td data-label="Mean session">59.8 s</td><td data-label="API cost">$0.2179</td><td data-label="Cost vs baseline" class="good">−5.92%</td><td data-label="Availability">100% (40/40)</td></tr>
+        <tr><td data-label="Arm">CodeGraph</td><td data-label="F1">97.97%</td><td data-label="Mean tokens">89,552</td><td data-label="Tools/task">13.8</td><td data-label="Mean session">65.6 s</td><td data-label="API cost">$0.2249</td><td data-label="Cost vs baseline" class="good">−2.93%</td><td data-label="Availability">90% (36/40)</td></tr>
+        <tr><td data-label="Arm">Sverklo</td><td data-label="F1">98.05%</td><td data-label="Mean tokens">109,315</td><td data-label="Tools/task">15.1</td><td data-label="Mean session">78.6 s</td><td data-label="API cost">$0.2593</td><td data-label="Cost vs baseline" class="bad">+11.95%</td><td data-label="Availability">100% (40/40)</td></tr>
+        <tr><td data-label="Arm">Cartog</td><td data-label="F1">97.43%</td><td data-label="Mean tokens">124,735</td><td data-label="Tools/task">15.9</td><td data-label="Mean session">74.0 s</td><td data-label="API cost">$0.2789</td><td data-label="Cost vs baseline" class="bad">+20.38%</td><td data-label="Availability">100% (40/40)</td></tr>
+        <tr><td data-label="Arm">Tilth</td><td data-label="F1">98.12%</td><td data-label="Mean tokens">107,748</td><td data-label="Tools/task">14.2</td><td data-label="Mean session">74.7 s</td><td data-label="API cost">$0.2450</td><td data-label="Cost vs baseline" class="bad">+5.77%</td><td data-label="Availability">100% (40/40)</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section aria-labelledby="paired-effects">
+      <h2 id="paired-effects">Paired effects versus baseline</h2>
+      <p>These are paired median percentage differences. Negative tool/token values mean fewer; positive session values are explicitly slower observed model sessions.</p>
+      <div class="table-wrap"><table class="report-table"><thead><tr><th>Arm</th><th>Tool calls</th><th>Tokens</th><th>Session time</th></tr></thead><tbody>
+        <tr class="row-accent"><td data-label="Arm">SolidKG core</td><td data-label="Tool calls" class="good">70.00% fewer</td><td data-label="Tokens">0.22% more</td><td data-label="Session time" class="bad">9.57% slower</td></tr>
+        <tr class="row-accent"><td data-label="Arm">SolidKG + SCIP</td><td data-label="Tool calls" class="good">70.98% fewer</td><td data-label="Tokens" class="bad">11.53% more</td><td data-label="Session time" class="bad">2.17% slower</td></tr>
+        <tr><td data-label="Arm">CodeGraph</td><td data-label="Tool calls">No change</td><td data-label="Tokens" class="good">0.90% fewer</td><td data-label="Session time" class="bad">5.18% slower</td></tr>
+        <tr><td data-label="Arm">Sverklo</td><td data-label="Tool calls" class="bad">3.92% more</td><td data-label="Tokens" class="bad">31.50% more</td><td data-label="Session time" class="bad">21.49% slower</td></tr>
+        <tr><td data-label="Arm">Cartog</td><td data-label="Tool calls" class="bad">8.71% more</td><td data-label="Tokens" class="bad">39.43% more</td><td data-label="Session time" class="bad">27.85% slower</td></tr>
+        <tr><td data-label="Arm">Tilth</td><td data-label="Tool calls">No change</td><td data-label="Tokens" class="bad">11.30% more</td><td data-label="Session time" class="bad">22.89% slower</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section aria-labelledby="latency">
+      <h2 id="latency">Direct MCP latency</h2>
+      <p>Cold and warm p50 values are direct retrieval timing, in milliseconds. They should not be read as complete task duration.</p>
+      <div class="table-wrap"><table class="report-table"><thead><tr><th>Arm</th><th>Cold p50</th><th>Warm p50</th></tr></thead><tbody>
+        <tr class="row-accent"><td data-label="Arm">SolidKG core</td><td data-label="Cold p50">5,022 ms</td><td data-label="Warm p50">1,212 ms</td></tr>
+        <tr class="row-accent"><td data-label="Arm">SolidKG + SCIP</td><td data-label="Cold p50">5,402 ms</td><td data-label="Warm p50">1,081 ms</td></tr>
+        <tr><td data-label="Arm">CodeGraph</td><td data-label="Cold p50">7,290 ms</td><td data-label="Warm p50">2,349 ms</td></tr>
+        <tr><td data-label="Arm">Sverklo</td><td data-label="Cold p50">200 ms</td><td data-label="Warm p50">100 ms</td></tr>
+        <tr><td data-label="Arm">Cartog</td><td data-label="Cold p50">1,351 ms</td><td data-label="Warm p50">37 ms</td></tr>
+        <tr><td data-label="Arm">Tilth</td><td data-label="Cold p50">14,844 ms</td><td data-label="Warm p50">239 ms</td></tr>
+      </tbody></table></div>
+      <p>Fast individual calls can still produce slower sessions because complete sessions also include tool selection, fallback behavior, model reasoning, and answer generation. Sverklo and Cartog show this distinction most clearly.</p>
+    </section>
+
+    <section aria-labelledby="pricing">
+      <h2 id="pricing">API-equivalent pricing methodology</h2>
+      <p>Estimates use GPT-5.6 Sol Standard short-context rates checked 2026-07-12: $5.00/M non-cached input, $0.50/M cached input, $6.25/M cache writes, and $30.00/M output. Reasoning tokens use the output rate.</p>
+      <p class="note">Formula: (non-cached input × $5.00/M) + (cached input × $0.50/M) + (cache writes × $6.25/M) + (output + reasoning × $30.00/M). These are API-equivalent estimates from raw token usage; actual OpenCode subscription billing recorded $0.</p>
+      <p>The token-category means below are the inputs to the estimate. Values are mean tokens per completed task.</p>
+      <div class="table-wrap"><table class="report-table compact-table"><thead><tr><th>Token category</th><th>Baseline</th><th>Core</th><th>SCIP</th><th>CodeGraph</th><th>Sverklo</th><th>Cartog</th><th>Tilth</th></tr></thead><tbody>
+        <tr><td data-label="Token category">Non-cached input</td><td data-label="Baseline">26,139.4</td><td data-label="Core">27,411.9</td><td data-label="SCIP">29,208.125</td><td data-label="CodeGraph">26,321.917</td><td data-label="Sverklo">30,709.725</td><td data-label="Cartog">32,271.35</td><td data-label="Tilth">27,046.375</td></tr>
+        <tr><td data-label="Token category">Cached input</td><td data-label="Baseline">67,673.6</td><td data-label="Core">43,558.4</td><td data-label="SCIP">53,452.8</td><td data-label="CodeGraph">61,141.333</td><td data-label="Sverklo">76,352</td><td data-label="Cartog">90,048</td><td data-label="Tilth">78,348.8</td></tr>
+        <tr><td data-label="Token category">Output + reasoning</td><td data-label="Baseline">2,236.7</td><td data-label="Core">1,784.575</td><td data-label="SCIP">1,505.225</td><td data-label="CodeGraph">2,089.139</td><td data-label="Sverklo">2,253.4</td><td data-label="Cartog">2,415.75</td><td data-label="Tilth">2,352.975</td></tr>
+      </tbody></table></div>
+      <p class="note">Official references: <a href="https://developers.openai.com/api/docs/models/gpt-5.6-sol">GPT-5.6 Sol model documentation</a> and <a href="https://developers.openai.com/api/docs/pricing">OpenAI pricing</a>.</p>
+    </section>
+
+    <section aria-labelledby="availability">
+      <h2 id="availability">Availability and parser-tier notes</h2>
+      <p>CodeGraph completed 36 of 40 cells because four .NET Runtime indexing cells were terminal unavailable in this frozen setup. This is an availability observation for this setup, not a general C# support claim.</p>
+      <p>Sverklo was available for all 40 cells. Its documented support includes tree-sitter-capable TypeScript/TSX, JavaScript, Python, Go, Rust, and C#, plus regex fallback for PHP, Java, Ruby, and other registered languages. The benchmark did not prove which parser handled each runtime cell.</p>
+    </section>
+
+    <section aria-labelledby="statistics">
+      <h2 id="statistics">Statistical note</h2>
+      <p>For the SolidKG tool-call reductions, the raw exact sign-flip p-value was <strong>.00195</strong>. The predeclared Holm-adjusted p-value across the comparison-endpoint family was <strong>.140625</strong>. Treat the reductions as descriptive effects, not multiplicity-adjusted statistical findings.</p>
+    </section>
+
+    <section aria-labelledby="design-limits">
+      <h2 id="design-limits">Study design and limits</h2>
+      <p>Ten repository-specific architecture questions were run across seven arms with four repeats per repository-arm cell. Two blinded SOL-high reviewers scored every completed answer, with a separate adjudication session for scored-field disagreements.</p>
+      <p>The benchmark covers architecture explanations, not generated patches, build success, regressions, security, maintenance work, or human productivity. One model, one host, four repeats per cell, and ceiling-limited quality constrain generalization. Direct latency used four process-level repeats; indexing preparation time was excluded.</p>
+    </section>
+
+    <footer>Primary source: <a href="opencode-seven-arm-2026-07-12.md">opencode-seven-arm-2026-07-12.md</a>. The report retains methodology, paired uncertainty, provenance, and the full local evidence context.</footer>
+  </main>
+</body>
+</html>

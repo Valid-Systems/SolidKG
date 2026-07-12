@@ -52,52 +52,14 @@ Quality was near ceiling and paired median F1 differences from baseline were zer
 
 CodeGraph completed 36/40 cells because its four .NET Runtime indexing cells were terminal unavailable in this frozen setup. Sverklo remained available across the corpus; its documented support uses different parser tiers, including tree-sitter-capable support for TS/TSX/JS/Python/Go/Rust/C# and regex fallback for PHP/Java/Ruby and other registered languages.
 
-See [`docs/benchmarks/opencode-seven-arm-2026-07-12.md`](docs/benchmarks/opencode-seven-arm-2026-07-12.md) for paired uncertainty, availability, latency, review methodology, repository effects, provenance, and limitations.
+See the [readable HTML results](docs/benchmarks/opencode-seven-arm-2026-07-12-presentation.html) for contextual comparison tables and API-equivalent cost estimates. The [full Markdown report](docs/benchmarks/opencode-seven-arm-2026-07-12.md) retains methodology, uncertainty, provenance, and limitations.
 
-### SolidKG vs CodeGraph: matched OpenCode comparison
+### Earlier comparison diagnostics
 
-The dedicated two-product OpenAI comparison used OpenCode with `openai/gpt-5.6-sol`, the same seven repositories and architecture questions for both products, current local builds, and four successful repeats per repository/product cell. Lower is better.
+The current seven-arm report supersedes the README summaries of the smaller comparisons. Their evidence remains available for historical and mechanism-specific analysis:
 
-| Equal-repository aggregate | SolidKG relative to CodeGraph |
-|---|---:|
-| Tool calls | 16.7% lower |
-| Tokens | 15.9% lower |
-| Read / Grep / Glob | 0 median for both products in all 7 repositories |
-
-| Codebase | SolidKG calls | CodeGraph calls | SolidKG tokens | CodeGraph tokens |
-|---|---:|---:|---:|---:|
-| VS Code | **1** | 3 | **25,063** | 67,542 |
-| Excalidraw | 2 | 2 | 47,471 | **46,515** |
-| Django | 2 | 2 | 47,061 | **45,625** |
-| Tokio | 2 | 2 | 48,094 | **47,935** |
-| OkHttp | **1** | 2 | **25,132** | 45,875 |
-| Gin | 1 | 1 | **22,478** | 23,965 |
-| Alamofire | 1 | 1 | **22,689** | 23,333 |
-
-Tool calls include graph queries and built-in file/search actions. Tokens sum every assistant step's input, cache, reasoning, and output usage.
-
-Scope: 56 successful runs, seven repositories × two products × four repeats. All runs cited source files; 54/56 matched every expected mechanism, and no completed run contained a recoverable tool error. Elapsed time is not compared because cells ran concurrently on a busy host. Generated-code quality and patch correctness are outside this architecture-explanation benchmark.
-
-See [`docs/benchmarks/opencode-head-to-head-2026-07-10.md`](docs/benchmarks/opencode-head-to-head-2026-07-10.md) for repository-level medians, methodology, validity checks, variance, and the historical pre-fix matrix.
-
-### Expanded matched corpus
-
-A separate July 11 local comparison added Cartog, Tilth, Azure PowerShell, and Apache Airflow. It used `openai/gpt-5.6-sol` with four repeats per repository/product cell. Lower is better.
-
-| Equal-repository reduction for SolidKG | Result |
-|---|---:|
-| Tool calls | 34.6% |
-| Read calls | 24.0% |
-| Grep calls | 77.8% |
-| Glob calls | 100.0% |
-| Graph calls | 12.5% |
-| Tokens | 34.7% |
-
-All 32 planned runs completed with zero tool errors and source-file citations in all 32 answers. The mechanism screen completed 31/32 checks, and a separate audit passed all eight median-representative answers. One non-representative Cartog/SolidKG run was partial because it omitted the Git-diff stage.
-
-Cartog and Tilth used recorded pinned commits. Azure PowerShell and Apache Airflow were unversioned local snapshots, so this is not an independent-reproduction or claim-grade result for those rows. The 3.3% wall-clock reduction is omitted here because concurrent subscription-host timing is descriptive rather than a controlled speed measure.
-
-See [`docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md`](docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md) and its [versioned compact evidence JSON](docs/benchmarks/evidence/opencode-expanded-2026-07-11.json) for repository medians, ranges, provenance, answer checks, and scope limits.
+- [July 10 SolidKG/CodeGraph comparison](docs/benchmarks/opencode-head-to-head-2026-07-10.md): seven repositories, two products, four repeats.
+- [July 11 expanded comparison](docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md): Cartog, Tilth, Azure PowerShell, and Airflow, with [compact evidence JSON](docs/benchmarks/evidence/opencode-expanded-2026-07-11.json).
 
 ### Reference-index diagnostics
 
