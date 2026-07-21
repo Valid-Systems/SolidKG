@@ -960,24 +960,23 @@ describe('CLI uninit', () => {
 });
 
 // =============================================================================
-// Tree-sitter Version Pinning
+// Tree-sitter Runtime Pinning
 // =============================================================================
 
-describe('Tree-sitter WASM Setup', () => {
-  it('should use web-tree-sitter and tree-sitter-wasms in dependencies', () => {
+describe('Native Tree-sitter Setup', () => {
+  it('should pin the native language pack dependency', () => {
     const pkgPath = path.join(__dirname, '..', 'package.json');
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 
-    expect(pkg.dependencies['web-tree-sitter']).toBeDefined();
-    expect(pkg.dependencies['tree-sitter-wasms']).toBeDefined();
+    expect(pkg.dependencies['@xberg-io/tree-sitter-language-pack']).toBe('1.13.1');
   });
 
-  it('should not have native tree-sitter in dependencies', () => {
+  it('should not retain the WASM parser dependencies', () => {
     const pkgPath = path.join(__dirname, '..', 'package.json');
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
 
-    expect(pkg.dependencies['tree-sitter']).toBeUndefined();
-    expect(pkg.overrides).toBeUndefined();
+    expect(pkg.dependencies['web-tree-sitter']).toBeUndefined();
+    expect(pkg.dependencies['tree-sitter-wasms']).toBeUndefined();
   });
 });
 

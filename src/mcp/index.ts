@@ -50,7 +50,6 @@ import {
 } from './daemon';
 import { runProxy } from './proxy';
 import { getDaemonSocketPath } from './daemon-paths';
-import { HOST_PPID_ENV } from '../extraction/wasm-runtime-flags';
 
 /**
  * How often to poll `process.ppid` to detect parent process death (see #277).
@@ -103,20 +102,6 @@ function parsePpidPollMs(raw: string | undefined): number {
   return Math.floor(parsed);
 }
 
-/**
- * Parse the host PID propagated across the `--liftoff-only` re-exec
- * ({@link HOST_PPID_ENV}). Returns a positive integer PID, or null when
- * unset/invalid — the direct-launch path, where the watchdog falls back to
- * `process.ppid` divergence. PIDs of 0/1 are rejected (0 = unknown, 1 = init,
- * i.e. already orphaned), so the watchdog doesn't latch onto init.
- */
-function parseHostPpid(raw: string | undefined): number | null {
-  if (raw === undefined || raw === '') return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 1) return null;
-  return parsed;
-}
-
 /** Whether `SOLIDKG_NO_DAEMON` was set to a truthy value. */
 function daemonOptOutSet(): boolean {
   const raw = process.env.SOLIDKG_NO_DAEMON;
@@ -156,8 +141,8 @@ function resolveDaemonRoot(explicitPath: string | null, dataDir?: string): strin
  * reach it) with stdio decoupled from the launcher (logs to
  * `.solidkg/daemon.log`). Re-invokes the *same* CLI faithfully across dev and
  * bundled launches by reusing `process.argv[0]` (the right node), the current
- * `process.execArgv` (carries `--liftoff-only`, so the daemon never re-execs)
- * and `process.argv[1]` (this script). The spawned process self-arbitrates the
+ * `process.execArgv`, and `process.argv[1]` (this script). The spawned process
+ * self-arbitrates the
  * O_EXCL lock, so racing launchers may each spawn one — losers exit and every
  * launcher proxies through the single winner.
  */
@@ -219,7 +204,6 @@ export class MCPServer {
   // PPID watchdog baseline — captured at construction so we always have a
   // baseline, even if start() runs after a fork-style reparent.
   private originalPpid: number = process.ppid;
-  private hostPpid: number | null = parseHostPpid(process.env[HOST_PPID_ENV]);
   // Idempotency guard for stop().
   private stopped = false;
   private mode: 'unstarted' | 'direct' | 'proxy' | 'daemon' = 'unstarted';
@@ -426,11 +410,8 @@ export class MCPServer {
     this.ppidWatchdog = setInterval(() => {
       const current = process.ppid;
       const ppidChanged = current !== this.originalPpid;
-      const hostGone = this.hostPpid !== null && !isProcessAlive(this.hostPpid);
-      if (ppidChanged || hostGone) {
-        const reason = ppidChanged
-          ? `ppid ${this.originalPpid} -> ${current}`
-          : `host pid ${this.hostPpid} exited`;
+      if (ppidChanged) {
+        const reason = `ppid ${this.originalPpid} -> ${current}`;
         process.stderr.write(
           `[SolidKG MCP] Parent process exited (${reason}); shutting down.\n`
         );

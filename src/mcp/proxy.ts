@@ -20,7 +20,6 @@
 
 import * as fs from 'fs';
 import * as net from 'net';
-import { HOST_PPID_ENV } from '../extraction/wasm-runtime-flags';
 import { DaemonHello, MAX_HELLO_LINE_BYTES } from './daemon';
 import { SolidKGPackageVersion } from './version';
 
@@ -191,7 +190,7 @@ function pipeUntilClose(socket: net.Socket): Promise<void> {
 
 /**
  * PPID watchdog mirroring the one in `MCPServer.start` — kills the proxy if
- * the MCP host (or its proxy of a host, see HOST_PPID_ENV) goes away without
+ * the MCP host goes away without
  * closing stdin. Issue #277 documents why we can't rely on stdin EOF on
  * Linux: the parent may be SIGKILL'd and reparenting doesn't close pipes.
  *
@@ -202,15 +201,11 @@ function startPpidWatchdog(socket: net.Socket): void {
   const pollMs = parsePollMs(process.env.SOLIDKG_PPID_POLL_MS);
   if (pollMs <= 0) return;
   const originalPpid = process.ppid;
-  const hostPpid = parseHostPpid(process.env[HOST_PPID_ENV]);
   const timer = setInterval(() => {
     const current = process.ppid;
     const ppidChanged = current !== originalPpid;
-    const hostGone = hostPpid !== null && !isProcessAliveLocal(hostPpid);
-    if (ppidChanged || hostGone) {
-      const reason = ppidChanged
-        ? `ppid ${originalPpid} -> ${current}`
-        : `host pid ${hostPpid} exited`;
+    if (ppidChanged) {
+      const reason = `ppid ${originalPpid} -> ${current}`;
       process.stderr.write(`[SolidKG MCP] Parent process exited (${reason}); shutting down.\n`);
       try { socket.destroy(); } catch { /* ignore */ }
       process.exit(0);
@@ -225,22 +220,4 @@ function parsePollMs(raw: string | undefined): number {
   if (!Number.isFinite(parsed)) return DEFAULT_PPID_POLL_MS;
   if (parsed < 0) return DEFAULT_PPID_POLL_MS;
   return Math.floor(parsed);
-}
-
-function parseHostPpid(raw: string | undefined): number | null {
-  if (raw === undefined || raw === '') return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 1) return null;
-  return parsed;
-}
-
-function isProcessAliveLocal(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (err: unknown) {
-    const e = err as NodeJS.ErrnoException;
-    if (e.code === 'EPERM') return true;
-    return false;
-  }
 }
