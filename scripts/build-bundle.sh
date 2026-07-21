@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 #
 # Build a self-contained SolidKG bundle: an official Node runtime + the
-# compiled app + its production deps, so SolidKG runs with NO system Node and
-# NO native build — node:sqlite is built into the bundled Node. One archive per
-# platform.
-#
-# Because dropping better-sqlite3 left zero native addons, the recipe is pure
-# file-packaging (download the target's Node, copy the app, archive) — so any
-# platform's bundle can be built on any OS. No cross-compile, no native runners.
+# compiled app + its production dependencies and parser libraries. Native
+# parser artifacts require this script to run on the target OS and architecture.
 #
 # Usage:
 #   scripts/build-bundle.sh <target> [node-version]
@@ -30,6 +25,12 @@ trap 'rm -rf "$WORK"' EXIT
 
 ARCH="${TARGET##*-}"   # x64 | arm64
 OSFAM="${TARGET%-*}"   # darwin | linux | win32
+HOST_TARGET="$(node -p "process.platform + '-' + process.arch")"
+
+[ "$TARGET" = "$HOST_TARGET" ] || {
+  echo "[bundle] error: native target ${TARGET} cannot be built on ${HOST_TARGET}" >&2
+  exit 1
+}
 
 echo "[bundle] target=${TARGET} node=${NODE_VERSION}"
 
@@ -55,34 +56,38 @@ else
 fi
 [ -f "$NODE_BIN" ] || { echo "[bundle] error: node binary not found ($NODE_BIN)" >&2; exit 1; }
 
-# 2. Build the app (compiled JS + copied wasm/schema assets).
+# 2. Build the app and stage the current platform's parser libraries.
 echo "[bundle] building app"
-( cd "$ROOT" && npm run build >/dev/null )
+( cd "$ROOT" && pnpm run build >/dev/null )
 
-# 3. Stage: app + production-only deps (pure JS/wasm → portable across platforms).
+# 3. Stage the app and current-platform production dependencies.
 STAGE="$WORK/solidkg-${TARGET}"
 mkdir -p "$STAGE/lib" "$STAGE/bin"
 cp -R "$ROOT/dist" "$STAGE/lib/dist"
 cp "$ROOT/package.json" "$ROOT/package-lock.json" "$STAGE/lib/"
+cp "$ROOT/LICENSE" "$STAGE/LICENSE"
 echo "[bundle] installing production dependencies"
 ( cd "$STAGE/lib" && npm ci --omit=dev --ignore-scripts >/dev/null 2>&1 )
 rm -f "$STAGE/lib/package-lock.json"
 
-# 4. Vendored Node + launcher (the launcher uses the bundled Node by relative
-#    path, so no system Node is ever needed).
-#
-# `--liftoff-only`: keep tree-sitter's large WASM grammars on V8's Liftoff
-# baseline compiler so they never reach the turboshaft optimizing tier, whose
-# per-compilation Zone arena OOMs the whole process (`Fatal process out of
-# memory: Zone`) on Node >= 22 — even with tens of GB free. The flag is read at
-# V8 engine init so it must be on node's command line; the parse worker inherits
-# it. See issues #293/#298 and src/extraction/wasm-runtime-flags.ts. (The CLI
-# also self-relaunches with this flag when launched without it, so non-bundled
-# runs are covered too; passing it here avoids that extra spawn.)
+NATIVE_SOURCE="$ROOT/.native-grammars/$TARGET"
+NATIVE_DESTINATION="$STAGE/lib/dist/extraction/native/$TARGET"
+node "$ROOT/scripts/copy-native-grammars.mjs" \
+  --source "$NATIVE_SOURCE" \
+  --destination "$NATIVE_DESTINATION"
+node "$ROOT/scripts/prepare-native-runtime.mjs" \
+  --package-root "$STAGE/lib" \
+  --addon-only
+node "$ROOT/scripts/verify-native-runtime.mjs" \
+  --package-root "$STAGE/lib" \
+  --grammar-dir "$NATIVE_DESTINATION"
+
+# 4. Vendored Node + launcher.
 if [ "$OSFAM" = "win32" ]; then
   cp "$NODE_BIN" "$STAGE/node.exe"
-  printf '@"%%~dp0..\\node.exe" --liftoff-only "%%~dp0..\\lib\\dist\\bin\\solidkg.js" %%*\r\n' \
+  printf '@"%%~dp0..\\node.exe" "%%~dp0..\\lib\\dist\\bin\\solidkg.js" %%*\r\n' \
     > "$STAGE/bin/solidkg.cmd"
+  BUNDLED_NODE="$STAGE/node.exe"
 else
   cp "$NODE_BIN" "$STAGE/node"
   cat > "$STAGE/bin/solidkg" <<'LAUNCH'
@@ -98,18 +103,30 @@ while [ -L "$SELF" ]; do
   esac
 done
 DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
-# --liftoff-only: avoid the V8 turboshaft WASM Zone OOM (issues #293/#298).
-exec "$DIR/node" --liftoff-only "$DIR/lib/dist/bin/solidkg.js" "$@"
+exec "$DIR/node" "$DIR/lib/dist/bin/solidkg.js" "$@"
 LAUNCH
   chmod +x "$STAGE/bin/solidkg"
+  BUNDLED_NODE="$STAGE/node"
 fi
 
-# 5. Archive (.zip for Windows, .tar.gz otherwise).
+# 5. Exercise the staged CLI with network grammar resolution disabled.
+SMOKE_PROJECT="$WORK/smoke-project"
+mkdir -p "$SMOKE_PROJECT"
+printf 'export function greet(name: string): string { return `Hello ${name}`; }\n' \
+  > "$SMOKE_PROJECT/index.ts"
+TREE_SITTER_LANGUAGE_PACK_MANIFEST_URL="file:///definitely-missing/parsers.json" \
+SOLIDKG_NO_DAEMON=1 \
+  "$BUNDLED_NODE" "$STAGE/lib/dist/bin/solidkg.js" init -i "$SMOKE_PROJECT" >/dev/null
+TREE_SITTER_LANGUAGE_PACK_MANIFEST_URL="file:///definitely-missing/parsers.json" \
+SOLIDKG_NO_DAEMON=1 \
+  "$BUNDLED_NODE" "$STAGE/lib/dist/bin/solidkg.js" query greet --path "$SMOKE_PROJECT" >/dev/null
+
+# 6. Archive (.zip for Windows, .tar.gz otherwise).
 mkdir -p "$OUT"
 if [ "$OSFAM" = "win32" ]; then
   ARCHIVE="$OUT/solidkg-${TARGET}.zip"
   rm -f "$ARCHIVE"
-  ( cd "$WORK" && zip -rqX "$ARCHIVE" "solidkg-${TARGET}" )
+  ( cd "$WORK" && 7z a -tzip "$ARCHIVE" "solidkg-${TARGET}" >/dev/null )
 else
   ARCHIVE="$OUT/solidkg-${TARGET}.tar.gz"
   # --no-xattrs: don't embed macOS xattrs that make GNU tar warn on Linux.

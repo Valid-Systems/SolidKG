@@ -4,8 +4,8 @@ SolidKG ships a **vendored Node 24 runtime** alongside the app. Because Node
 24 includes real built-in SQLite (`node:sqlite`, with WAL + FTS5), bundling Node
 means:
 
-- **No native build** — `better-sqlite3` is gone, so there are zero native addons
-  to compile or rebuild.
+- **No SQLite native build** — `better-sqlite3` is gone; the only target-specific
+  native code is the prebuilt tree-sitter language-pack addon and parser libraries.
 - **No wasm fallback** — and therefore no more `database is locked` (issue #238).
 - **No Node-version dependence** — the app always runs on the bundled Node,
   whatever the user has (or doesn't have) installed.
@@ -19,8 +19,8 @@ platform, identical recipe (only the Node download differs):
 solidkg-<target>/
   node | node.exe          # official Node runtime for <target>
   lib/
-    dist/                  # compiled app (+ tree-sitter .wasm grammars, schema.sql)
-    node_modules/          # production deps only (pure JS / wasm — portable)
+    dist/                  # compiled app (+ schema, parser metadata, native grammar libraries)
+    node_modules/          # production deps, including the target N-API parser addon
   bin/
     solidkg | solidkg.cmd   # launcher → runs the bundled Node with the app
 ```
@@ -34,11 +34,11 @@ scripts/build-bundle.sh linux-x64            # -> release/solidkg-linux-x64.tar.
 scripts/build-bundle.sh win32-x64            # -> release/solidkg-win32-x64.zip
 ```
 
-Because dropping better-sqlite3 left **zero native addons**, building a bundle is
-pure file-packaging — **any** target builds on **any** OS (the whole matrix builds
-on one Linux runner). Cross-compilation isn't a concern; only *run-testing* a
-bundle needs the target platform (or emulation, e.g. `docker run --platform
-linux/amd64`).
+Native parser artifacts are platform- and architecture-specific. Each bundle is
+built and smoke-tested on its matching target, where `prepare:native-runtime`
+stages the pinned grammar libraries and the build repairs the Windows addon's
+Node import when required. Cross-building a native bundle on another target is
+rejected by `build-bundle.sh`.
 
 ## Install channels (all deliver the same bundle)
 
@@ -64,8 +64,8 @@ linux/amd64`).
 ## Release pipeline
 
 [`.github/workflows/release.yml`](.github/workflows/release.yml) — manually
-triggered. Reads the version from `package.json`, builds every platform bundle on
-one runner, creates the GitHub Release, and publishes
+triggered. Reads the version from `package.json`, builds each platform bundle on
+its matching matrix runner, creates the GitHub Release, and publishes
 the npm shim + per-platform packages. Requires the `NPM_TOKEN` repo secret.
 
 Still TODO:
