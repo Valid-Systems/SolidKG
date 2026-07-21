@@ -32,33 +32,30 @@ function latestMtimeMs(paths: readonly string[], includeEntry: (entryPath: strin
 function hasCurrentBuiltDist(): boolean {
   const schemaPath = path.join(repoRoot, 'dist', 'db', 'schema.sql');
   const schemaSource = path.join(repoRoot, 'src', 'db', 'schema.sql');
-  const wasmDir = path.join(repoRoot, 'dist', 'extraction', 'wasm');
-  const wasmSourceDir = path.join(repoRoot, 'src', 'extraction', 'wasm');
-  if (!fs.existsSync(cliPath) || !fs.existsSync(schemaPath) || !fs.existsSync(wasmDir)) return false;
-  if (!fs.readdirSync(wasmDir).some(entry => entry.endsWith('.wasm'))) return false;
+  const nativeManifest = path.join(repoRoot, 'dist', 'extraction', 'native-grammars.json');
+  const nativeManifestSource = path.join(repoRoot, 'src', 'extraction', 'native-grammars.json');
+  const nativeDir = path.join(repoRoot, '.native-grammars', `${process.platform}-${process.arch}`);
+  if (!fs.existsSync(cliPath) || !fs.existsSync(schemaPath) || !fs.existsSync(nativeManifest) || !fs.existsSync(nativeDir)) return false;
+  if (fs.readdirSync(nativeDir).length < 32) return false;
 
   const typeScriptSourceMtime = latestMtimeMs([
     path.join(repoRoot, 'src'),
     path.join(repoRoot, 'tsconfig.json'),
   ], entryPath => entryPath.endsWith('.ts') || entryPath.endsWith('.json'));
   const schemaCurrent = fs.statSync(schemaPath).mtimeMs >= fs.statSync(schemaSource).mtimeMs;
-  const wasmCurrent = latestMtimeMs([wasmDir]) >= latestMtimeMs([wasmSourceDir]);
+  const nativeManifestCurrent = fs.statSync(nativeManifest).mtimeMs >= fs.statSync(nativeManifestSource).mtimeMs;
 
-  return fs.statSync(cliPath).mtimeMs >= typeScriptSourceMtime && schemaCurrent && wasmCurrent;
+  return fs.statSync(cliPath).mtimeMs >= typeScriptSourceMtime && schemaCurrent && nativeManifestCurrent;
 }
 
 function copyBuildAssets(): void {
   fs.mkdirSync(path.join(repoRoot, 'dist', 'db'), { recursive: true });
   fs.copyFileSync(path.join(repoRoot, 'src', 'db', 'schema.sql'), path.join(repoRoot, 'dist', 'db', 'schema.sql'));
 
-  const wasmSource = path.join(repoRoot, 'src', 'extraction', 'wasm');
-  const wasmTarget = path.join(repoRoot, 'dist', 'extraction', 'wasm');
-  fs.mkdirSync(wasmTarget, { recursive: true });
-  for (const entry of fs.readdirSync(wasmSource)) {
-    if (entry.endsWith('.wasm')) {
-      fs.copyFileSync(path.join(wasmSource, entry), path.join(wasmTarget, entry));
-    }
-  }
+  const extractionTarget = path.join(repoRoot, 'dist', 'extraction');
+  fs.mkdirSync(extractionTarget, { recursive: true });
+  fs.rmSync(path.join(extractionTarget, 'wasm'), { recursive: true, force: true });
+  fs.copyFileSync(path.join(repoRoot, 'src', 'extraction', 'native-grammars.json'), path.join(extractionTarget, 'native-grammars.json'));
 }
 
 function stripBinSourceMapComments(): void {

@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10.34.5
       - uses: actions/setup-node@v6
         with:
           node-version: 24.16.0
@@ -25,3 +25,52 @@ jobs:
       - run: pnpm exec tsc
       - run: pnpm run build
       - run: pnpm test
+
+  source-archive:
+    name: GitHub source archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Create and inspect GitHub-style source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_root="$RUNNER_TEMP/solidkg-source-archive"
+          mkdir -p "$archive_root"
+          git archive --format=tar --prefix=SolidKG/ HEAD | tar -xf - -C "$archive_root"
+          test ! -e "$archive_root/SolidKG/docs/benchmarks"
+          test ! -e "$archive_root/SolidKG/docs/design/readiness-evidence-manifest.json"
+          test ! -e "$archive_root/SolidKG/scripts/agent-eval/run-all.sh"
+          test ! -e "$archive_root/SolidKG/fixtures"
+          test ! -e "$archive_root/SolidKG/__tests__/agent-eval"
+          test -f "$archive_root/SolidKG/LICENSE"
+          test -f "$archive_root/SolidKG/docs/THIRD_PARTY_LICENSES.md"
+          test -f "$archive_root/SolidKG/docs/tested-codebases.md"
+          test -f "$archive_root/SolidKG/scripts/agent-eval/probe-trace.mjs"
+          test -f "$archive_root/SolidKG/src/db/schema.sql"
+          test -f "$archive_root/SolidKG/src/extraction/native-grammars.json"
+          test -f "$archive_root/SolidKG/scripts/prepare-native-runtime.mjs"
+          test ! -e "$archive_root/SolidKG/src/extraction/wasm"
+          test -f "$archive_root/SolidKG/vendored/README.md"
+          test -f "$archive_root/SolidKG/vendored/scip-clang/indexer/main.cc"
+          test -f "$archive_root/SolidKG/vendored/scip-dart/bin/scip_dart.dart"
+          test -f "$archive_root/SolidKG/vendored/scip-dotnet/ScipDotnet/Program.cs"
+          test -f "$archive_root/SolidKG/vendored/scip-java/scip-java/src/main/scala/com/sourcegraph/scip_java/ScipJava.scala"
+          test -f "$archive_root/SolidKG/vendored/scip-php/bin/scip-php"
+          test -f "$archive_root/SolidKG/vendored/scip-python/packages/pyright-scip/src/main.ts"
+          test -f "$archive_root/SolidKG/vendored/scip-ruby/gems/scip-ruby/bin/scip-ruby"
+          test -f "$archive_root/SolidKG/vendored/scip-typescript/src/main.ts"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install archived source dependencies
+        working-directory: ${{ runner.temp }}/solidkg-source-archive/SolidKG
+        run: pnpm install --frozen-lockfile
+      - name: Verify archived source
+        working-directory: ${{ runner.temp }}/solidkg-source-archive/SolidKG
+        run: pnpm run verify:source:full
