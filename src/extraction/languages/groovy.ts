@@ -1,6 +1,7 @@
-import type { Node as SyntaxNode } from 'web-tree-sitter';
+import type { Node as SyntaxNode } from '../native-tree-sitter';
 import { getChildByField, getNodeText } from '../tree-sitter-helpers';
 import type { LanguageExtractor } from '../tree-sitter-types';
+import { visitGroovyCommandNode } from './groovy-command-grammar';
 
 function modifierText(node: SyntaxNode): string {
   for (let i = 0; i < node.namedChildCount; i++) {
@@ -51,6 +52,9 @@ export const groovyExtractor: LanguageExtractor = {
   returnField: 'type',
   classifyClassNode: (node) => node.type === 'trait_declaration' ? 'trait' : 'class',
   visitNode: (node, ctx) => {
+    const commandResult = visitGroovyCommandNode(node, ctx);
+    if (commandResult !== undefined) return commandResult;
+
     if (node.type === 'local_variable_declaration') {
       for (let i = 0; i < node.namedChildCount; i++) {
         const declarator = node.namedChild(i);

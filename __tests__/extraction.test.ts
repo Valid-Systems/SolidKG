@@ -394,6 +394,26 @@ in
 });
 
 describe('TypeScript Extraction', () => {
+  it('should preserve identifier text after UTF-8 multi-byte characters', () => {
+    // Given: identifiers following both a non-BMP emoji and a multi-byte BMP character.
+    const code = '/* 😀 */ const after = 1;\nconst café = after;';
+
+    // When: native Tree-sitter positions are projected back into JavaScript source text.
+    const result = extractFromSource('unicode.ts', code);
+
+    // Then: byte columns do not corrupt the UTF-16 source slices.
+    const constants = result.nodes.filter((node) => node.kind === 'constant');
+    expect(constants.map((node) => node.name)).toEqual(['after', 'café']);
+    expect(constants.find((node) => node.name === 'after')).toMatchObject({
+      startColumn: 15,
+      endColumn: 24,
+    });
+    expect(constants.find((node) => node.name === 'café')).toMatchObject({
+      startColumn: 6,
+      endColumn: 18,
+    });
+  });
+
   it('should parse explicit TypeScript module extensions', () => {
     const mts = extractFromSource('module.mts', 'export function loadConfig() { return 1; }');
     const cts = extractFromSource('module.cts', 'export function loadLegacyConfig() { return 2; }');
@@ -5136,6 +5156,7 @@ void helperFunction(int count) {
 
 describe('Groovy Extraction', () => {
   it('should extract classes, methods, closure-valued functions, imports, and Gradle-style tasks', () => {
+    // Given: a Groovy class, top-level closure, and Gradle task declaration.
     const code = `
 package demo
 
@@ -5155,8 +5176,11 @@ task customTask {
   }
 }
 `;
+
+    // When: the pinned command-oriented Groovy grammar is extracted.
     const result = extractFromSource('build.gradle', code);
 
+    // Then: declarations and each scope's calls are exact.
     expect(result.nodes.find((n) => n.kind === 'file')?.language).toBe('groovy');
     const imports = result.nodes.filter((n) => n.kind === 'import').map((n) => n.name);
     expect(imports).toContain('com.acme.Widget');
@@ -5170,8 +5194,129 @@ task customTask {
     expect(functions).toContain('configureTask');
     expect(functions).toContain('customTask');
 
-    const calls = result.unresolvedReferences.filter((r) => r.referenceKind === 'calls').map((r) => r.referenceName);
-    expect(calls).toEqual(expect.arrayContaining(['amounts.collect', 'amounts.collect { amount -> amount * 2 }.sum', 'println', 'doLast']));
+    const callsFrom = (nodeId: string | undefined): string[] => result.unresolvedReferences
+      .filter((reference) => reference.referenceKind === 'calls' && reference.fromNodeId === nodeId)
+      .map((reference) => reference.referenceName);
+    expect(callsFrom(method?.id)).toEqual(['amounts.collect', 'sum']);
+    expect(callsFrom(result.nodes.find((n) => n.kind === 'function' && n.name === 'configureTask')?.id)).toEqual(['println']);
+    expect(callsFrom(result.nodes.find((n) => n.kind === 'function' && n.name === 'customTask')?.id)).toEqual(['doLast', 'println']);
+  });
+
+  it('should distinguish modified declarations, imports, inheritance, and calls', () => {
+    // Given: ordinary Groovy forms that the command grammar represents with generic units and blocks.
+    const code = `
+import static com.acme.MathTools.*
+import com.acme.Legacy as Alias
+
+public class BillingService extends BaseService implements Auditable, Closeable {
+  private final def formatter = { value -> normalize(value) }
+
+  protected static BigDecimal total(List<Integer> amounts) {
+    if (amounts.isEmpty()) {
+      return zero()
+    }
+    return amounts.collect { amount -> amount * 2 }.sum()
+  }
+
+  void close() {
+    this.flush()
+    println 'closed'
+  }
+}
+`;
+
+    // When: SolidKG extracts the source through the pinned native Groovy parser.
+    const result = extractFromSource('src/BillingService.groovy', code);
+
+    // Then: only source-backed declarations and normalized graph references are emitted.
+    expect(result.nodes.filter((node) => node.kind === 'import').map((node) => node.name)).toEqual([
+      'com.acme.MathTools.*',
+      'com.acme.Legacy',
+    ]);
+    const cls = result.nodes.find((node) => node.kind === 'class' && node.name === 'BillingService');
+    expect(cls).toMatchObject({ visibility: 'public' });
+    const methods = result.nodes.filter((node) => node.kind === 'method');
+    expect(methods.map((node) => node.name)).toEqual(['formatter', 'total', 'close']);
+    expect(methods.find((node) => node.name === 'formatter')).toMatchObject({ visibility: 'private' });
+    expect(methods.find((node) => node.name === 'total')).toMatchObject({ visibility: 'protected', isStatic: true });
+
+    const referencesFrom = (nodeId: string | undefined, kind: string): string[] => result.unresolvedReferences
+      .filter((reference) => reference.fromNodeId === nodeId && reference.referenceKind === kind)
+      .map((reference) => reference.referenceName);
+    expect(referencesFrom(cls?.id, 'extends')).toEqual(['BaseService']);
+    expect(referencesFrom(cls?.id, 'implements')).toEqual(['Auditable', 'Closeable']);
+    expect(referencesFrom(methods.find((node) => node.name === 'formatter')?.id, 'calls')).toEqual(['normalize']);
+    expect(referencesFrom(methods.find((node) => node.name === 'total')?.id, 'calls')).toEqual([
+      'amounts.isEmpty',
+      'zero',
+      'amounts.collect',
+      'sum',
+    ]);
+    expect(referencesFrom(methods.find((node) => node.name === 'close')?.id, 'calls')).toEqual(['flush', 'println']);
+  });
+
+  it('should recover compact classes swallowed by wildcard imports', () => {
+    // Given: the pinned grammar merges a class into the preceding wildcard import command.
+    const code = `import static com.acme.MathTools.*
+public class BillingService extends BaseService {
+  BigDecimal total(List<Integer> amounts) { return amounts.sum() }
+}`;
+
+    // When: the compact source is extracted.
+    const result = extractFromSource('src/BillingService.groovy', code);
+
+    // Then: the source-backed class, method, inheritance, and call remain available.
+    const cls = result.nodes.find((node) => node.kind === 'class' && node.name === 'BillingService');
+    const method = result.nodes.find((node) => node.kind === 'method' && node.name === 'total');
+    expect(cls).toMatchObject({ startLine: 2, visibility: 'public' });
+    expect(method).toMatchObject({ startLine: 3 });
+    expect(result.unresolvedReferences.filter((reference) => reference.fromNodeId === cls?.id).map((reference) => reference.referenceName)).toEqual(['BaseService']);
+    expect(result.unresolvedReferences.filter((reference) => reference.fromNodeId === method?.id).map((reference) => reference.referenceName)).toEqual(['amounts.sum']);
+  });
+
+  it('should ignore import-looking text in comments and strings', () => {
+    // Given: only one import line is syntax; the other two are inert source text.
+    const code = `/*
+import com.fake.Commented
+*/
+def text = '''
+import com.fake.StringValue
+'''
+import com.acme.Widget`;
+
+    // When: the command-oriented Groovy fallback extracts imports.
+    const result = extractFromSource('src/Imports.groovy', code);
+
+    // Then: only the AST-backed import is emitted.
+    expect(result.nodes.filter((node) => node.kind === 'import').map((node) => node.name)).toEqual([
+      'com.acme.Widget',
+    ]);
+  });
+
+  it('should recover nested classes once with their hierarchy intact', () => {
+    // Given: a wildcard import swallows a class containing another class in the pinned AST.
+    const code = `import static com.acme.MathTools.*
+class Outer {
+  class Inner {
+    void work() { println 'done' }
+  }
+}`;
+
+    // When: merged-import recovery visits the class body.
+    const result = extractFromSource('src/Outer.groovy', code);
+
+    // Then: nested declarations are emitted once under their owning scopes.
+    expect(result.nodes
+      .filter((node) => node.kind === 'class')
+      .map((node) => ({ name: node.name, qualifiedName: node.qualifiedName }))).toEqual([
+        { name: 'Outer', qualifiedName: 'Outer' },
+        { name: 'Inner', qualifiedName: 'Outer::Inner' },
+      ]);
+    expect(result.nodes
+      .filter((node) => node.kind === 'method')
+      .map((node) => ({ name: node.name, qualifiedName: node.qualifiedName }))).toEqual([
+        { name: 'work', qualifiedName: 'Outer::Inner::work' },
+      ]);
   });
 });
 
