@@ -32,5 +32,6 @@ describe('release and CI guardrails', () => {
     expect(workflow).toContain('pnpm test');
     expect(workflow).toContain('pnpm run build');
     expect(workflow).toContain('Package smoke');
+    expect(workflow).toContain('pkg.license');
   });
 });
