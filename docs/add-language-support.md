@@ -2,7 +2,7 @@
 
 This cookbook is for contributors adding a new tree-sitter-backed language to SolidKG. Use it together with the local `add-lang` skill at `.claude/skills/add-lang/SKILL.md`. That skill is the execution checklist. This document explains what each step must prove before a language can be called supported.
 
-A language is not supported when a parser exists. It is supported only after SolidKG can find the files, load a healthy grammar, extract useful graph nodes and edges, ship the needed WASM assets, pass tests, appear in docs, and validate on real repositories.
+A language is not supported when a parser exists. It is supported only after SolidKG can find the files, load a healthy native grammar, extract useful graph nodes and edges, stage the parser library for every release target, pass tests, appear in docs, and validate on real repositories.
 
 ## What Support Means
 
@@ -10,7 +10,7 @@ A complete language change covers these surfaces:
 
 1. The language token is in `src/types.ts` `LANGUAGES`.
 2. Extensions map to that token in `src/extraction/grammars.ts` `EXTENSION_MAP`.
-3. A grammar entry exists in `WASM_GRAMMAR_FILES`, and any vendored grammar under `src/extraction/wasm/` is copied into `dist/` by `pnpm run copy-assets` or `pnpm run build`.
+3. A grammar entry exists in `src/extraction/native-grammars.json`, and `pnpm run prepare:native-runtime` stages its shared library for the host platform.
 4. A language extractor exists in `src/extraction/languages/<lang>.ts` and is registered in `src/extraction/languages/index.ts` `EXTRACTORS`.
 5. Extracted symbols use existing `NodeKind` and `EdgeKind` values from `src/types.ts`; don't invent new kind strings for language-specific concepts.
 6. `__tests__/extraction.test.ts` covers language detection and extraction from inline source.
@@ -29,29 +29,18 @@ Use the lowercase single token that should appear in the `Language` union, for e
 rg "'<lang>'|<lang>:" src/types.ts src/extraction/languages/index.ts src/extraction/grammars.ts
 ```
 
-If the language is already present in `LANGUAGES`, `EXTRACTORS`, `WASM_GRAMMAR_FILES`, and `EXTENSION_MAP`, don't reimplement it. Run the validation and benchmark steps instead.
+If the language is already present in `LANGUAGES`, `EXTRACTORS`, `native-grammars.json`, and `EXTENSION_MAP`, don't reimplement it. Run the validation and benchmark steps instead.
 
 ### 2. Find and health-check the grammar
 
-First check whether `tree-sitter-wasms` already ships the grammar:
+Confirm that the pinned `@xberg-io/tree-sitter-language-pack` catalog contains the language, then add its package and native library names to `src/extraction/native-grammars.json`. Stage the current platform's library and health-check it before writing an extractor:
 
 ```bash
-Get-ChildItem -LiteralPath "node_modules/tree-sitter-wasms/out" | Where-Object Name -Match "<lang>"
-```
-
-If the grammar is present, health-check it before writing an extractor:
-
-```bash
+pnpm run prepare:native-runtime
 node scripts/add-lang/check-grammar.mjs <lang> path/to/valid-sample.<ext>
 ```
 
-If the grammar fails on valid code, or if it uses an old ABI that corrupts the shared WASM heap, vendor a healthy build under `src/extraction/wasm/tree-sitter-<lang>.wasm` and run the health check against that file:
-
-```bash
-node scripts/add-lang/check-grammar.mjs src/extraction/wasm/tree-sitter-<lang>.wasm path/to/valid-sample.<ext>
-```
-
-Lua is the concrete example to study. `src/extraction/languages/lua.ts` documents why SolidKG uses a vendored ABI-15 grammar instead of the older `tree-sitter-wasms` Lua build. If you vendor a grammar, make sure `src/extraction/grammars.ts` loads it from `dist/extraction/wasm/` and that `pnpm run copy-assets` copies it during builds.
+The check disables runtime downloads, loads the parser from `.native-grammars/<platform>-<arch>`, and parses the valid sample repeatedly. If the pinned package does not provide a loadable native library or valid code produces error trees, stop. Update the pinned dependency deliberately rather than adding an untracked parser binary or a runtime download path.
 
 Stop if you can't get a healthy grammar. Don't ship a half-wired language.
 
@@ -63,22 +52,16 @@ Dump a representative sample before writing mappings:
 node scripts/add-lang/dump-ast.mjs <lang> path/to/sample.<ext>
 ```
 
-For a vendored grammar, pass the WASM path:
-
-```bash
-node scripts/add-lang/dump-ast.mjs src/extraction/wasm/tree-sitter-<lang>.wasm path/to/sample.<ext>
-```
-
 The frequency table and field names tell you what to map for `nameField`, `paramsField`, `bodyField`, `returnField`, imports, calls, variables, classes, structs, interfaces, enums, and type aliases.
 
 Use an existing extractor as the first model:
 
-| Language family | Example extractor |
-|---|---|
-| Functional or trait-heavy languages | `src/extraction/languages/rust.ts` or `src/extraction/languages/scala.ts` |
-| OO languages | `src/extraction/languages/java.ts` or `src/extraction/languages/csharp.ts` |
-| Scripting languages | `src/extraction/languages/python.ts`, `src/extraction/languages/ruby.ts`, or `src/extraction/languages/lua.ts` |
-| Receiver-based methods | `src/extraction/languages/go.ts` |
+| Language family                     | Example extractor                                                                                              |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Functional or trait-heavy languages | `src/extraction/languages/rust.ts` or `src/extraction/languages/scala.ts`                                      |
+| OO languages                        | `src/extraction/languages/java.ts` or `src/extraction/languages/csharp.ts`                                     |
+| Scripting languages                 | `src/extraction/languages/python.ts`, `src/extraction/languages/ruby.ts`, or `src/extraction/languages/lua.ts` |
+| Receiver-based methods              | `src/extraction/languages/go.ts`                                                                               |
 
 `rust.ts` is a compact example of mapping functions, traits, structs, enums, imports, variables, signatures, visibility, and receiver type. `lua.ts` is a good example when imports are represented as calls and variable extraction needs a language-specific branch.
 
@@ -87,12 +70,11 @@ Use an existing extractor as the first model:
 Make the small wiring edits first:
 
 1. Add the token to `LANGUAGES` in `src/types.ts` before `unknown`.
-2. Add grammar filename mapping to `WASM_GRAMMAR_FILES` in `src/extraction/grammars.ts`.
+2. Add the package and native library names to `src/extraction/native-grammars.json`.
 3. Add every extension to `EXTENSION_MAP` in `src/extraction/grammars.ts`.
 4. Add a display name branch in `getLanguageDisplayName` in `src/extraction/grammars.ts`.
-5. If the grammar is vendored, add the language to the vendored WASM path branch in `loadGrammarsForLanguages`.
-6. Create `src/extraction/languages/<lang>.ts` exporting `<lang>Extractor`.
-7. Import and register the extractor in `src/extraction/languages/index.ts`.
+5. Create `src/extraction/languages/<lang>.ts` exporting `<lang>Extractor`.
+6. Import and register the extractor in `src/extraction/languages/index.ts`.
 
 Extractor mappings must use the shared graph vocabulary. Map language-specific declarations to the nearest existing `NodeKind`, such as `function`, `method`, `class`, `struct`, `interface`, `trait`, `enum`, `enum_member`, `type_alias`, `import`, `variable`, `constant`, `property`, and `field`. Calls and references should become existing `EdgeKind` values such as `calls`, `imports`, `contains`, `extends`, `implements`, `references`, `type_of`, `returns`, `instantiates`, `overrides`, and `decorates`.
 
@@ -100,13 +82,13 @@ If the grammar nests declared names in a way the generic extractor can't find, a
 
 ### 5. Build and verify extraction locally
 
-Run the build so TypeScript, schema assets, and grammar WASM assets are all checked:
+Run the build so TypeScript, schema/native metadata, and the host's native parser libraries are all checked:
 
 ```bash
 pnpm run build
 ```
 
-For a fast asset check after changing only vendored WASM or schema files, run:
+For a fast metadata copy after changing only the schema or native grammar map, run:
 
 ```bash
 pnpm run copy-assets
@@ -140,11 +122,11 @@ If you document a narrower focused command in a pull request, make sure it is va
 
 Pick three popular repositories without asking, one per size tier:
 
-| Tier | Target indexed files |
-|---|---|
-| Small | Fewer than about 150 |
-| Medium | About 150 to 1500 |
-| Large | More than about 1500 |
+| Tier   | Target indexed files |
+| ------ | -------------------- |
+| Small  | Fewer than about 150 |
+| Medium | About 150 to 1500    |
+| Large  | More than about 1500 |
 
 Use GitHub search to find candidates, then curate for repositories that are genuinely dominated by the target language:
 
@@ -152,19 +134,16 @@ Use GitHub search to find candidates, then curate for repositories that are genu
 gh search repos --language=<lang> --sort=stars --limit 40 --json fullName,stargazerCount,description
 ```
 
-Add the chosen repos and one cross-file architecture question per repo to `.claude/skills/agent-eval/corpus.json` so later runs can repeat the same evaluation.
-
-Run extraction and agent evaluation with the local dev build:
+Run extraction validation with the local dev build:
 
 ```bash
 pnpm run build
 ./scripts/local-install.sh
-scripts/add-lang/bench.sh <lang> <name> <url> "<cross-file question>" headless
+node scripts/add-lang/verify-extraction.mjs <repo> <lang>
+node scripts/agent-eval/probe-explore.mjs <repo> "<cross-file question>"
 ```
 
-`bench.sh` clones or reuses the repo, wipes and rebuilds `.solidkg/`, runs `verify-extraction.mjs`, then runs the with-SolidKG and without-SolidKG A/B through `scripts/agent-eval/run-all.sh`. Record tool calls, file Reads, Grep/Bash use, SolidKG tool calls, duration, cost, answer quality, file counts, node counts, edge counts, and verification status.
-
-For framework or dynamic-dispatch coverage discovered while validating a language, follow `docs/design/dynamic-dispatch-coverage-playbook.md`. That playbook defines the trace probes, synthesized edge checks, no-explosion checks, and small/medium/large validation bar for flows that static extraction doesn't connect by itself.
+Repeat on small, medium, and large repositories. For framework or dynamic-dispatch coverage, use the public trace/node/context/explore probes, check synthesized edge provenance and stable node/hyperedge counts, and record any known gaps conservatively. The unpublished A/B harness and raw evidence are not part of the initial public archive.
 
 ### 8. Update user-facing docs
 
@@ -181,7 +160,7 @@ Use conservative wording. For example, CUDA files are currently mapped through t
 
 A complete handoff should include:
 
-1. Files changed, including any vendored `.wasm`.
+1. Files changed, including `src/extraction/native-grammars.json` when parser coverage changed.
 2. Extraction results per real repo: files, nodes, edges, and `verify-extraction` status.
 3. A/B results per real repo: with vs without SolidKG, tool calls, file Reads, Grep/Bash, SolidKG calls, duration, cost, and correctness verdict.
 4. Gaps, such as anonymous callbacks, dynamic imports, generated code, framework route forms, or metaprogramming that stayed out of scope.
@@ -194,25 +173,24 @@ Copy this into the language task and check it off:
 
 ```text
 [ ] Token resolved and not already supported, or already supported and benchmark-only path chosen
-[ ] Grammar found or vendored
+[ ] Grammar is available from the pinned native language pack
 [ ] Grammar health-check passes on valid code
 [ ] AST dump reviewed from representative sample
 [ ] src/types.ts LANGUAGES updated
-[ ] src/extraction/grammars.ts WASM_GRAMMAR_FILES updated
+[ ] src/extraction/native-grammars.json updated
 [ ] src/extraction/grammars.ts EXTENSION_MAP updated
 [ ] src/extraction/grammars.ts display name updated
-[ ] Vendored grammar branch updated when needed
 [ ] src/extraction/languages/<lang>.ts added with NodeKind and EdgeKind mappings
 [ ] src/extraction/languages/index.ts EXTRACTORS updated
 [ ] Narrow tree-sitter core branch added only if the grammar shape requires it
 [ ] pnpm run build passes
-[ ] pnpm run copy-assets verified when WASM assets changed
+[ ] pnpm run prepare:native-runtime stages the host parser library
+[ ] pnpm run copy-assets verified when schema or native grammar metadata changed
 [ ] verify-extraction.mjs passes on a sample repo
 [ ] __tests__/extraction.test.ts detection and extraction tests pass
 [ ] README and site language docs updated with conservative claims
 [ ] User-facing docs updated when needed
-[ ] .claude/skills/agent-eval/corpus.json has small, medium, and large repos
-[ ] scripts/add-lang/bench.sh run for all three repos
-[ ] Dynamic-dispatch playbook followed for any framework flow gaps
-[ ] Final report includes extraction, A/B, and known gaps
+[ ] Small, medium, and large repositories pass deterministic extraction probes
+[ ] Public trace/node/context/explore probes cover any framework flow gaps
+[ ] Final report includes extraction results and known gaps without unpublished performance claims
 ```

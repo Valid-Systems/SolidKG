@@ -5,7 +5,7 @@ description: Contributor checklist for adding tree-sitter language support to So
 
 This guide is for contributors adding a new tree-sitter-backed language. The repository source of truth is the local `add-lang` skill at `.claude/skills/add-lang/SKILL.md`; this page summarizes the repeatable workflow and links to the deeper cookbook in `docs/add-language-support.md`.
 
-A language isn't supported just because a parser exists. It is supported after SolidKG can discover its files, load a healthy grammar, extract real graph nodes and edges, copy any WASM assets into the build, pass tests, update docs, and validate on small, medium, and large real repositories.
+A language isn't supported just because a parser exists. It is supported after SolidKG can discover its files, load a healthy native grammar, extract real graph nodes and edges, stage the parser library for every release target, pass tests, update docs, and validate on small, medium, and large real repositories.
 
 ## Required surfaces
 
@@ -13,8 +13,8 @@ A language isn't supported just because a parser exists. It is supported after S
 |---|---|
 | Language token | `src/types.ts` `LANGUAGES` |
 | Extension mapping | `src/extraction/grammars.ts` `EXTENSION_MAP` |
-| Grammar mapping | `src/extraction/grammars.ts` `WASM_GRAMMAR_FILES` |
-| Vendored WASM, when needed | `src/extraction/wasm/tree-sitter-<lang>.wasm` |
+| Native grammar mapping | `src/extraction/native-grammars.json` |
+| Host parser staging | `pnpm run prepare:native-runtime` |
 | Extractor | `src/extraction/languages/<lang>.ts` |
 | Extractor registration | `src/extraction/languages/index.ts` `EXTRACTORS` |
 | Tests | `__tests__/extraction.test.ts` |
@@ -25,17 +25,17 @@ Current file discovery is driven by `EXTENSION_MAP` plus special file rules such
 
 ## Workflow
 
-1. Resolve the lowercase language token and check whether it already appears in `LANGUAGES`, `EXTRACTORS`, `WASM_GRAMMAR_FILES`, and `EXTENSION_MAP`.
-2. Find the grammar in `node_modules/tree-sitter-wasms/out/`, or vendor a healthy `.wasm` under `src/extraction/wasm/`.
+1. Resolve the lowercase language token and check whether it already appears in `LANGUAGES`, `EXTRACTORS`, `native-grammars.json`, and `EXTENSION_MAP`.
+2. Confirm the pinned `@xberg-io/tree-sitter-language-pack` catalog contains the grammar, add its package/library mapping, and run `pnpm run prepare:native-runtime`.
 3. Run `node scripts/add-lang/check-grammar.mjs <lang> path/to/valid-sample.<ext>` before writing the extractor. A parser that fails on valid code must not ship.
 4. Dump the AST with `node scripts/add-lang/dump-ast.mjs <lang> path/to/sample.<ext>` and map the real node and field names.
-5. Write `src/extraction/languages/<lang>.ts` using an existing extractor as a model. `rust.ts` is a compact example for functions, traits, structs, imports, variables, signatures, and receiver types. `lua.ts` is the example for call-shaped imports and vendored grammar notes.
+5. Write `src/extraction/languages/<lang>.ts` using an existing extractor as a model. `rust.ts` is a compact example for functions, traits, structs, imports, variables, signatures, and receiver types. `lua.ts` is the example for call-shaped imports.
 6. Register the extractor in `src/extraction/languages/index.ts`.
-7. Build with `pnpm run build`. If you changed vendored grammar assets, also run `pnpm run copy-assets` or confirm build copied the WASM into `dist/extraction/wasm/`.
+7. Build with `pnpm run build`; it stages the host native parsers and copies `native-grammars.json` into `dist/extraction/`.
 8. Index a sample repo with `node dist/bin/solidkg.js init -i path/to/sample-repo` and run `node scripts/add-lang/verify-extraction.mjs path/to/sample-repo <lang>` until it passes.
 9. Add `__tests__/extraction.test.ts` coverage for detection and inline source extraction, then run `pnpm exec vitest run __tests__/extraction.test.ts`.
-10. Pick small, medium, and large real repositories, add them to `.claude/skills/agent-eval/corpus.json`, and run `scripts/add-lang/bench.sh <lang> <name> <url> "<question>" headless` for each one.
-11. If the language or framework has dynamic-dispatch flows, validate with `docs/design/dynamic-dispatch-coverage-playbook.md` before claiming flow coverage.
+10. Pick small, medium, and large real repositories and run deterministic extraction plus public trace/node/context/explore probes for each one.
+11. If the language or framework has dynamic-dispatch flows, verify end-to-end traces, synthesized-edge provenance, and stable node/hyperedge counts before claiming flow coverage.
 12. Update docs with only the support that tests and evaluation prove.
 
 ## Mapping rules
@@ -49,7 +49,7 @@ If the generic extractor can't find a grammar shape, add the narrowest possible 
 A complete language task reports:
 
 1. `pnpm run build` result.
-2. `pnpm run copy-assets` result when WASM assets changed.
+2. `pnpm run prepare:native-runtime` result when native grammar coverage changed.
 3. Focused extraction test result.
 4. `verify-extraction.mjs` result for each real repo.
 5. A/B results for each real repo, with and without SolidKG, including tool calls, file Reads, Grep/Bash use, SolidKG calls, duration, cost, and answer quality.

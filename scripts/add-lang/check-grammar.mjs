@@ -1,75 +1,62 @@
 #!/usr/bin/env node
-// Verify a tree-sitter grammar wasm is HEALTHY under the project's web-tree-sitter
-// runtime BEFORE writing an extractor. Prints the ABI version and parses a valid
-// sample many times in a multi-grammar context, to catch heap-corruption bugs
-// that silently drop nodes on every parse after the first.
+// Verify that a configured native tree-sitter grammar parses a syntactically
+// valid sample repeatedly before writing an extractor.
 //
-// Why this exists: the tree-sitter-wasms Lua grammar is ABI 13 and corrupts the
-// shared WASM heap under web-tree-sitter 0.25 — Lua extraction degraded on every
-// file after the first (nested calls/imports vanished). The fix was to vendor the
-// upstream ABI-15 wasm. Run this on any new grammar first; if it FAILs, vendor a
-// newer build instead of using the tree-sitter-wasms one.
-//
-// Usage: node scripts/add-lang/check-grammar.mjs <lang|wasm-path> <valid-sample> [iterations]
-// Exit: 0 healthy, 1 corruption / parse errors, 2 could not run.
-// NOTE: the sample must be SYNTACTICALLY VALID — a broken sample fails for the
-//       wrong reason.
+// Usage: node scripts/add-lang/check-grammar.mjs <lang> <valid-sample> [iterations]
+// Exit: 0 healthy, 1 parse errors, 2 could not run.
 
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { Parser, Language } from 'web-tree-sitter';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const require = createRequire(import.meta.url);
-const fail = (code, msg) => { console.error(`[check-grammar] ${msg}`); process.exit(code); };
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const grammarMap = JSON.parse(readFileSync(join(repoRoot, 'src', 'extraction', 'native-grammars.json'), 'utf8'));
+const require = createRequire(join(repoRoot, 'package.json'));
 
-const [token, sample, iterArg] = process.argv.slice(2);
-if (!token || !sample) fail(2, 'usage: check-grammar.mjs <lang|wasm-path> <valid-sample> [iterations]');
+function fail(code, message) {
+  console.error(`[check-grammar] ${message}`);
+  process.exit(code);
+}
+
+const [token, sample, iterationArgument] = process.argv.slice(2);
+if (!token || !sample) fail(2, 'usage: check-grammar.mjs <lang> <valid-sample> [iterations]');
 if (!existsSync(sample)) fail(2, `sample not found: ${sample}`);
-const iters = iterArg ? parseInt(iterArg, 10) : 20;
 
-const SPECIAL = { csharp: 'c_sharp', 'c#': 'c_sharp' };
-function resolveWasm(t) {
-  if (t.endsWith('.wasm')) return existsSync(t) ? t : fail(2, `wasm not found: ${t}`);
-  const base = SPECIAL[t.toLowerCase()] ?? t.toLowerCase();
-  try { return require.resolve(`tree-sitter-wasms/out/tree-sitter-${base}.wasm`); } catch { /* try vendored */ }
-  const vendored = `src/extraction/wasm/tree-sitter-${base}.wasm`;
-  if (existsSync(vendored)) return vendored;
-  return fail(2, `no grammar for "${t}" — not in tree-sitter-wasms and not vendored`);
+const language = token.toLowerCase() === 'c#' ? 'csharp' : token.toLowerCase();
+const config = grammarMap[language];
+if (!config) fail(2, `no native grammar mapping for "${token}" in src/extraction/native-grammars.json`);
+
+const iterations = iterationArgument ? Number.parseInt(iterationArgument, 10) : 20;
+if (!Number.isInteger(iterations) || iterations < 1) fail(2, `iterations must be a positive integer: ${iterationArgument}`);
+
+const cacheDir = join(repoRoot, '.native-grammars', `${process.platform}-${process.arch}`);
+process.env.TREE_SITTER_LANGUAGE_PACK_MANIFEST_URL = 'file:///definitely-missing/parsers.json';
+const languagePack = require('@xberg-io/tree-sitter-language-pack');
+languagePack.configure({ cacheDir });
+
+let parser;
+try {
+  parser = languagePack.getParser(config.packageName);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  fail(2, `failed to load ${config.packageName} from ${cacheDir}: ${message}`);
 }
 
-const wasmPath = resolveWasm(token);
 const source = readFileSync(sample, 'utf8');
-
-try { await Parser.init(); }
-catch { await Parser.init({ locateFile: () => require.resolve('web-tree-sitter/tree-sitter.wasm') }); }
-
-// Load a second, known-good grammar — the corruption surfaces under the
-// multi-grammar runtime that real indexing uses, not a single grammar in isolation.
-try { await Language.load(require.resolve('tree-sitter-wasms/out/tree-sitter-python.wasm')); } catch { /* ok */ }
-
-let language;
-try { language = await Language.load(wasmPath); }
-catch (e) { fail(2, `failed to load ${wasmPath}: ${e.message}`); }
-
-const parser = new Parser();
-parser.setLanguage(language);
-
-let ok = 0, err = 0;
-for (let i = 0; i < iters; i++) {
+let clean = 0;
+let errors = 0;
+for (let iteration = 0; iteration < iterations; iteration++) {
   const tree = parser.parse(source);
-  if (tree.rootNode.hasError) err++; else ok++;
+  if (!tree) fail(2, `parser returned no tree on iteration ${iteration + 1}`);
+  if (tree.rootNode().hasError()) errors++; else clean++;
 }
 
-console.log(`grammar: ${wasmPath.split('/').pop()}`);
-console.log(`  ABI version: ${language.abiVersion}`);
-console.log(`  parses: ${ok} clean / ${err} with errors (of ${iters})`);
-if (err > 0) {
-  console.log(
-    `RESULT: FAIL — ${err}/${iters} parses produced ERROR trees on a valid sample. ` +
-    `This grammar corrupts under web-tree-sitter; vendor a newer (ABI 14/15) wasm ` +
-    `(see SKILL.md "Find a grammar"). Confirm your sample is syntactically valid first.`
-  );
+console.log(`grammar: ${config.packageName}`);
+console.log(`  cache: ${cacheDir}`);
+console.log(`  parses: ${clean} clean / ${errors} with errors (of ${iterations})`);
+if (errors > 0) {
+  console.log(`RESULT: FAIL — ${errors}/${iterations} parses produced ERROR trees on a valid sample.`);
   process.exit(1);
 }
-console.log('RESULT: PASS — grammar parses cleanly and reuses safely.');
-process.exit(0);
+console.log('RESULT: PASS — native grammar parses cleanly and reuses safely offline.');
