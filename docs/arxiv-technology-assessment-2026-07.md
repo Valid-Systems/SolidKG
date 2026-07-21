@@ -224,14 +224,14 @@ Any retrieval intervention must improve the existing default `solidkg_explore` c
 
 ### Decision bars
 
-| Experiment | Ship/continue bar | Reject or rethink when |
-|---|---|---|
-| Baseline attribution | At least four archived runs per arm, raw call sequences and payload sizes, exact binary hashes, and the directional gap reproduced on most repository medians. | The gap does not reproduce or cannot be localized to a product-controlled surface. |
-| Graph acceptance | Exact equality for canonical deterministic facts after fresh versus sync indexing, zero false paths in negative fixtures, and explicit precision/recall/coverage reporting. | Stable outputs still miss expected edges, add confident false edges, or conceal ambiguous SCIP links. |
-| Packet compaction | No new answer failures, evidence-atom accuracy non-inferior, median cumulative packet bytes/tokens and graph calls reduced on most repositories, and p95 latency within a pre-registered budget. | Savings come from omitted required anchors, misleading sufficiency, or host-only behavior. |
-| Adaptive fusion | Required-anchor recall improves on held-out repositories without exact-intent, hard-negative, latency, or payload regression. | The attribution study shows no anchor-recall problem, or gains disappear outside training repositories. |
-| Concept coverage | Missing-required-concept rate falls on labeled prompts without widening packets or increasing false anchors. | Concept parsing is unstable, model-dependent, or duplicates existing exact/path evidence. |
-| SCIP reconciliation | Every ambiguous negative control abstains; per-language link, ambiguity, abstention, and sampled precision are reported separately. | A coverage number is presented without sampled correctness or runtime-flow boundaries. |
+| Experiment           | Ship/continue bar                                                                                                                                                                                | Reject or rethink when                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Baseline attribution | At least four archived runs per arm, raw call sequences and payload sizes, exact binary hashes, and the directional gap reproduced on most repository medians.                                   | The gap does not reproduce or cannot be localized to a product-controlled surface.                      |
+| Graph acceptance     | Exact equality for canonical deterministic facts after fresh versus sync indexing, zero false paths in negative fixtures, and explicit precision/recall/coverage reporting.                      | Stable outputs still miss expected edges, add confident false edges, or conceal ambiguous SCIP links.   |
+| Packet compaction    | No new answer failures, evidence-atom accuracy non-inferior, median cumulative packet bytes/tokens and graph calls reduced on most repositories, and p95 latency within a pre-registered budget. | Savings come from omitted required anchors, misleading sufficiency, or host-only behavior.              |
+| Adaptive fusion      | Required-anchor recall improves on held-out repositories without exact-intent, hard-negative, latency, or payload regression.                                                                    | The attribution study shows no anchor-recall problem, or gains disappear outside training repositories. |
+| Concept coverage     | Missing-required-concept rate falls on labeled prompts without widening packets or increasing false anchors.                                                                                     | Concept parsing is unstable, model-dependent, or duplicates existing exact/path evidence.               |
+| SCIP reconciliation  | Every ambiguous negative control abstains; per-language link, ambiguity, abstention, and sampled precision are reported separately.                                                              | A coverage number is presented without sampled correctness or runtime-flow boundaries.                  |
 
 Every experiment should preserve the existing order of proof:
 

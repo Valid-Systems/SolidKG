@@ -122,25 +122,25 @@ If an experiment wins, translate the lesson into deterministic output guidance i
 
 Candidate trigger states:
 
-| Trigger State | Candidate Output Behavior |
-|---|---|
-| Duplicate callable names | Provide qualified or path-qualified retry examples. |
-| No path found with qualified candidates | Provide bounded candidate retry guidance and evidence anchors. |
-| Stale index banner | Provide exact sync/retry guidance bounded to stale files. |
-| Omitted/truncated source | Suggest narrower `solidkg_explore` or targeted `solidkg_node`, not broad Read. |
-| Heuristic-only path segment | Surface calibrated uncertainty and evidence. |
-| Low source coverage | Surface bounded insufficiency and next SolidKG call. |
-| Traceable flow not using trace | Provide `solidkg_trace(from,to)` guidance only when deterministic traceable evidence exists. |
-| Evidence insufficient for requested claim | State insufficiency and suggest exact evidence-gathering SolidKG call. |
+| Trigger State                             | Candidate Output Behavior                                                                    |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Duplicate callable names                  | Provide qualified or path-qualified retry examples.                                          |
+| No path found with qualified candidates   | Provide bounded candidate retry guidance and evidence anchors.                               |
+| Stale index banner                        | Provide exact sync/retry guidance bounded to stale files.                                    |
+| Omitted/truncated source                  | Suggest narrower `solidkg_explore` or targeted `solidkg_node`, not broad Read.               |
+| Heuristic-only path segment               | Surface calibrated uncertainty and evidence.                                                 |
+| Low source coverage                       | Surface bounded insufficiency and next SolidKG call.                                         |
+| Traceable flow not using trace            | Provide `solidkg_trace(from,to)` guidance only when deterministic traceable evidence exists. |
+| Evidence insufficient for requested claim | State insufficiency and suggest exact evidence-gathering SolidKG call.                       |
 
 Optional minimal metadata, only if needed:
 
-| Field | Constraint |
-|---|---|
-| `state` | Explicit trigger state only. |
+| Field        | Constraint                                              |
+| ------------ | ------------------------------------------------------- |
+| `state`      | Explicit trigger state only.                            |
 | `confidence` | Calibrated to deterministic evidence, not LLM judgment. |
-| `evidence` | Anchors from returned graph/source metadata. |
-| `nextTool` | Exact existing SolidKG tool and retry example. |
+| `evidence`   | Anchors from returned graph/source metadata.            |
+| `nextTool`   | Exact existing SolidKG tool and retry example.          |
 
 Avoid broad frameworks, session ledgers, persistent trajectory memory, and branding-led concepts until a narrow correction proves value.
 
@@ -254,19 +254,19 @@ Compare the candidate product output against baseline.
 
 Release gate metrics:
 
-| Metric | Desired Direction |
-|---|---|
-| Read count | Down. |
-| Grep count | Down. |
-| Trace adoption | Up where flow is traceable. |
-| Retry success after ambiguity/no-path/stale/truncated | Up. |
-| Final-answer evidence coverage | Up. |
-| Wrong endpoint suggestions | No increase. |
-| Added calls | No harmful increase. |
-| Payload/output size | Bounded increase only. |
-| Premature-stop/under-verification regressions | No increase. |
-| Non-flow regression rate | No increase. |
-| Privacy footprint | No increase outside explicit eval artifacts. |
+| Metric                                                | Desired Direction                            |
+| ----------------------------------------------------- | -------------------------------------------- |
+| Read count                                            | Down.                                        |
+| Grep count                                            | Down.                                        |
+| Trace adoption                                        | Up where flow is traceable.                  |
+| Retry success after ambiguity/no-path/stale/truncated | Up.                                          |
+| Final-answer evidence coverage                        | Up.                                          |
+| Wrong endpoint suggestions                            | No increase.                                 |
+| Added calls                                           | No harmful increase.                         |
+| Payload/output size                                   | Bounded increase only.                       |
+| Premature-stop/under-verification regressions         | No increase.                                 |
+| Non-flow regression rate                              | No increase.                                 |
+| Privacy footprint                                     | No increase outside explicit eval artifacts. |
 
 Kill criteria:
 
@@ -280,67 +280,67 @@ Kill criteria:
 
 ### Wave 1: Foundation
 
-| ID | Task | Category | Skills | QA |
-|---|---|---|---|---|
-| 1 | Define Eval Taxonomy Contract | `deep` | `agent-eval`, `software-architecture` | All required failure classes have deterministic labels and evidence sources. |
-| 2 | Define Privacy And Artifact Rules | `deep` | `software-architecture` | No raw/default trajectory persistence; explicit eval artifact rules exist. |
+| ID  | Task                              | Category | Skills                                | QA                                                                           |
+| --- | --------------------------------- | -------- | ------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | Define Eval Taxonomy Contract     | `deep`   | `agent-eval`, `software-architecture` | All required failure classes have deterministic labels and evidence sources. |
+| 2   | Define Privacy And Artifact Rules | `deep`   | `software-architecture`               | No raw/default trajectory persistence; explicit eval artifact rules exist.   |
 
 ### Wave 2: Analyzer Setup
 
-| ID | Task | Depends On | Category | Skills | QA |
-|---|---|---|---|---|---|
-| 3 | Build Offline Analyzer MVP | 1, 2 | `unspecified-high` | `agent-eval` | Analyzer runs locally and emits labels/metrics. |
-| 4 | Add Golden/Sanitized Fixtures | 1, 2 | `unspecified-low` | `agent-eval` | Fixtures cover all failure classes and controls. |
+| ID  | Task                          | Depends On | Category           | Skills       | QA                                               |
+| --- | ----------------------------- | ---------- | ------------------ | ------------ | ------------------------------------------------ |
+| 3   | Build Offline Analyzer MVP    | 1, 2       | `unspecified-high` | `agent-eval` | Analyzer runs locally and emits labels/metrics.  |
+| 4   | Add Golden/Sanitized Fixtures | 1, 2       | `unspecified-low`  | `agent-eval` | Fixtures cover all failure classes and controls. |
 
 ### Wave 3: Analyzer Verification
 
-| ID | Task | Depends On | Category | Skills | QA |
-|---|---|---|---|---|---|
-| 5 | Add Analyzer Tests | 1, 3, 4 | `unspecified-low` | `agent-eval` | Tests deterministically classify fixtures. |
-| 6 | Run Baseline Eval Pass | 3, 5 | `deep` | `agent-eval` | Baseline metrics and top failure classes recorded. |
+| ID  | Task                   | Depends On | Category          | Skills       | QA                                                 |
+| --- | ---------------------- | ---------- | ----------------- | ------------ | -------------------------------------------------- |
+| 5   | Add Analyzer Tests     | 1, 3, 4    | `unspecified-low` | `agent-eval` | Tests deterministically classify fixtures.         |
+| 6   | Run Baseline Eval Pass | 3, 5       | `deep`            | `agent-eval` | Baseline metrics and top failure classes recorded. |
 
 ### Wave 4: Experiments
 
-| ID | Task | Depends On | Category | Skills | QA |
-|---|---|---|---|---|---|
-| 7 | Design Bounded Correction Experiments | 6 | `deep` | `agent-eval`, `software-architecture` | Each experiment maps to an observed failure and harm metric. |
-| 8 | Run Replay/A/B Experiments | 7 | `deep` | `agent-eval` | Results distinguish successful, failed, and eval-only corrections. |
+| ID  | Task                                  | Depends On | Category | Skills                                | QA                                                                 |
+| --- | ------------------------------------- | ---------- | -------- | ------------------------------------- | ------------------------------------------------------------------ |
+| 7   | Design Bounded Correction Experiments | 6          | `deep`   | `agent-eval`, `software-architecture` | Each experiment maps to an observed failure and harm metric.       |
+| 8   | Run Replay/A/B Experiments            | 7          | `deep`   | `agent-eval`                          | Results distinguish successful, failed, and eval-only corrections. |
 
 ### Wave 5: Product Selection
 
-| ID | Task | Depends On | Category | Skills | QA |
-|---|---|---|---|---|---|
-| 9 | Decide Shippable Output States | 8 | `ultrabrain` | `agent-eval`, `software-architecture` | Only evidence-backed deterministic states selected. |
-| 10 | Specify Deterministic Tool-Output Blocks | 9 | `unspecified-high` | `software-architecture` | Each block has trigger, evidence, confidence, and exact next tool. |
+| ID  | Task                                     | Depends On | Category           | Skills                                | QA                                                                 |
+| --- | ---------------------------------------- | ---------- | ------------------ | ------------------------------------- | ------------------------------------------------------------------ |
+| 9   | Decide Shippable Output States           | 8          | `ultrabrain`       | `agent-eval`, `software-architecture` | Only evidence-backed deterministic states selected.                |
+| 10  | Specify Deterministic Tool-Output Blocks | 9          | `unspecified-high` | `software-architecture`               | Each block has trigger, evidence, confidence, and exact next tool. |
 
 ### Wave 6: Shippable Changes
 
-| ID | Task | Depends On | Category | Skills | QA |
-|---|---|---|---|---|---|
-| 11 | Implement Shippable Output Changes | 10 | `unspecified-high` | None | Existing tool outputs enhanced without new generic steering tool. |
-| 12 | Add MCP/Tool-Output Tests | 10, 11 | `unspecified-low` | None | Trigger, false-positive, payload, and deterministic-output tests pass. |
+| ID  | Task                               | Depends On | Category           | Skills | QA                                                                     |
+| --- | ---------------------------------- | ---------- | ------------------ | ------ | ---------------------------------------------------------------------- |
+| 11  | Implement Shippable Output Changes | 10         | `unspecified-high` | None   | Existing tool outputs enhanced without new generic steering tool.      |
+| 12  | Add MCP/Tool-Output Tests          | 10, 11     | `unspecified-low`  | None   | Trigger, false-positive, payload, and deterministic-output tests pass. |
 
 ### Wave 7: Release Gate
 
-| ID | Task | Depends On | Category | Skills | QA |
-|---|---|---|---|---|---|
-| 13 | Run Regression Eval Gate | 11, 12 | `deep` | `agent-eval` | Target metrics improve; harm metrics do not regress. |
-| 14 | Update Docs And Changelog | 13 | `writing` | `crafting-effective-readmes` if README/docs touched | Docs distinguish eval experiments from product MCP behavior. |
+| ID  | Task                      | Depends On | Category  | Skills                                              | QA                                                           |
+| --- | ------------------------- | ---------- | --------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| 13  | Run Regression Eval Gate  | 11, 12     | `deep`    | `agent-eval`                                        | Target metrics improve; harm metrics do not regress.         |
+| 14  | Update Docs And Changelog | 13         | `writing` | `crafting-effective-readmes` if README/docs touched | Docs distinguish eval experiments from product MCP behavior. |
 
 ## Atomic Commit Strategy
 
-| Commit | Contents |
-|---|---|
-| 1 | Taxonomy contract, privacy/artifact rules, and no product behavior changes. |
-| 2 | Offline analyzer MVP with sanitized fixtures. |
-| 3 | Analyzer tests and baseline report plumbing. |
-| 4 | Replay/A/B experiment harness additions. |
-| 5 | Experiment result fixtures or recorded sanitized summaries. |
-| 6 | Selected deterministic tool-output specification. |
-| 7 | Product output changes for one trigger family only. |
-| 8 | Product tests for that trigger family. |
-| 9 | Additional trigger families, one commit per family. |
-| 10 | Regression eval results and docs. |
+| Commit | Contents                                                                    |
+| ------ | --------------------------------------------------------------------------- |
+| 1      | Taxonomy contract, privacy/artifact rules, and no product behavior changes. |
+| 2      | Offline analyzer MVP with sanitized fixtures.                               |
+| 3      | Analyzer tests and baseline report plumbing.                                |
+| 4      | Replay/A/B experiment harness additions.                                    |
+| 5      | Experiment result fixtures or recorded sanitized summaries.                 |
+| 6      | Selected deterministic tool-output specification.                           |
+| 7      | Product output changes for one trigger family only.                         |
+| 8      | Product tests for that trigger family.                                      |
+| 9      | Additional trigger families, one commit per family.                         |
+| 10     | Regression eval results and docs.                                           |
 
 Rules:
 
