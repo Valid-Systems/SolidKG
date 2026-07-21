@@ -2,7 +2,9 @@
   "name": "solidkg",
   "version": "0.8.0",
   "private": true,
-  "description": "Local semantic code intelligence for AI coding agents, with benchmark suite context for retrieval savings.",
+  "packageManager": "pnpm@10.34.5",
+  "license": "SEE LICENSE IN LICENSE",
+  "description": "Local-first code intelligence and an MCP server for AI coding agents.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -20,25 +22,28 @@
   "files": [
     "dist",
     "scripts",
+    "LICENSE",
     "README.md",
     "docs/THIRD_PARTY_LICENSES.md",
     "docs/third-party-licenses"
   ],
   "scripts": {
-    "build": "tsc && npm run copy-assets && node scripts/strip-bin-comments.mjs && node -e \"require('fs').chmodSync('dist/bin/solidkg.js', 0o755)\"",
+    "build": "pnpm run prepare:native-runtime && pnpm run clean && tsc && pnpm run copy-assets && node scripts/strip-bin-comments.mjs && node -e \"require('fs').chmodSync('dist/bin/solidkg.js', 0o755)\"",
+    "prepare:native-runtime": "node scripts/prepare-native-runtime.mjs",
+    "pretest": "pnpm run prepare:native-runtime",
     "preuninstall": "node dist/bin/uninstall.js",
-    "copy-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/extraction/wasm',{recursive:true});fs.readdirSync('src/extraction/wasm').filter(f=>f.endsWith('.wasm')).forEach(f=>fs.copyFileSync('src/extraction/wasm/'+f,'dist/extraction/wasm/'+f))\"",
+    "copy-assets": "node -e \"const fs=require('fs');fs.mkdirSync('dist/db',{recursive:true});fs.copyFileSync('src/db/schema.sql','dist/db/schema.sql');fs.mkdirSync('dist/extraction',{recursive:true});fs.copyFileSync('src/extraction/native-grammars.json','dist/extraction/native-grammars.json')\"",
     "dev": "tsc --watch",
-    "cli": "npm run build && node dist/bin/solidkg.js",
+    "cli": "pnpm run build && node dist/bin/solidkg.js",
     "test": "vitest run",
+    "test:public": "vitest run --testTimeout 15000",
     "test:watch": "vitest",
-    "test:eval": "vitest run __tests__/evaluation/",
-    "eval": "npm run build && npx tsx __tests__/evaluation/runner.ts",
     "clean": "node -e \"const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true})\"",
     "prepublishOnly": "node scripts/guard-root-publish.mjs",
     "readiness:artifacts": "node scripts/readiness/verify-release-artifacts.mjs",
-    "bench:reference-quality": "node scripts/agent-eval/reference-quality-sweep.mjs",
-    "test:reference-quality": "pnpm run build && vitest run __tests__/agent-eval/reference-quality-policy.test.ts __tests__/agent-eval/reference-quality-sqlite.test.ts __tests__/agent-eval/reference-quality-probes.test.ts __tests__/agent-eval/reference-quality-report.test.ts __tests__/agent-eval/reference-quality-cli.test.ts"
+    "verify:source": "node scripts/readiness/verify-source-checkout.mjs",
+    "verify:source:full": "pnpm run verify:source && pnpm run test:public && pnpm run readiness:artifacts",
+    "install:source": "pnpm run build && pnpm link --global"
   },
   "keywords": [
     "code-intelligence",
@@ -50,13 +55,12 @@
     "@bufbuild/protobuf": "^2.12.0",
     "@c4312/scip": "^0.1.0",
     "@sourcegraph/scip-typescript": "0.4.0",
+    "@xberg-io/tree-sitter-language-pack": "1.13.1",
     "chokidar": "^4.0.3",
     "commander": "^14.0.2",
     "ignore": "^7.0.5",
     "jsonc-parser": "^3.3.1",
-    "picomatch": "^4.0.3",
-    "tree-sitter-wasms": "^0.1.11",
-    "web-tree-sitter": "^0.25.10"
+    "picomatch": "^4.0.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",
@@ -67,6 +71,6 @@
     "vitest": "^4.1.7"
   },
   "engines": {
-    "node": ">=24.0.0 <25.0.0"
+    "node": ">=24.0.0"
   }
 }
