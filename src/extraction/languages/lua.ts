@@ -1,9 +1,9 @@
-import type { Node as SyntaxNode } from 'web-tree-sitter';
+import type { Node as SyntaxNode } from '../native-tree-sitter';
 import { getNodeText, getChildByField } from '../tree-sitter-helpers';
 import type { LanguageExtractor } from '../tree-sitter-types';
 
 // Node names follow the vendored ABI-15 grammar (@tree-sitter-grammars/
-// tree-sitter-lua), NOT the older tree-sitter-wasms build — see grammars.ts.
+// tree-sitter-lua) so Lua and Luau share the same native grammar behavior.
 
 /** First descendant of a given type (breadth-first), or null. */
 function findDescendant(node: SyntaxNode, type: string): SyntaxNode | null {
