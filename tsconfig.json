@@ -26,10 +26,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["node"],
-    "resolveJsonModule": true,
-    "paths": {
-      "web-tree-sitter": ["./src/web-tree-sitter.d.ts"]
-    }
+    "resolveJsonModule": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "__tests__"]
