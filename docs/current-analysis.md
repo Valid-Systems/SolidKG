@@ -757,7 +757,7 @@ Required before any behavioral claim:
 
 - `pnpm exec tsc` passes.
 - `pnpm test` passes.
-- Asset-copy/package tests pass for schema and WASM files.
+- Asset-copy/package tests pass for schema, native parser metadata, and target parser libraries.
 - CLI/server entrypoints start under supported Node versions.
 - Installer idempotency and uninstall tests pass for all supported agent targets.
 
