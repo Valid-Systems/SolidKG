@@ -4,7 +4,7 @@
  * Handles parsing source code and extracting structural information.
  */
 
-import { Node as SyntaxNode, Tree } from 'web-tree-sitter';
+import { Node as SyntaxNode, Tree } from './native-tree-sitter';
 import * as path from 'path';
 import {
   Language,
@@ -272,13 +272,6 @@ export class TreeSitterExtractor {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
 
-      // WASM memory errors leave the module in a corrupted state — all subsequent
-      // parses would also fail. Re-throw so the worker can detect and crash,
-      // forcing a clean restart with a fresh heap.
-      if (msg.includes('memory access out of bounds') || msg.includes('out of memory')) {
-        throw error;
-      }
-
       this.errors.push({
         message: `Parse error: ${msg}`,
         filePath: this.filePath,
@@ -286,8 +279,6 @@ export class TreeSitterExtractor {
         code: 'parse_error',
       });
     } finally {
-      // Free tree-sitter WASM memory immediately — trees hold native heap memory
-      // invisible to V8's GC that accumulates across thousands of files.
       if (this.tree) {
         this.tree.delete();
         this.tree = null;
