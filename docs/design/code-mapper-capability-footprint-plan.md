@@ -38,42 +38,35 @@ Use one row per evidence assertion. Deduplicate semantically at query time so mu
 
 ```typescript
 type CapabilityOperation =
-  | 'read'
-  | 'write'
-  | 'guard'
-  | 'emit'
-  | 'subscribe'
-  | 'send'
-  | 'mutate';
+  | "read"
+  | "write"
+  | "guard"
+  | "emit"
+  | "subscribe"
+  | "send"
+  | "mutate";
 
 type CapabilityResourceKind =
-  | 'datastore'
-  | 'config'
-  | 'auth'
-  | 'channel'
-  | 'filesystem'
-  | 'network'
-  | 'process'
-  | 'state'
-  | 'ui';
+  | "datastore"
+  | "config"
+  | "auth"
+  | "channel"
+  | "filesystem"
+  | "network"
+  | "process"
+  | "state"
+  | "ui";
 
 type CapabilityOrigin =
-  | 'ast'
-  | 'scip'
-  | 'framework_resolver'
-  | 'semantic_synthesis'
-  | 'annotation';
+  | "ast"
+  | "scip"
+  | "framework_resolver"
+  | "semantic_synthesis"
+  | "annotation";
 
-type CapabilityCertainty =
-  | 'precise'
-  | 'static'
-  | 'heuristic'
-  | 'unverified';
+type CapabilityCertainty = "precise" | "static" | "heuristic" | "unverified";
 
-type CapabilityScope =
-  | 'node_scoped'
-  | 'callsite_scoped'
-  | 'relation_scoped';
+type CapabilityScope = "node_scoped" | "callsite_scoped" | "relation_scoped";
 
 interface CapabilityAssertion {
   id: string;
@@ -119,7 +112,7 @@ interface CapabilityAnalysisRun {
   producerId: string;
   producerVersion: string;
   sourceHash: string;
-  status: 'complete' | 'partial' | 'unsupported' | 'failed';
+  status: "complete" | "partial" | "unsupported" | "failed";
   diagnostics?: string;
 }
 ```
@@ -249,32 +242,32 @@ Hard invariance gate: enabling annotations must leave nodes, edges, hyperedges, 
 
 ## Revised Phase Order
 
-| Phase | Purpose | Exit Criteria |
-| --- | --- | --- |
-| 1. Contract and invariants | Taxonomy, provenance axes, path semantics, coverage states, annotation threat model, output budgets. | Contract accepted; topology invariance and absence semantics explicit. |
-| 2. Predeclare evaluation | Fixtures, ground truth, target/control/negative prompts, pass thresholds. | Eval protocol can run before implementation as baseline. |
-| 3. Storage and lifecycle | Migration, stable IDs, producer runs, invalidation, deletion, schema-versioned output contracts. | Idempotent storage and lifecycle tests designed. |
-| 4. Thin vertical slice | Config-read producer plus query-time projection of existing hyperedges; expose only through `trace` and `node`. | Targeted tests pass; outputs remain compact. |
-| 5. Agent-eval gate | Capability-off versus capability-on using identical topology. | No Read/Grep or correctness regression; target prompts improve. |
-| 6. Producer expansion | Auth and typed datastore rules. | Precision fixtures pass; unsupported states are visible. |
-| 7. Context enrichment | Add compact `context` output after trace/node pass. | Minimal and standard context outputs remain budget-safe. |
-| 8. Conditional explore enrichment | Add only if A/B eval proves value. | Source-heavy output does not increase total agent context. |
-| 9. Optional annotations | Add only behind egress and invariance gates. | Annotation output isolated, opt-in, and excluded by default. |
+| Phase                             | Purpose                                                                                                         | Exit Criteria                                                          |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 1. Contract and invariants        | Taxonomy, provenance axes, path semantics, coverage states, annotation threat model, output budgets.            | Contract accepted; topology invariance and absence semantics explicit. |
+| 2. Predeclare evaluation          | Fixtures, ground truth, target/control/negative prompts, pass thresholds.                                       | Eval protocol can run before implementation as baseline.               |
+| 3. Storage and lifecycle          | Migration, stable IDs, producer runs, invalidation, deletion, schema-versioned output contracts.                | Idempotent storage and lifecycle tests designed.                       |
+| 4. Thin vertical slice            | Config-read producer plus query-time projection of existing hyperedges; expose only through `trace` and `node`. | Targeted tests pass; outputs remain compact.                           |
+| 5. Agent-eval gate                | Capability-off versus capability-on using identical topology.                                                   | No Read/Grep or correctness regression; target prompts improve.        |
+| 6. Producer expansion             | Auth and typed datastore rules.                                                                                 | Precision fixtures pass; unsupported states are visible.               |
+| 7. Context enrichment             | Add compact `context` output after trace/node pass.                                                             | Minimal and standard context outputs remain budget-safe.               |
+| 8. Conditional explore enrichment | Add only if A/B eval proves value.                                                                              | Source-heavy output does not increase total agent context.             |
+| 9. Optional annotations           | Add only behind egress and invariance gates.                                                                    | Annotation output isolated, opt-in, and excluded by default.           |
 
 ## Task Dependency Graph
 
-| Task | Depends On | Dependents | Purpose |
-| --- | --- | --- | --- |
-| 1. Contract And Invariants | None | 2, 3, 4, 6, 9 | Define taxonomy, provenance, path semantics, and non-goals. |
-| 2. Evaluation Contract | 1 | 5, 8 | Predeclare target/control/negative prompts and pass bars. |
-| 3. Storage And Lifecycle | 1 | 4, 5, 6 | Store assertions and producer-run coverage safely. |
-| 4. Thin Vertical Slice | 2, 3 | 5, 6 | Implement config-read plus hyperedge projection through trace/node. |
-| 5. Repo-Native Tests | 3, 4 | 8 | Lock schema, lifecycle, output, and invariance behavior. |
-| 6. Trace And Node Output | 3, 4 | 7, 8 | Surface first capability packet in high-value tools. |
-| 7. Context Output | 6 | 8 | Add compact query-relevant summaries after trace/node succeed. |
-| 8. Agent Eval Gates | 2, 5, 6, 7 | 10 | Prove behavior improves without correctness regression. |
-| 9. Optional Annotation Design | 1 | 10 | Design isolated, opt-in annotation storage and threat model. |
-| 10. Optional Annotation Implementation | 8, 9 | None | Implement only if deterministic layer passes gates. |
+| Task                                   | Depends On | Dependents    | Purpose                                                             |
+| -------------------------------------- | ---------- | ------------- | ------------------------------------------------------------------- |
+| 1. Contract And Invariants             | None       | 2, 3, 4, 6, 9 | Define taxonomy, provenance, path semantics, and non-goals.         |
+| 2. Evaluation Contract                 | 1          | 5, 8          | Predeclare target/control/negative prompts and pass bars.           |
+| 3. Storage And Lifecycle               | 1          | 4, 5, 6       | Store assertions and producer-run coverage safely.                  |
+| 4. Thin Vertical Slice                 | 2, 3       | 5, 6          | Implement config-read plus hyperedge projection through trace/node. |
+| 5. Repo-Native Tests                   | 3, 4       | 8             | Lock schema, lifecycle, output, and invariance behavior.            |
+| 6. Trace And Node Output               | 3, 4       | 7, 8          | Surface first capability packet in high-value tools.                |
+| 7. Context Output                      | 6          | 8             | Add compact query-relevant summaries after trace/node succeed.      |
+| 8. Agent Eval Gates                    | 2, 5, 6, 7 | 10            | Prove behavior improves without correctness regression.             |
+| 9. Optional Annotation Design          | 1          | 10            | Design isolated, opt-in annotation storage and threat model.        |
+| 10. Optional Annotation Implementation | 8, 9       | None          | Implement only if deterministic layer passes gates.                 |
 
 ## Testing And Eval Gates
 

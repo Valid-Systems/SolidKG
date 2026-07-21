@@ -121,6 +121,7 @@ test().catch(console.error);
 ```
 
 **What to check for each query:**
+
 - Do the entry points make sense for the question?
 - Are the right files surfacing (not just test files or unrelated code)?
 - Is there a mix of edge types (calls, contains, extends, implements) — not just `contains`?
@@ -171,6 +172,7 @@ test().catch(console.error);
 ```
 
 **What to check:**
+
 - Does the target symbol rank in the top 3?
 - For common names like `get`, do the results include qualified names that help disambiguate?
 - Are there zero-result queries? That's a bug.
@@ -214,6 +216,7 @@ test().catch(console.error);
 ```
 
 **What to check:**
+
 - Do methods have callers AND callees? If a method has 0 of both, edge extraction may be broken.
 - Do the callers/callees make sense? A `build()` method should call constructor-like things, and be called by setup/initialization code.
 - Are the counts reasonable? A core method in a popular codebase should have multiple callers.
@@ -259,6 +262,7 @@ test().catch(console.error);
 ```
 
 **What to check:**
+
 - Does changing a core interface/class show a wide impact radius?
 - Are the affected files reasonable (things that import/extend/use it)?
 - Is the impact radius non-empty? Zero impact on a core type means edges are missing.
@@ -311,6 +315,7 @@ sqlite3 <codebase_path>/.solidkg/solidkg.db "
 ```
 
 **What to check:**
+
 - `contains` should be the most common (structural hierarchy).
 - `calls` should be plentiful — if near zero, call extraction is broken for this language.
 - `imports` should exist — if zero, import parsing is broken.
@@ -330,19 +335,19 @@ sqlite3 <codebase_path>/.solidkg/solidkg.db "
 
 **What to check for each language:**
 
-| Node Kind | Expected? | Notes |
-|-----------|-----------|-------|
-| `file` | Always | One per source file |
-| `class` | If language has classes | |
-| `method` | If language has methods | Should include owner type in `qualified_name` |
-| `function` | If language has top-level functions | |
-| `interface` | If language has interfaces/protocols | |
-| `enum` | If language has enums | |
-| `enum_member` | If language has enums | Values inside enums |
-| `import` | Always | One per import statement |
-| `variable` / `field` | Usually | Fields, constants, top-level vars |
-| `struct` | If language has structs | Go, Rust, C, Swift |
-| `trait` | If language has traits | Rust |
+| Node Kind            | Expected?                            | Notes                                         |
+| -------------------- | ------------------------------------ | --------------------------------------------- |
+| `file`               | Always                               | One per source file                           |
+| `class`              | If language has classes              |                                               |
+| `method`             | If language has methods              | Should include owner type in `qualified_name` |
+| `function`           | If language has top-level functions  |                                               |
+| `interface`          | If language has interfaces/protocols |                                               |
+| `enum`               | If language has enums                |                                               |
+| `enum_member`        | If language has enums                | Values inside enums                           |
+| `import`             | Always                               | One per import statement                      |
+| `variable` / `field` | Usually                              | Fields, constants, top-level vars             |
+| `struct`             | If language has structs              | Go, Rust, C, Swift                            |
+| `trait`              | If language has traits               | Rust                                          |
 
 If an expected node kind has 0 count, the language extractor is missing that AST type.
 
@@ -427,6 +432,7 @@ test().catch(console.error);
 ```
 
 **What to check for each prompt:**
+
 - Does it return entry points? Zero entry points = total failure.
 - Are the entry points **relevant** to the question? (Not just random symbols that happen to share a word.)
 - Does it span multiple files? Most real questions involve cross-file understanding.
@@ -439,35 +445,35 @@ test().catch(console.error);
 
 ## Diagnosing Failures
 
-| Symptom | Likely Cause | Where to Fix |
-|---------|-------------|--------------|
-| Method missing owner type in `qualified_name` | Language needs `getReceiverType` | `src/extraction/languages/<lang>.ts` |
-| `solidkg_explore` returns irrelevant files | Common names flooding FTS; co-location boost not helping | `src/db/queries.ts: findNodesByExactName`, `src/context/index.ts` |
-| Zero `calls` edges | `callTypes` missing or wrong AST node type | `src/extraction/languages/<lang>.ts: callTypes` |
-| Zero `extends`/`implements` edges | `extractInheritance()` doesn't handle this language's AST | `src/extraction/tree-sitter.ts: extractInheritance()` |
-| Missing node kinds (no enums, no interfaces) | AST type not listed in extractor | `src/extraction/languages/<lang>.ts: enumTypes`, `interfaceTypes`, etc. |
-| Search term dropped from query | Term is in the stop words list | `src/search/query-utils.ts: STOP_WORDS` |
-| `qualified_name` missing class for nested methods | Extraction not walking parent stack correctly | `src/extraction/tree-sitter.ts: visitNode()` |
-| Import edges missing | `extractImport` returns null for this syntax | `src/extraction/languages/<lang>.ts: extractImport` |
-| C++ classes/structs/enums missing from macro namespaces | Macros like `NLOHMANN_JSON_NAMESPACE_BEGIN` cause tree-sitter to misparse namespace blocks as `function_definition` | `src/extraction/languages/c-cpp.ts: isMisparsedFunction` filters bad names; `src/extraction/tree-sitter.ts: visitFunctionBody` extracts structural nodes |
-| C++ classes missing from `.h` headers | `.h` files default to `c` language which has `classTypes: []` | `src/extraction/grammars.ts: looksLikeCpp()` — content-based heuristic promotes `.h` files to `cpp` when C++ patterns detected |
-| Ruby methods inside modules missing owner in `qualified_name` | Ruby `module` AST nodes not being extracted | `src/extraction/languages/ruby.ts: visitNode` hook extracts modules; `src/extraction/tree-sitter.ts: isInsideClassLikeNode` includes `module` kind |
-| TypeScript abstract classes missing | `abstract_class_declaration` not in `classTypes` | `src/extraction/languages/typescript.ts: classTypes` — add `abstract_class_declaration` |
-| Single-expression arrow functions silently dropped | `extractName` finds identifier in expression body instead of returning `<anonymous>` | `src/extraction/tree-sitter.ts: extractName` — skip identifier search for `arrow_function`/`function_expression` nodes |
-| Kotlin interfaces/enums extracted as classes | `class_declaration` matches `classTypes` first; `interfaceTypes`/`enumTypes` never fire | `src/extraction/languages/kotlin.ts: classifyClassNode` detects `interface`/`enum` keywords in AST children |
-| Kotlin functions have zero calls extracted | Tree-sitter grammar doesn't use field names, so `getChildByField(node, 'function_body')` returns null | `src/extraction/languages/kotlin.ts: resolveBody` finds body by type (`function_body`, `class_body`, `enum_class_body`) |
-| Kotlin `navigation_expression` calls not resolved cleanly | `navigation_expression` fell through to `getNodeText` producing messy names with parentheses | `src/extraction/tree-sitter.ts: extractCall` — handle `navigation_expression` by extracting method name from `navigation_suffix > simple_identifier` |
-| Kotlin `fun interface` declarations invisible | Tree-sitter-kotlin doesn't support `fun interface` syntax (Kotlin 1.4+), producing ERROR or misparse as `function_declaration` | `src/extraction/languages/kotlin.ts: visitNode` detects three misparse patterns: (1) ERROR node + lambda body, (2) function_declaration with `user_type("interface")` direct child + name in ERROR child, (3) function_declaration with ERROR child containing `user_type("interface")` + name. `isFunInterfaceNode` checks both direct and ERROR-nested `user_type` children |
-| Kotlin class/interface methods missing when nested `fun interface` present | Tree-sitter misparsed parent body as ERROR (starting with `{`) + class_body (nested interface body); `resolveBody` found wrong body | `src/extraction/languages/kotlin.ts: resolveBody` prefers ERROR bodies starting with `{`; `visitNode` excludes body-like ERROR from `fun interface` detection |
-| Svelte `$props()` destructuring produces ugly variable names | `let { x, y } = $props()` has `object_pattern` as variable name node; `getNodeText` returns full pattern | `src/extraction/tree-sitter.ts: extractVariable` skips `object_pattern`/`array_pattern` named declarators |
-| Svelte template function calls invisible (e.g. `class={cn(...)}`) | SvelteExtractor only parsed `<script>` blocks, missing calls in template markup | `src/extraction/svelte-extractor.ts: extractTemplateCalls` scans `{expression}` blocks in template for call patterns |
-| Svelte `$state`/`$derived` rune calls creating noise | Runes are compiler builtins, not real function calls | `src/extraction/svelte-extractor.ts` filters `SVELTE_RUNES` set from unresolved references |
-| Object literal getters/setters extracted as standalone functions | `method_definition` inside `object` literals treated same as class methods | `src/extraction/tree-sitter.ts: extractMethod` skips `method_definition` nodes whose parent is `object`/`object_expression` |
-| JavaScript `class extends` produces zero inheritance edges | JS tree-sitter uses `class_heritage → identifier` (bare), not `class_heritage → extends_clause → identifier` like TypeScript | `src/extraction/tree-sitter.ts: extractInheritance` — handle bare `identifier`/`type_identifier` children when parent is `class_heritage` |
-| PHP traits extracted as classes | `trait_declaration` in `classTypes` but `extractClass` hardcodes `class` kind | `src/extraction/languages/php.ts: classifyClassNode` returns `'trait'` for `trait_declaration`; `src/extraction/tree-sitter-types.ts` adds `'trait'` to return type |
-| PHP class properties missing (0 field nodes) | `extractField` looks for `variable_declarator` children; PHP uses `property_element > variable_name > name` | `src/extraction/tree-sitter.ts: extractField` — handle `property_element` children with `variable_name > name` path |
-| PHP class constants skipped inside classes | `variableTypes` check has `!isInsideClassLikeNode()` guard, so `const_declaration` inside classes falls through | `src/extraction/languages/php.ts: visitNode` hook catches `const_declaration`, extracts `const_element > name` as `constant` kind |
-| PHP `use TraitName` inside classes invisible | `use_declaration` nodes in class body not processed for edges | `src/extraction/languages/php.ts: visitNode` hook extracts trait names from `use_declaration` and creates `implements` unresolved references |
+| Symptom                                                                    | Likely Cause                                                                                                                        | Where to Fix                                                                                                                                                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Method missing owner type in `qualified_name`                              | Language needs `getReceiverType`                                                                                                    | `src/extraction/languages/<lang>.ts`                                                                                                                                                                                                                                                                                                                                          |
+| `solidkg_explore` returns irrelevant files                                 | Common names flooding FTS; co-location boost not helping                                                                            | `src/db/queries.ts: findNodesByExactName`, `src/context/index.ts`                                                                                                                                                                                                                                                                                                             |
+| Zero `calls` edges                                                         | `callTypes` missing or wrong AST node type                                                                                          | `src/extraction/languages/<lang>.ts: callTypes`                                                                                                                                                                                                                                                                                                                               |
+| Zero `extends`/`implements` edges                                          | `extractInheritance()` doesn't handle this language's AST                                                                           | `src/extraction/tree-sitter.ts: extractInheritance()`                                                                                                                                                                                                                                                                                                                         |
+| Missing node kinds (no enums, no interfaces)                               | AST type not listed in extractor                                                                                                    | `src/extraction/languages/<lang>.ts: enumTypes`, `interfaceTypes`, etc.                                                                                                                                                                                                                                                                                                       |
+| Search term dropped from query                                             | Term is in the stop words list                                                                                                      | `src/search/query-utils.ts: STOP_WORDS`                                                                                                                                                                                                                                                                                                                                       |
+| `qualified_name` missing class for nested methods                          | Extraction not walking parent stack correctly                                                                                       | `src/extraction/tree-sitter.ts: visitNode()`                                                                                                                                                                                                                                                                                                                                  |
+| Import edges missing                                                       | `extractImport` returns null for this syntax                                                                                        | `src/extraction/languages/<lang>.ts: extractImport`                                                                                                                                                                                                                                                                                                                           |
+| C++ classes/structs/enums missing from macro namespaces                    | Macros like `NLOHMANN_JSON_NAMESPACE_BEGIN` cause tree-sitter to misparse namespace blocks as `function_definition`                 | `src/extraction/languages/c-cpp.ts: isMisparsedFunction` filters bad names; `src/extraction/tree-sitter.ts: visitFunctionBody` extracts structural nodes                                                                                                                                                                                                                      |
+| C++ classes missing from `.h` headers                                      | `.h` files default to `c` language which has `classTypes: []`                                                                       | `src/extraction/grammars.ts: looksLikeCpp()` — content-based heuristic promotes `.h` files to `cpp` when C++ patterns detected                                                                                                                                                                                                                                                |
+| Ruby methods inside modules missing owner in `qualified_name`              | Ruby `module` AST nodes not being extracted                                                                                         | `src/extraction/languages/ruby.ts: visitNode` hook extracts modules; `src/extraction/tree-sitter.ts: isInsideClassLikeNode` includes `module` kind                                                                                                                                                                                                                            |
+| TypeScript abstract classes missing                                        | `abstract_class_declaration` not in `classTypes`                                                                                    | `src/extraction/languages/typescript.ts: classTypes` — add `abstract_class_declaration`                                                                                                                                                                                                                                                                                       |
+| Single-expression arrow functions silently dropped                         | `extractName` finds identifier in expression body instead of returning `<anonymous>`                                                | `src/extraction/tree-sitter.ts: extractName` — skip identifier search for `arrow_function`/`function_expression` nodes                                                                                                                                                                                                                                                        |
+| Kotlin interfaces/enums extracted as classes                               | `class_declaration` matches `classTypes` first; `interfaceTypes`/`enumTypes` never fire                                             | `src/extraction/languages/kotlin.ts: classifyClassNode` detects `interface`/`enum` keywords in AST children                                                                                                                                                                                                                                                                   |
+| Kotlin functions have zero calls extracted                                 | Tree-sitter grammar doesn't use field names, so `getChildByField(node, 'function_body')` returns null                               | `src/extraction/languages/kotlin.ts: resolveBody` finds body by type (`function_body`, `class_body`, `enum_class_body`)                                                                                                                                                                                                                                                       |
+| Kotlin `navigation_expression` calls not resolved cleanly                  | `navigation_expression` fell through to `getNodeText` producing messy names with parentheses                                        | `src/extraction/tree-sitter.ts: extractCall` — handle `navigation_expression` by extracting method name from `navigation_suffix > simple_identifier`                                                                                                                                                                                                                          |
+| Kotlin `fun interface` declarations invisible                              | Tree-sitter-kotlin doesn't support `fun interface` syntax (Kotlin 1.4+), producing ERROR or misparse as `function_declaration`      | `src/extraction/languages/kotlin.ts: visitNode` detects three misparse patterns: (1) ERROR node + lambda body, (2) function_declaration with `user_type("interface")` direct child + name in ERROR child, (3) function_declaration with ERROR child containing `user_type("interface")` + name. `isFunInterfaceNode` checks both direct and ERROR-nested `user_type` children |
+| Kotlin class/interface methods missing when nested `fun interface` present | Tree-sitter misparsed parent body as ERROR (starting with `{`) + class_body (nested interface body); `resolveBody` found wrong body | `src/extraction/languages/kotlin.ts: resolveBody` prefers ERROR bodies starting with `{`; `visitNode` excludes body-like ERROR from `fun interface` detection                                                                                                                                                                                                                 |
+| Svelte `$props()` destructuring produces ugly variable names               | `let { x, y } = $props()` has `object_pattern` as variable name node; `getNodeText` returns full pattern                            | `src/extraction/tree-sitter.ts: extractVariable` skips `object_pattern`/`array_pattern` named declarators                                                                                                                                                                                                                                                                     |
+| Svelte template function calls invisible (e.g. `class={cn(...)}`)          | SvelteExtractor only parsed `<script>` blocks, missing calls in template markup                                                     | `src/extraction/svelte-extractor.ts: extractTemplateCalls` scans `{expression}` blocks in template for call patterns                                                                                                                                                                                                                                                          |
+| Svelte `$state`/`$derived` rune calls creating noise                       | Runes are compiler builtins, not real function calls                                                                                | `src/extraction/svelte-extractor.ts` filters `SVELTE_RUNES` set from unresolved references                                                                                                                                                                                                                                                                                    |
+| Object literal getters/setters extracted as standalone functions           | `method_definition` inside `object` literals treated same as class methods                                                          | `src/extraction/tree-sitter.ts: extractMethod` skips `method_definition` nodes whose parent is `object`/`object_expression`                                                                                                                                                                                                                                                   |
+| JavaScript `class extends` produces zero inheritance edges                 | JS tree-sitter uses `class_heritage → identifier` (bare), not `class_heritage → extends_clause → identifier` like TypeScript        | `src/extraction/tree-sitter.ts: extractInheritance` — handle bare `identifier`/`type_identifier` children when parent is `class_heritage`                                                                                                                                                                                                                                     |
+| PHP traits extracted as classes                                            | `trait_declaration` in `classTypes` but `extractClass` hardcodes `class` kind                                                       | `src/extraction/languages/php.ts: classifyClassNode` returns `'trait'` for `trait_declaration`; `src/extraction/tree-sitter-types.ts` adds `'trait'` to return type                                                                                                                                                                                                           |
+| PHP class properties missing (0 field nodes)                               | `extractField` looks for `variable_declarator` children; PHP uses `property_element > variable_name > name`                         | `src/extraction/tree-sitter.ts: extractField` — handle `property_element` children with `variable_name > name` path                                                                                                                                                                                                                                                           |
+| PHP class constants skipped inside classes                                 | `variableTypes` check has `!isInsideClassLikeNode()` guard, so `const_declaration` inside classes falls through                     | `src/extraction/languages/php.ts: visitNode` hook catches `const_declaration`, extracts `const_element > name` as `constant` kind                                                                                                                                                                                                                                             |
+| PHP `use TraitName` inside classes invisible                               | `use_declaration` nodes in class body not processed for edges                                                                       | `src/extraction/languages/php.ts: visitNode` hook extracts trait names from `use_declaration` and creates `implements` unresolved references                                                                                                                                                                                                                                  |
 
 ## After Fixing Issues
 
@@ -528,15 +534,15 @@ if (receiverType) {
 
 ## Key Files
 
-| File | Role |
-|------|------|
-| `src/extraction/languages/<lang>.ts` | Language extractor — node types, call types, `getReceiverType` |
-| `src/extraction/tree-sitter.ts` | Core extraction — `extractMethod()`, `extractCall()`, `extractInheritance()` |
-| `src/extraction/tree-sitter-types.ts` | `LanguageExtractor` interface definition |
-| `src/search/query-utils.ts` | `STOP_WORDS`, `extractSearchTerms`, `scorePathRelevance` |
-| `src/db/queries.ts` | `searchNodesFTS` (BM25), `findNodesByExactName` (co-location boost) |
-| `src/context/index.ts` | `findRelevantContext` — hybrid search + graph traversal |
-| `src/mcp/tools.ts` | MCP tool handlers — `solidkg_explore` implementation |
+| File                                  | Role                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------- |
+| `src/extraction/languages/<lang>.ts`  | Language extractor — node types, call types, `getReceiverType`               |
+| `src/extraction/tree-sitter.ts`       | Core extraction — `extractMethod()`, `extractCall()`, `extractInheritance()` |
+| `src/extraction/tree-sitter-types.ts` | `LanguageExtractor` interface definition                                     |
+| `src/search/query-utils.ts`           | `STOP_WORDS`, `extractSearchTerms`, `scorePathRelevance`                     |
+| `src/db/queries.ts`                   | `searchNodesFTS` (BM25), `findNodesByExactName` (co-location boost)          |
+| `src/context/index.ts`                | `findRelevantContext` — hybrid search + graph traversal                      |
+| `src/mcp/tools.ts`                    | MCP tool handlers — `solidkg_explore` implementation                         |
 
 ## Language Status
 
