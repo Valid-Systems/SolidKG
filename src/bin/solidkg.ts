@@ -41,8 +41,7 @@ import type SolidKG from '../index';
 import type { IndexProgress } from '../extraction';
 import { logWarn } from '../errors';
 
-import { buildNode25BlockBanner, buildNodeTooOldBanner, MIN_NODE_MAJOR } from './node-version-check';
-import { relaunchWithWasmRuntimeFlagsIfNeeded } from '../extraction/wasm-runtime-flags';
+import { buildNodeTooOldBanner, MIN_NODE_MAJOR } from './node-version-check';
 
 const STATUS_JSON_SCHEMA_VERSION = 'solidkg.status.v1';
 const OVERVIEW_EXPAND_PATH_LIMIT = 50;
@@ -128,25 +127,8 @@ async function loadSolidKG(): Promise<typeof import('../index')> {
   }
 }
 
-// Block SolidKG on Node.js 25.x — V8's turboshaft WASM JIT has a Zone
-// allocator bug that reliably crashes when compiling tree-sitter
-// grammars (see #54, #81, #140). The previous behaviour was a soft
-// console.warn that scrolls off-screen before the OOM crash 30 seconds
-// later, leading to a steady stream of "what is this OOM" reports.
-// Hard-exit before any WASM work; allow override via env var for users
-// who patched V8 themselves or want to test a future fix.
 const nodeVersion = process.versions.node;
 const nodeMajor = parseInt(nodeVersion.split('.')[0] ?? '0', 10);
-if (nodeMajor >= 25) {
-  process.stderr.write(buildNode25BlockBanner(nodeVersion) + '\n');
-  if (!process.env.SOLIDKG_ALLOW_UNSAFE_NODE) {
-    process.exit(1);
-  }
-  // Override active — banner shown for visibility, continuing.
-}
-// Enforce the supported Node floor. `engines` in package.json only *warns* on
-// install (unless engine-strict), so hard-block here to actually keep users off
-// unsupported versions. Mirrors the 25+ block above. See package.json `engines`.
 if (nodeMajor < MIN_NODE_MAJOR) {
   process.stderr.write(buildNodeTooOldBanner(nodeVersion) + '\n');
   if (!process.env.SOLIDKG_ALLOW_UNSAFE_NODE) {
@@ -154,13 +136,6 @@ if (nodeMajor < MIN_NODE_MAJOR) {
   }
   // Override active — banner shown for visibility, continuing.
 }
-
-// Re-exec with V8's `--liftoff-only` if it isn't already set, so tree-sitter's
-// large WASM grammars never hit the turboshaft Zone OOM (`Fatal process out of
-// memory: Zone`) on Node >= 22. No-op under the bundled launcher, which already
-// passes the flag. Must run before any grammar (in the parse worker, which
-// inherits this process's flags) is compiled. See ../extraction/wasm-runtime-flags.
-relaunchWithWasmRuntimeFlagsIfNeeded(__filename);
 
 // Check if running with no arguments - run installer
 if (process.argv.length === 2) {
