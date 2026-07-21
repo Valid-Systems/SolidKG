@@ -1,103 +1,91 @@
 #!/usr/bin/env node
-// Dump the tree-sitter AST for a sample file so you can write a LanguageExtractor
-// mapping. Loads a grammar .wasm directly via web-tree-sitter (the same runtime
-// solidkg uses) — you do NOT need to register the language first.
+// Dump the native tree-sitter AST for a configured language so contributors can
+// map the grammar's real node and field names in a LanguageExtractor.
 //
-// Usage:
-//   node scripts/add-lang/dump-ast.mjs <lang|wasm-path> <sample-file> [--depth=N] [--full]
-// Examples:
-//   node scripts/add-lang/dump-ast.mjs lua sample.lua
-//   node scripts/add-lang/dump-ast.mjs src/extraction/wasm/tree-sitter-zig.wasm a.zig --depth=4
-//
-// Output: an indented AST (named nodes, with field names) followed by a
-// node-type FREQUENCY table. The frequency table is the payoff — it tells you
-// which node types to map to functionTypes / classTypes / importTypes / etc.
+// Usage: node scripts/add-lang/dump-ast.mjs <lang> <sample-file> [--depth=N] [--full]
 
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { Parser, Language } from 'web-tree-sitter';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const require = createRequire(import.meta.url);
-const fail = (msg) => { console.error(`[dump-ast] ${msg}`); process.exit(1); };
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const grammarMap = JSON.parse(readFileSync(join(repoRoot, 'src', 'extraction', 'native-grammars.json'), 'utf8'));
+const require = createRequire(join(repoRoot, 'package.json'));
 
-const argv = process.argv.slice(2);
-const positional = argv.filter((a) => !a.startsWith('--'));
-const [langOrWasm, sampleFile] = positional;
-const depthFlag = argv.find((a) => a.startsWith('--depth='));
-const showAll = argv.includes('--full'); // also print anonymous (token) nodes
-const maxDepth = depthFlag ? parseInt(depthFlag.split('=')[1], 10) : (showAll ? Infinity : 8);
-
-if (!langOrWasm || !sampleFile) {
-  fail('usage: dump-ast.mjs <lang|wasm-path> <sample-file> [--depth=N] [--full]');
+function fail(message) {
+  console.error(`[dump-ast] ${message}`);
+  process.exit(1);
 }
+
+const argumentsList = process.argv.slice(2);
+const positional = argumentsList.filter((argument) => !argument.startsWith('--'));
+const [token, sampleFile] = positional;
+const depthFlag = argumentsList.find((argument) => argument.startsWith('--depth='));
+const showAll = argumentsList.includes('--full');
+const maxDepth = depthFlag ? Number.parseInt(depthFlag.split('=')[1], 10) : (showAll ? Number.POSITIVE_INFINITY : 8);
+
+if (!token || !sampleFile) fail('usage: dump-ast.mjs <lang> <sample-file> [--depth=N] [--full]');
 if (!existsSync(sampleFile)) fail(`sample file not found: ${sampleFile}`);
+if (Number.isNaN(maxDepth) || maxDepth < 0) fail(`depth must be a non-negative integer: ${depthFlag}`);
 
-// Language tokens whose tree-sitter-wasms filename differs from the token.
-const WASM_SPECIAL = { csharp: 'c_sharp', 'c#': 'c_sharp' };
+const language = token.toLowerCase() === 'c#' ? 'csharp' : token.toLowerCase();
+const config = grammarMap[language];
+if (!config) fail(`no native grammar mapping for "${token}" in src/extraction/native-grammars.json`);
 
-function resolveWasm(token) {
-  if (token.endsWith('.wasm')) {
-    if (!existsSync(token)) fail(`wasm not found: ${token}`);
-    return token;
-  }
-  const base = WASM_SPECIAL[token.toLowerCase()] ?? token.toLowerCase();
-  try {
-    return require.resolve(`tree-sitter-wasms/out/tree-sitter-${base}.wasm`);
-  } catch {
-    /* not in tree-sitter-wasms — try a vendored copy */
-  }
-  const vendored = `src/extraction/wasm/tree-sitter-${base}.wasm`;
-  if (existsSync(vendored)) return vendored;
-  fail(
-    `no grammar for "${token}" — not in tree-sitter-wasms and not vendored at ` +
-      `${vendored}. Pass an explicit .wasm path, or vendor one (see SKILL.md "Find a grammar").`
-  );
+const cacheDir = join(repoRoot, '.native-grammars', `${process.platform}-${process.arch}`);
+process.env.TREE_SITTER_LANGUAGE_PACK_MANIFEST_URL = 'file:///definitely-missing/parsers.json';
+const languagePack = require('@xberg-io/tree-sitter-language-pack');
+languagePack.configure({ cacheDir });
+
+let parser;
+try {
+  parser = languagePack.getParser(config.packageName);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  fail(`failed to load ${config.packageName} from ${cacheDir}: ${message}`);
 }
 
-const wasmPath = resolveWasm(langOrWasm);
 const source = readFileSync(sampleFile, 'utf8');
-
-try {
-  await Parser.init();
-} catch {
-  await Parser.init({ locateFile: () => require.resolve('web-tree-sitter/tree-sitter.wasm') });
-}
-
-let language;
-try {
-  language = await Language.load(wasmPath);
-} catch (e) {
-  fail(`failed to load grammar ${wasmPath}: ${e.message}`);
-}
-
-const parser = new Parser();
-parser.setLanguage(language);
+const sourceBytes = Buffer.from(source, 'utf8');
 const tree = parser.parse(source);
+if (!tree) fail(`parser returned no tree for ${sampleFile}`);
 
-const freq = new Map();
-const snippet = (node) => {
-  const t = node.text.replace(/\s+/g, ' ').trim();
-  return t.length > 48 ? `${t.slice(0, 48)}…` : t;
-};
+const frequency = new Map();
+function snippet(node) {
+  const text = sourceBytes.subarray(node.startByte(), node.endByte()).toString('utf8').replace(/\s+/g, ' ').trim();
+  return text.length > 48 ? `${text.slice(0, 48)}…` : text;
+}
+
+function childrenWithFields(node) {
+  const cursor = node.walk();
+  if (!cursor.gotoFirstChild()) return [];
+  const children = [];
+  do {
+    children.push({ node: cursor.node(), fieldName: cursor.fieldName() });
+  } while (cursor.gotoNextSibling());
+  return children;
+}
 
 function walk(node, depth, fieldName) {
-  if (node.isNamed) freq.set(node.type, (freq.get(node.type) || 0) + 1);
-  if ((node.isNamed || showAll) && depth <= maxDepth) {
+  const kind = node.kind();
+  if (node.isNamed()) frequency.set(kind, (frequency.get(kind) ?? 0) + 1);
+  if ((node.isNamed() || showAll) && depth <= maxDepth) {
     const field = fieldName ? `${fieldName}: ` : '';
-    const leaf = node.childCount === 0 ? `  "${snippet(node)}"` : '';
-    console.log(`${'  '.repeat(depth)}${field}${node.type}  @${node.startPosition.row + 1}:${node.startPosition.column}${leaf}`);
+    const leaf = node.childCount() === 0 ? `  "${snippet(node)}"` : '';
+    const position = node.startPosition();
+    console.log(`${'  '.repeat(depth)}${field}${kind}  @${position.row + 1}:${position.column}${leaf}`);
   }
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i);
-    if (child) walk(child, depth + 1, node.fieldNameForChild(i));
+  for (const child of childrenWithFields(node)) {
+    walk(child.node, depth + 1, child.fieldName);
   }
 }
 
-console.log(`\n# AST for ${sampleFile}  (grammar: ${wasmPath.split('/').pop()})\n`);
-walk(tree.rootNode, 0, null);
+console.log(`\n# AST for ${sampleFile}  (grammar: ${config.packageName})\n`);
+walk(tree.rootNode(), 0, null);
 
 console.log('\n# Node-type frequency (named nodes) — map the relevant ones in your extractor:\n');
-[...freq.entries()]
-  .sort((a, b) => b[1] - a[1])
-  .forEach(([type, n]) => console.log(`  ${String(n).padStart(5)}  ${type}`));
+[...frequency.entries()]
+  .sort((left, right) => right[1] - left[1])
+  .forEach(([kind, count]) => console.log(`  ${String(count).padStart(5)}  ${kind}`));
 console.log();

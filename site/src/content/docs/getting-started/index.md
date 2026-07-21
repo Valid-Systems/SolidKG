@@ -40,7 +40,7 @@ On narrow screens, scroll tables horizontally to view every column.
 | Area | Integrated technologies | Role in SolidKG |
 |---|---|---|
 | Runtime and implementation | TypeScript, Node.js 24, ESM/CommonJS package exports, pnpm | Implements the library, CLI, MCP server, installer, workers, and release build. |
-| Parsing | tree-sitter, `web-tree-sitter`, `tree-sitter-wasms`, 15 bundled custom grammar WASM files | Parses supported languages into deterministic ASTs without sending source to an LLM. Heavy parsing runs in worker threads. |
+| Parsing | tree-sitter, `@xberg-io/tree-sitter-language-pack`, per-platform native grammar libraries | Parses supported languages into deterministic ASTs without sending source to an LLM. Heavy parsing runs in worker threads. |
 | Hybrid and standalone extraction | Dedicated Svelte, Vue, Liquid, and Delphi-form extractors; static Razor and Jinja/HTML template handling | Covers hybrid or nonstandard formats that need more than a normal tree-sitter language adapter. |
 | Storage and search | Node's built-in `node:sqlite`, SQLite, FTS5, WAL mode, prepared statements, schema migrations | Stores files, symbols, pairwise edges, semantic hyperedges, source-body chunks, snapshots, architecture reports, and optional SCIP facts locally. |
 | Graph and hypergraph analysis | Directed edges, ordered semantic hyperedges, BFS/DFS traversal, path finding, impact radius, Ca/Ce/instability metrics | Preserves direct relationships and multi-symbol structures such as route chains, event channels, UI render paths, native bridges, and type contracts. |
@@ -128,9 +128,9 @@ On narrow screens, scroll horizontally after opening the table.
 
 The remaining repository directories were available to the external snapshot but did not have a measurable index row. Their presence is recorded in `docs/tested-codebases.md`; it is not evidence that those repositories were indexed, validated, or stress-tested.
 
-## Research evidence map
+## Validation scope
 
-| Research question | Evidence already recorded | Important limitation |
+| Question | Maintainer-reported work | Important limitation |
 |---|---|---|
 | Can one local graph represent many languages and frameworks? | Language adapters, framework resolvers, and 51 measured reference indexes within a larger 118-directory availability inventory | Presence and extraction coverage do not prove runtime equivalence. |
 | Do semantic hyperedges and synthesis recover relationships missed by direct AST calls? | Route, event, UI-render, dynamic-dispatch, native-bridge, and type-contract fixtures plus real-repository playbooks | Synthesized edges are heuristic and must retain provenance. |
@@ -139,15 +139,6 @@ The remaining repository directories were available to the external snapshot but
 | Can compiler facts complement parser facts? | Optional SCIP generation/import, node linking, precise-reference tools, and status metrics | SCIP coverage depends on external indexers and language support. |
 | Can the system remain local-first and reproducible? | SQLite storage, deterministic AST extraction, hashed diagnostic manifests, benchmark-specific revisions where recorded, and per-platform bundles | Baseline source revisions are not frozen, and an MCP host may send returned snippets to its configured model provider. |
 
-## Research evidence and limitations
+## Public validation material
 
-Use these sources when preparing a future systems or benchmark paper:
-
-- `docs/code-intelligence-capabilities.md`: capability-to-evidence record.
-- `docs/tested-codebases.md`: measured benchmark/playbook repositories plus the separately labeled availability inventory.
-- `docs/benchmarks/reference-quality-baseline.md`: 51-repository measurable baseline.
-- `docs/benchmarks/reference-quality-sweep.md`: metric definitions and claim boundaries.
-- `docs/design/dynamic-dispatch-coverage-playbook.md`: framework and dynamic-dispatch validation method.
-- `docs/design/claims-register.md`: wording, attribution, and benchmark-passport rules.
-
-Treat this as a dated implementation and measurement snapshot, not a paper artifact bundle. Before using it in a paper, freeze the exact source revision, corpus revisions, index manifests, raw run artifacts, and analysis scripts used by the study.
+The initial public release includes the capability/frontier record, tested-codebase list, and dynamic-dispatch validation method. Benchmark reports, raw trajectories, evidence bundles, and paper-preparation material are intentionally omitted until the maintainers are ready to publish and defend them. Treat the reported numbers as maintainer claims, not a reproducible paper artifact bundle.
