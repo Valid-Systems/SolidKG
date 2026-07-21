@@ -162,8 +162,8 @@ describe('evaluation corpus manifest policy', () => {
     expect(packageJson.files).not.toContain('fixtures/evaluation-corpus');
     expect(buildBundle).toContain('cp -R "$ROOT/dist" "$STAGE/lib/dist"');
     expect(buildBundle).not.toContain('fixtures/evaluation-corpus');
-    expect(packNpm).toContain('files: [process.env.NODEFILE, "lib", "bin"]');
-    expect(packNpm).toContain('files: ["npm-shim.js","README.md"]');
+    expect(packNpm).toContain('files: [process.env.NODEFILE, "lib", "bin", "LICENSE"]');
+    expect(packNpm).toContain('files: ["npm-shim.js","README.md","LICENSE"]');
     expect(packNpm).not.toContain('fixtures/evaluation-corpus');
   });
 });

@@ -22,9 +22,13 @@ function record(line = '') {
 }
 
 function run(command, args, options = {}) {
-  const useCmd = process.platform === 'win32' && (command === 'npm' || command === 'pnpm');
-  const executable = useCmd ? 'cmd.exe' : command;
-  const finalArgs = useCmd ? ['/d', '/s', '/c', command, ...args] : args;
+  const npmCli = process.platform === 'win32' && command === 'npm'
+    ? join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
+    : null;
+  const useNodeCli = npmCli !== null && existsSync(npmCli);
+  const useCmd = process.platform === 'win32' && !useNodeCli && (command === 'npm' || command === 'pnpm');
+  const executable = useNodeCli ? process.execPath : useCmd ? 'cmd.exe' : command;
+  const finalArgs = useNodeCli ? [npmCli, ...args] : useCmd ? ['/d', '/s', '/c', command, ...args] : args;
   const result = spawnSync(executable, finalArgs, {
     cwd: options.cwd || repoRoot,
     env: { ...process.env, ...(options.env || {}) },
@@ -72,8 +76,8 @@ function parsePackJson(stdout) {
 function ensureBuiltDist() {
   if (!existsSync(join(repoRoot, 'dist', 'bin', 'solidkg.js'))
     || !existsSync(join(repoRoot, 'dist', 'db', 'schema.sql'))
-    || !existsSync(join(repoRoot, 'dist', 'extraction', 'wasm'))
-    || readdirSync(join(repoRoot, 'dist', 'extraction', 'wasm')).filter((file) => file.endsWith('.wasm')).length === 0) {
+    || !existsSync(join(repoRoot, 'dist', 'extraction', 'native-grammars.json'))
+    || existsSync(join(repoRoot, 'dist', 'extraction', 'wasm'))) {
     run('pnpm', ['run', 'build']);
   }
 }
@@ -81,8 +85,7 @@ function ensureBuiltDist() {
 function verifyDistAssets() {
   const entrypoint = join(repoRoot, 'dist', 'bin', 'solidkg.js');
   const schema = join(repoRoot, 'dist', 'db', 'schema.sql');
-  const wasmDir = join(repoRoot, 'dist', 'extraction', 'wasm');
-  const wasmFiles = readdirSync(wasmDir).filter((file) => file.endsWith('.wasm')).sort();
+  const nativeManifest = join(repoRoot, 'dist', 'extraction', 'native-grammars.json');
 
   assert(existsSync(entrypoint), 'built executable entrypoint dist/bin/solidkg.js exists');
   if (process.platform === 'win32') {
@@ -91,8 +94,8 @@ function verifyDistAssets() {
     assert((statSync(entrypoint).mode & 0o111) !== 0, 'dist/bin/solidkg.js is executable on POSIX');
   }
   assert(existsSync(schema), 'built artifact includes dist/db/schema.sql');
-  assert(wasmFiles.length > 0, 'built artifact includes dist/extraction/wasm/*.wasm');
-  record(`WASM files: ${wasmFiles.join(', ')}`);
+  assert(existsSync(nativeManifest), 'built artifact includes dist/extraction/native-grammars.json');
+  assert(!existsSync(join(repoRoot, 'dist', 'extraction', 'wasm')), 'built artifact excludes obsolete parser WASM assets');
 }
 
 function verifyRootPackDryRun() {
@@ -102,7 +105,9 @@ function verifyRootPackDryRun() {
   for (const file of files) record(`  ${file}`);
   assert(files.includes('dist/bin/solidkg.js'), 'root package file list includes dist/bin/solidkg.js');
   assert(files.includes('dist/db/schema.sql'), 'root package file list includes dist/db/schema.sql');
-  assert(files.some((file) => file.startsWith('dist/extraction/wasm/') && file.endsWith('.wasm')), 'root package file list includes dist/extraction/wasm/*.wasm');
+  assert(files.includes('dist/extraction/native-grammars.json'), 'root package file list includes dist/extraction/native-grammars.json');
+  assert(!files.some((file) => file.endsWith('.wasm')), 'root package file list excludes obsolete parser WASM assets');
+  assert(files.includes('LICENSE'), 'root package file list includes LICENSE');
   assert(files.includes('scripts/npm-shim.js'), 'root package file list includes scripts/npm-shim.js');
   assert(!files.some((file) => file.startsWith('fixtures/evaluation-corpus/')), 'root package file list excludes fixtures/evaluation-corpus/** by default');
 }
@@ -112,23 +117,29 @@ function writeSyntheticPlatformPackage(pkgDir, target) {
   mkdirSync(join(bundleDir, 'bin'), { recursive: true });
   mkdirSync(join(bundleDir, 'lib', 'dist', 'bin'), { recursive: true });
   mkdirSync(join(bundleDir, 'lib', 'dist', 'db'), { recursive: true });
-  mkdirSync(join(bundleDir, 'lib', 'dist', 'extraction', 'wasm'), { recursive: true });
+  mkdirSync(join(bundleDir, 'lib', 'dist', 'extraction', 'native', target), { recursive: true });
+  mkdirSync(join(bundleDir, 'lib', 'node_modules', '@xberg-io', 'tree-sitter-language-pack'), { recursive: true });
   writeFileSync(join(bundleDir, 'node'), '#!/bin/sh\necho synthetic-node\n');
   chmodSync(join(bundleDir, 'node'), 0o755);
+  writeFileSync(join(bundleDir, 'LICENSE'), 'synthetic license\n');
   writeFileSync(join(bundleDir, 'bin', 'solidkg'), '#!/bin/sh\necho synthetic-solidkg\n');
   chmodSync(join(bundleDir, 'bin', 'solidkg'), 0o755);
   writeFileSync(join(bundleDir, 'lib', 'dist', 'bin', 'solidkg.js'), '#!/usr/bin/env node\nconsole.log("synthetic")\n');
   writeFileSync(join(bundleDir, 'lib', 'dist', 'db', 'schema.sql'), '-- synthetic schema\n');
-  writeFileSync(join(bundleDir, 'lib', 'dist', 'extraction', 'wasm', 'synthetic.wasm'), 'synthetic wasm\n');
+  const nativeExtension = target.startsWith('darwin-') ? 'dylib' : 'so';
+  writeFileSync(join(bundleDir, 'lib', 'dist', 'extraction', 'native', target, `libtree_sitter_typescript.${nativeExtension}`), 'synthetic native grammar\n');
+  writeFileSync(join(bundleDir, 'lib', 'node_modules', '@xberg-io', 'tree-sitter-language-pack', 'index.js'), 'module.exports = {};\n');
+  writeFileSync(join(bundleDir, 'lib', 'node_modules', '@xberg-io', 'tree-sitter-language-pack', 'synthetic.node'), 'synthetic native addon\n');
 
   const [osName, cpu] = target.split('-');
   writeFileSync(join(bundleDir, 'package.json'), JSON.stringify({
     name: `solidkg-${target}`,
     version,
     description: `SolidKG self-contained bundle for ${target}`,
+    license: 'SEE LICENSE IN LICENSE',
     os: [osName],
     cpu: [cpu],
-    files: ['node', 'lib', 'bin'],
+    files: ['node', 'lib', 'bin', 'LICENSE'],
   }, null, 2) + '\n');
 }
 
@@ -144,25 +155,29 @@ function verifyPackNpmWithSyntheticBundles() {
     mkdirSync(mainDir, { recursive: true });
     cpSync(join(repoRoot, 'scripts', 'npm-shim.js'), join(mainDir, 'npm-shim.js'));
     cpSync(join(repoRoot, 'README.md'), join(mainDir, 'README.md'));
+    cpSync(join(repoRoot, 'LICENSE'), join(mainDir, 'LICENSE'));
     const optionalDependencies = Object.fromEntries(syntheticTargets.map((target) => [`solidkg-${target}`, version]));
     writeFileSync(join(mainDir, 'package.json'), JSON.stringify({
       name: 'solidkg',
       version,
       description: 'Local-first code intelligence for AI agents (MCP). Self-contained - bundles its own runtime.',
+      license: 'SEE LICENSE IN LICENSE',
       bin: { solidkg: 'npm-shim.js' },
       optionalDependencies,
-      files: ['npm-shim.js', 'README.md'],
+      files: ['npm-shim.js', 'README.md', 'LICENSE'],
     }, null, 2) + '\n');
 
     const mainPackage = JSON.parse(readFileSync(join(mainDir, 'package.json'), 'utf8'));
     assert(mainPackage.bin?.solidkg === 'npm-shim.js', 'main npm package maps bin.solidkg to npm-shim.js');
-    assert(JSON.stringify(mainPackage.files) === JSON.stringify(['npm-shim.js', 'README.md']), 'main npm package file whitelist is npm-shim.js and README.md');
+    assert(mainPackage.license === 'SEE LICENSE IN LICENSE', 'main npm package references LICENSE file');
+    assert(JSON.stringify(mainPackage.files) === JSON.stringify(['npm-shim.js', 'README.md', 'LICENSE']), 'main npm package file whitelist is npm-shim.js, README.md, and LICENSE');
     for (const target of syntheticTargets) {
       assert(mainPackage.optionalDependencies?.[`solidkg-${target}`] === version, `main npm optionalDependencies maps solidkg-${target} to package version`);
     }
 
     const mainPackFiles = parsePackJson(run('npm', ['pack', '--dry-run', '--json', '--ignore-scripts', mainDir]));
     assert(mainPackFiles.includes('npm-shim.js'), 'main npm dry-run package includes npm-shim.js');
+    assert(mainPackFiles.includes('LICENSE'), 'main npm dry-run package includes LICENSE');
     assert(!mainPackFiles.some((file) => file.startsWith('fixtures/evaluation-corpus/')), 'main npm dry-run package excludes fixtures/evaluation-corpus/**');
 
     for (const target of syntheticTargets) {
@@ -171,19 +186,24 @@ function verifyPackNpmWithSyntheticBundles() {
       const files = listFiles(pkgDir);
       record(`solidkg-${target} staged files:`);
       for (const file of files) record(`  ${file}`);
-      assert(JSON.stringify(pkg.files) === JSON.stringify(['node', 'lib', 'bin']), `solidkg-${target} package whitelist is node/lib/bin`);
+      assert(pkg.license === 'SEE LICENSE IN LICENSE', `solidkg-${target} package references LICENSE file`);
+      assert(JSON.stringify(pkg.files) === JSON.stringify(['node', 'lib', 'bin', 'LICENSE']), `solidkg-${target} package whitelist is node/lib/bin/LICENSE`);
       assert(pkg.os?.[0] === target.split('-')[0], `solidkg-${target} package os matches target`);
       assert(pkg.cpu?.[0] === target.split('-')[1], `solidkg-${target} package cpu matches target`);
       assert(files.includes('node'), `solidkg-${target} includes vendored node runtime`);
+      assert(files.includes('LICENSE'), `solidkg-${target} includes LICENSE`);
       assert(files.includes('bin/solidkg'), `solidkg-${target} includes executable launcher`);
       assert(files.includes('lib/dist/bin/solidkg.js'), `solidkg-${target} includes CLI entrypoint`);
       assert(files.includes('lib/dist/db/schema.sql'), `solidkg-${target} includes schema.sql`);
-      assert(files.some((file) => file.startsWith('lib/dist/extraction/wasm/') && file.endsWith('.wasm')), `solidkg-${target} includes WASM assets`);
+      assert(files.some((file) => file.startsWith(`lib/dist/extraction/native/${target}/`)), `solidkg-${target} includes target-native grammar assets`);
+      assert(files.some((file) => file.startsWith('lib/node_modules/@xberg-io/tree-sitter-language-pack/') && file.endsWith('.node')), `solidkg-${target} includes the native parser addon`);
       assert(!files.some((file) => file.startsWith('fixtures/evaluation-corpus/')), `solidkg-${target} excludes fixtures/evaluation-corpus/**`);
 
       const platformPackFiles = parsePackJson(run('npm', ['pack', '--dry-run', '--json', '--ignore-scripts', pkgDir]));
+      assert(platformPackFiles.includes('LICENSE'), `solidkg-${target} dry-run package includes LICENSE`);
       assert(platformPackFiles.includes('lib/dist/db/schema.sql'), `solidkg-${target} dry-run package includes schema.sql`);
-      assert(platformPackFiles.some((file) => file.startsWith('lib/dist/extraction/wasm/') && file.endsWith('.wasm')), `solidkg-${target} dry-run package includes WASM assets`);
+      assert(platformPackFiles.some((file) => file.startsWith(`lib/dist/extraction/native/${target}/`)), `solidkg-${target} dry-run package includes target-native grammar assets`);
+      assert(platformPackFiles.some((file) => file.startsWith('lib/node_modules/@xberg-io/tree-sitter-language-pack/') && file.endsWith('.node')), `solidkg-${target} dry-run package includes the native parser addon`);
       assert(!platformPackFiles.some((file) => file.startsWith('fixtures/evaluation-corpus/')), `solidkg-${target} dry-run package excludes fixtures/evaluation-corpus/**`);
     }
   } finally {
@@ -201,8 +221,15 @@ function verifyScriptAndWorkflowGuards() {
     assert(workflow.includes(target), `release workflow builds ${target}`);
   }
   assert(buildBundle.includes('cp -R "$ROOT/dist" "$STAGE/lib/dist"'), 'build-bundle copies built dist into bundle lib/dist');
-  assert(packNpm.includes('files: [process.env.NODEFILE, "lib", "bin"]'), 'pack-npm platform packages whitelist node/lib/bin');
-  assert(packNpm.includes('files: ["npm-shim.js","README.md"]'), 'pack-npm main package whitelist is shim plus README');
+  assert(buildBundle.includes('cp "$ROOT/LICENSE" "$STAGE/LICENSE"'), 'build-bundle copies LICENSE into bundle root');
+  assert(buildBundle.includes('HOST_TARGET='), 'build-bundle rejects cross-platform native packaging');
+  assert(buildBundle.includes('copy-native-grammars.mjs'), 'build-bundle copies the manifest-allowlisted native grammars');
+  assert(buildBundle.includes('--package-root "$STAGE/lib"'), 'build-bundle repairs the staged native addon');
+  assert(workflow.includes('ubuntu-24.04-arm') && workflow.includes('windows-11-arm') && workflow.includes('macos-15-intel'), 'release workflow uses native runners for ARM64 and Intel targets');
+  assert(workflow.includes('actions/upload-artifact@v7') && workflow.includes('actions/download-artifact@v8'), 'release workflow hands native archives to one publish job');
+  assert(packNpm.includes('license: "SEE LICENSE IN LICENSE"'), 'pack-npm packages reference LICENSE file');
+  assert(packNpm.includes('files: [process.env.NODEFILE, "lib", "bin", "LICENSE"]'), 'pack-npm platform packages whitelist node/lib/bin/LICENSE');
+  assert(packNpm.includes('files: ["npm-shim.js","README.md","LICENSE"]'), 'pack-npm main package whitelist is shim plus README plus LICENSE');
   assert(shim.includes('SOLIDKG_NO_DOWNLOAD'), 'npm shim supports SOLIDKG_NO_DOWNLOAD');
   assert(shim.includes('SOLIDKG_INSTALL_DIR'), 'npm shim supports SOLIDKG_INSTALL_DIR');
   assert(shim.includes('SOLIDKG_DOWNLOAD_BASE'), 'npm shim supports SOLIDKG_DOWNLOAD_BASE');

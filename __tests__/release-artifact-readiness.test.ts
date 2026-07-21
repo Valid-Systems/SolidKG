@@ -20,8 +20,10 @@ describe('release artifact readiness', () => {
     expect(evidence).toContain('Publication commands executed: none');
     expect(evidence).toContain('root package file list includes dist/bin/solidkg.js');
     expect(evidence).toContain('root package file list includes dist/db/schema.sql');
-    expect(evidence).toContain('root package file list includes dist/extraction/wasm/*.wasm');
+    expect(evidence).toContain('root package file list includes dist/extraction/native-grammars.json');
+    expect(evidence).toContain('root package file list includes LICENSE');
     expect(evidence).toContain('main npm package maps bin.solidkg to npm-shim.js');
+    expect(evidence).toContain('main npm package references LICENSE file');
     expect(evidence).toContain('excludes fixtures/evaluation-corpus/**');
     expect(evidence).not.toMatch(/^\s*fixtures\/evaluation-corpus\//m);
   }, 60000);
