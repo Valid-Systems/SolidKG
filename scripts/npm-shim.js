@@ -59,10 +59,10 @@ function resolveInstalledBundle() {
     if (isWindows) {
       // Modern Node refuses to spawn the bundle's .cmd directly (EINVAL, the
       // CVE-2024-27980 hardening on Node 24), so invoke the bundled node.exe
-      // against the app entry point and pass --liftoff-only here.
+      // against the app entry point.
       var nodeExe = require.resolve(pkg + '/node.exe');
       var entry = require.resolve(pkg + '/lib/dist/bin/solidkg.js');
-      return { command: nodeExe, args: liftoff(entry) };
+      return { command: nodeExe, args: [entry].concat(process.argv.slice(2)) };
     }
     return { command: require.resolve(pkg + '/bin/solidkg'), args: process.argv.slice(2) };
   } catch (e) {
@@ -78,20 +78,13 @@ function launcherIn(dir) {
     var nodeExe = path.join(dir, 'node.exe');
     var entry = path.join(dir, 'lib', 'dist', 'bin', 'solidkg.js');
     if (fs.existsSync(nodeExe) && fs.existsSync(entry)) {
-      return { command: nodeExe, args: liftoff(entry) };
+      return { command: nodeExe, args: [entry].concat(process.argv.slice(2)) };
     }
   } else {
     var launcher = path.join(dir, 'bin', 'solidkg');
     if (fs.existsSync(launcher)) return { command: launcher, args: process.argv.slice(2) };
   }
   return null;
-}
-
-// --liftoff-only keeps tree-sitter's WASM grammars off V8's turboshaft tier to
-// avoid the Zone OOM on Node >= 22 (issues #293/#298). The unix bin/solidkg
-// launcher already passes it; on Windows we invoke node.exe directly so add it.
-function liftoff(entry) {
-  return ['--liftoff-only', entry].concat(process.argv.slice(2));
 }
 
 // Download + cache the platform bundle from solidkg.local release artifacts. Returns

@@ -61,8 +61,9 @@ for archive in "${archives[@]}"; do
         name: `solidkg-${process.env.TARGET}`,
         version: process.env.VERSION,
         description: `SolidKG self-contained bundle for ${process.env.TARGET}`,
+        license: "SEE LICENSE IN LICENSE",
         os: [process.env.OSV], cpu: [process.env.ARCHV],
-        files: [process.env.NODEFILE, "lib", "bin"]
+        files: [process.env.NODEFILE, "lib", "bin", "LICENSE"]
       }, null, 2) + "\n");
     ' "$pkgdir/package.json"
   targets+=("$target")
@@ -72,6 +73,7 @@ done
 # Main shim package.
 cp "$ROOT/scripts/npm-shim.js" "$NPM/main/npm-shim.js"
 [ -f "$ROOT/README.md" ] && cp "$ROOT/README.md" "$NPM/main/README.md"
+[ -f "$ROOT/LICENSE" ] && cp "$ROOT/LICENSE" "$NPM/main/LICENSE"
 VERSION="$VERSION" TARGETS="${targets[*]}" \
   node -e '
     const fs=require("fs");
@@ -82,9 +84,10 @@ VERSION="$VERSION" TARGETS="${targets[*]}" \
       name: "solidkg",
       version: process.env.VERSION,
       description: "Local-first code intelligence for AI agents (MCP). Self-contained — bundles its own runtime.",
+      license: "SEE LICENSE IN LICENSE",
       bin: { solidkg: "npm-shim.js" },
       optionalDependencies: opt,
-      files: ["npm-shim.js","README.md"]
+      files: ["npm-shim.js","README.md","LICENSE"]
     }, null, 2) + "\n");
   ' "$NPM/main/package.json"
 
