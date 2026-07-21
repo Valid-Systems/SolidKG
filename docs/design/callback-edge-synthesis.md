@@ -3,7 +3,7 @@
 **Status:** Phases 1–3 implemented & validated as a **prototype, uncommitted on `main`**
 (as of 2026-05-22). This doc is the handoff for continuing the work.
 **Motivation:** close the dynamic-dispatch hole that static extraction leaves for
-observer / event-emitter / signal patterns, where a *dispatcher* invokes callbacks
+observer / event-emitter / signal patterns, where a _dispatcher_ invokes callbacks
 registered elsewhere through a shared store — so flows like "how does an update
 reach the screen" actually exist in the graph.
 
@@ -20,6 +20,7 @@ We synthesize `dispatcher → callback` edges that static parsing misses. It wor
   node count moved +3 after Phase 3 (no explosion).
 
 **Files touched (all uncommitted on `main`):**
+
 - `src/resolution/callback-synthesizer.ts` — the whole-graph synthesis pass (Phase 1 + 2).
 - `src/resolution/index.ts` — calls `synthesizeCallbackEdges()` at the end of
   `resolveAndPersistBatched()` (after base edges are persisted) + the import.
@@ -27,6 +28,7 @@ We synthesize `dispatcher → callback` edges that static parsing misses. It wor
   functions (Phase 3), so inline named handlers become linkable nodes.
 
 **How to reproduce / test:**
+
 ```bash
 npm run build
 rm -rf /tmp/solidkg-corpus/excalidraw/.solidkg
@@ -38,6 +40,7 @@ sqlite3 /tmp/solidkg-corpus/excalidraw/.solidkg/solidkg.db \
 # end-to-end trace (uses the dev probes):
 node scripts/agent-eval/probe-trace.mjs /tmp/solidkg-corpus/excalidraw triggerUpdate triggerRender
 ```
+
 Probe scripts (dev-only, in `scripts/agent-eval/`): `probe-node.mjs` (symbol + trail),
 `probe-trace.mjs` (call path), `probe-context.mjs`, `probe-explore.mjs`. EventEmitter
 fixture lives at `/tmp/cb-fixture/bus.js` (ephemeral — recreate or move into `__tests__/`).
@@ -49,10 +52,14 @@ fixture lives at `/tmp/cb-fixture/bus.js` (ephemeral — recreate or move into `
 ```ts
 class Scene {
   private callbacks = new Set<Callback>();
-  onUpdate(cb: Callback) { this.callbacks.add(cb); }          // REGISTRAR
-  triggerUpdate() { for (const cb of this.callbacks) cb(); }  // DISPATCHER
+  onUpdate(cb: Callback) {
+    this.callbacks.add(cb);
+  } // REGISTRAR
+  triggerUpdate() {
+    for (const cb of this.callbacks) cb();
+  } // DISPATCHER
 }
-this.scene.onUpdate(this.triggerRender);                      // REGISTRATION SITE
+this.scene.onUpdate(this.triggerRender); // REGISTRATION SITE
 ```
 
 The runtime edge `triggerUpdate → triggerRender` does not exist statically:
@@ -67,25 +74,27 @@ multi-site correlation** (registrar, registration, dispatcher). So it's a whole-
 pass after base resolution, language-level (any OO observer), living in
 `src/resolution/callback-synthesizer.ts` — **not** under `frameworks/`.
 
-> Sibling mechanism for the *other* dynamic-dispatch class — **named** attribute/
+> Sibling mechanism for the _other_ dynamic-dispatch class — **named** attribute/
 > descriptor dispatch (e.g. django `self._iterable_class(...)`) — is the
 > `claimsReference` hook (`resolution/types.ts` + `resolution/index.ts` pre-filter)
-> + a `FrameworkResolver.resolve()` (django ORM resolver in `frameworks/python.ts`).
-> That one *does* fit `resolve()` because the ref is named. Both are part of the same
-> coverage effort; see the "Related work" section.
+>
+> - a `FrameworkResolver.resolve()` (django ORM resolver in `frameworks/python.ts`).
+>   That one _does_ fit `resolve()` because the ref is named. Both are part of the same
+>   coverage effort; see the "Related work" section.
 
 ---
 
 ## As-built algorithm (and where it diverged from the original design)
 
 ### Field-observer channels (`fieldChannelEdges`, Phase 1)
+
 1. **Candidates** by method/function **name** — registrar `^(on[A-Z]\w*|subscribe|
-   addListener|addEventListener|register|watch|listen|addCallback)$`; dispatcher
+addListener|addEventListener|register|watch|listen|addCallback)$`; dispatcher
    contains `(emit|trigger|notify|dispatch|fire|publish|flush)`.
 2. **Confirm by body** (read via `ctx.readFile` + slice node lines): registrar has
    `this.<F>.add|push|set(`; dispatcher has `for (… of [Array.from(]this.<F>)` + a call,
    or `this.<F>.forEach(`.
-3. **Pairing — DIVERGENCE:** the design said pair by *class*; the build pairs by
+3. **Pairing — DIVERGENCE:** the design said pair by _class_; the build pairs by
    **same file + same field `F`** (file as a class proxy — getting the containing class
    reliably was harder). Works for the common 1-class-per-file case; revisit for
    multi-class files.
@@ -97,9 +106,10 @@ pass after base resolution, language-level (any OO observer), living in
    `MAX_CALLBACKS_PER_CHANNEL = 40`.
 
 ### EventEmitter channels (`eventEmitterEdges`, Phase 2)
+
 - **File-oriented scan** (`ctx.getAllFiles()` + `readFile`, substring pre-filter on
   `.emit(`/`.on(`/etc). `ON_RE` = `\.(?:on|once|addListener)\(\s*['"]([^'"]+)['"]\s*,\s*
-  (?:function\s+(\w+)|(?:this\.)?(\w+))`; `EMIT_RE` = `\.(?:emit|fire|dispatchEvent)\(\s*['"]([^'"]+)['"]`.
+(?:function\s+(\w+)|(?:this\.)?(\w+))`; `EMIT_RE` = `\.(?:emit|fire|dispatchEvent)\(\s*['"]([^'"]+)['"]`.
 - Dispatcher = **enclosing function** of the `emit('e')` call (`enclosingFn` finds the
   tightest function/method/component node containing the line). Handler = `getNodesByName`
   of the on-handler name.
@@ -109,6 +119,7 @@ pass after base resolution, language-level (any OO observer), living in
   dispatchers (generic names like `error`/`change` would over-link without type info).
 
 ### Provenance — DIVERGENCE
+
 `Edge.provenance` is a fixed enum (`'tree-sitter'|'scip'|'heuristic'`), so synthesized
 edges use **`provenance: 'heuristic'`** + `metadata: { synthesizedBy: 'callback'|
 'event-emitter', via/event/field }`. The design's `'callback-synthesis'` provenance and
@@ -116,9 +127,10 @@ high/medium/low **confidence tiers were NOT implemented** — the fan-out cap +
 registrar-name uniqueness + named-only handlers are the precision guards instead.
 
 ### Phase 3 — inline callback extraction (`tree-sitter.ts`)
+
 The real blocker for EventEmitter on real repos: inline handlers
 (`on('mount', function onmount(){})`) weren't **nodes**, so nothing could link to them.
-Root cause: `visitFunctionBody` walked *through* nested functions without extracting them.
+Root cause: `visitFunctionBody` walked _through_ nested functions without extracting them.
 Fix: in `visitForCallsAndStructure`, when a body node is a `functionType` and
 `extractName` returns a real name, call `extractFunction` (which extracts it and walks
 its own body) and return. **Named only** — anonymous arrows fall through to the existing
@@ -129,12 +141,12 @@ excalidraw +3 nodes, no explosion, no regression.
 
 ## Validation results (actual)
 
-| Repo | Result |
-|---|---|
-| excalidraw | 1 synthesized edge `triggerUpdate → triggerRender` (of 27,214); `trace(mutateElement, triggerRender)` = 3 hops; nodes 9,286 → 9,289 |
-| express | after Phase 3: `use → onmount` `{event-emitter, event:"mount"}` (`onmount` now extracted at `application.js:109`) |
-| `/tmp/cb-fixture/bus.js` | `tick → handleRefresh`, `persist → handleSave` (named-method EventEmitter handlers) |
-| excalidraw / express | no Phase-1 regression; node counts stable |
+| Repo                     | Result                                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| excalidraw               | 1 synthesized edge `triggerUpdate → triggerRender` (of 27,214); `trace(mutateElement, triggerRender)` = 3 hops; nodes 9,286 → 9,289 |
+| express                  | after Phase 3: `use → onmount` `{event-emitter, event:"mount"}` (`onmount` now extracted at `application.js:109`)                   |
+| `/tmp/cb-fixture/bus.js` | `tick → handleRefresh`, `persist → handleSave` (named-method EventEmitter handlers)                                                 |
+| excalidraw / express     | no Phase-1 regression; node counts stable                                                                                           |
 
 ---
 
@@ -161,13 +173,16 @@ excalidraw +3 nodes, no explosion, no regression.
    unaffected — the change is in the shared walker), resolver tests for the django side.
 
 ## Edge cases / model
+
 - **Over-approximation across instances** is accepted (reachability, not instance
   precision). `unregister`/`off` ignored.
 - Synthesized edges are **additive** — never replace static edges; tooling can filter on
   `provenance='heuristic'` + `metadata.synthesizedBy`.
 
 ## Related work (same coverage effort)
+
 This is one half of closing dynamic-dispatch coverage. The other artifacts on `main`:
+
 - **Named attribute/descriptor resolver**: `claimsReference` (`resolution/types.ts`,
   pre-filter in `resolution/index.ts`) + django ORM resolver (`frameworks/python.ts`,
   `_iterable_class` → `ModelIterable.__iter__`).

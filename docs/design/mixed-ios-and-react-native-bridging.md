@@ -12,12 +12,10 @@ apps.
 > branch — only the design, the validation corpus, and the success bar.
 > Coding starts on a follow-up branch per phase.
 
-This work is the next item on the
-[dynamic-dispatch coverage playbook](./dynamic-dispatch-coverage-playbook.md) §6
-matrix: row "Swift × Objective-C bridging" and a new "React Native bridge"
-row. Both are **resolver** patterns (named refs exist on both sides — the
-bridging rule is deterministic) — not synthesizer patterns. See §3a of the
-playbook for the reference Django ORM resolver.
+This work covers the "Swift × Objective-C bridging" and "React Native bridge"
+validation rows maintained internally. Both are **resolver** patterns (named
+refs exist on both sides — the bridging rule is deterministic) rather than
+synthesizer patterns.
 
 ---
 
@@ -345,8 +343,7 @@ otherwise closed but a Fabric flow still breaks.
   do not redesign JVM extraction.
 - **Dynamic / computed bridge keys** — `NativeModules[someVar]`,
   `requireNativeModule(name)` where `name` is a parameter, etc. We only
-  resolve literal-key access (matches the
-  [agent-eval Lua frontier](./dynamic-dispatch-coverage-playbook.md) — anonymous-only patterns deferred).
+  resolve literal-key access; anonymous-only patterns remain deferred.
 - **Bridging-header file content parsing** — we *do* index `.h` files
   (already does via #165's content sniff) but we do **not** parse the
   bridging header's `#import` list as a special "what's visible to Swift"
