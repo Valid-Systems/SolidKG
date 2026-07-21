@@ -40,6 +40,7 @@ This plan does NOT move Django extraction from regex to AST. The regex approach 
 ## Task 1: Update the `FrameworkResolver` interface
 
 **Files:**
+
 - Modify: `src/resolution/types.ts:88-100`
 
 - [ ] **Step 1: Write the failing test**
@@ -47,23 +48,23 @@ This plan does NOT move Django extraction from regex to AST. The regex approach 
 Create `__tests__/frameworks.test.ts`:
 
 ```typescript
-import { describe, it, expect } from 'vitest';
-import type { FrameworkResolver, UnresolvedRef } from '../src/resolution/types';
-import type { Node } from '../src/types';
+import { describe, it, expect } from "vitest";
+import type { FrameworkResolver, UnresolvedRef } from "../src/resolution/types";
+import type { Node } from "../src/types";
 
-describe('FrameworkResolver.extract interface', () => {
-  it('extract() returns { nodes, references }', () => {
+describe("FrameworkResolver.extract interface", () => {
+  it("extract() returns { nodes, references }", () => {
     const resolver: FrameworkResolver = {
-      name: 'fake',
+      name: "fake",
       detect: () => true,
       resolve: () => null,
-      languages: ['python'],
+      languages: ["python"],
       extract: (_filePath: string, _content: string) => ({
         nodes: [] as Node[],
         references: [] as UnresolvedRef[],
       }),
     };
-    const result = resolver.extract!('foo.py', '');
+    const result = resolver.extract!("foo.py", "");
     expect(result).toEqual({ nodes: [], references: [] });
   });
 });
@@ -135,6 +136,7 @@ git commit -m "feat(resolution): replace extractNodes with extract() returning n
 ## Task 2: Add `getApplicableFrameworks` helper and keep detection correct
 
 **Files:**
+
 - Modify: `src/resolution/frameworks/index.ts`
 
 - [ ] **Step 1: Write the failing test**
@@ -142,22 +144,36 @@ git commit -m "feat(resolution): replace extractNodes with extract() returning n
 Append to `__tests__/frameworks.test.ts`:
 
 ```typescript
-import { getApplicableFrameworks } from '../src/resolution/frameworks';
-import type { FrameworkResolver } from '../src/resolution/types';
+import { getApplicableFrameworks } from "../src/resolution/frameworks";
+import type { FrameworkResolver } from "../src/resolution/types";
 
-describe('getApplicableFrameworks', () => {
-  const pyFw: FrameworkResolver = { name: 'py', languages: ['python'], detect: () => true, resolve: () => null };
-  const jsFw: FrameworkResolver = { name: 'js', languages: ['javascript', 'typescript'], detect: () => true, resolve: () => null };
-  const anyFw: FrameworkResolver = { name: 'any', detect: () => true, resolve: () => null };
+describe("getApplicableFrameworks", () => {
+  const pyFw: FrameworkResolver = {
+    name: "py",
+    languages: ["python"],
+    detect: () => true,
+    resolve: () => null,
+  };
+  const jsFw: FrameworkResolver = {
+    name: "js",
+    languages: ["javascript", "typescript"],
+    detect: () => true,
+    resolve: () => null,
+  };
+  const anyFw: FrameworkResolver = {
+    name: "any",
+    detect: () => true,
+    resolve: () => null,
+  };
 
-  it('filters by language', () => {
-    const result = getApplicableFrameworks([pyFw, jsFw, anyFw], 'python');
-    expect(result.map(r => r.name)).toEqual(['py', 'any']);
+  it("filters by language", () => {
+    const result = getApplicableFrameworks([pyFw, jsFw, anyFw], "python");
+    expect(result.map((r) => r.name)).toEqual(["py", "any"]);
   });
 
-  it('returns anyFw-only when language has no matches', () => {
-    const result = getApplicableFrameworks([pyFw, jsFw, anyFw], 'rust');
-    expect(result.map(r => r.name)).toEqual(['any']);
+  it("returns anyFw-only when language has no matches", () => {
+    const result = getApplicableFrameworks([pyFw, jsFw, anyFw], "rust");
+    expect(result.map((r) => r.name)).toEqual(["any"]);
   });
 });
 ```
@@ -172,7 +188,7 @@ Expected: FAIL — `getApplicableFrameworks` is not exported.
 Add after the existing `detectFrameworks` function:
 
 ```typescript
-import type { Language } from '../../types';
+import type { Language } from "../../types";
 
 /**
  * Filter a list of detected frameworks down to ones that apply to a given language.
@@ -180,10 +196,10 @@ import type { Language } from '../../types';
  */
 export function getApplicableFrameworks(
   detected: FrameworkResolver[],
-  language: Language
+  language: Language,
 ): FrameworkResolver[] {
   return detected.filter(
-    (fw) => !fw.languages || fw.languages.includes(language)
+    (fw) => !fw.languages || fw.languages.includes(language),
   );
 }
 ```
@@ -205,6 +221,7 @@ git commit -m "feat(resolution): add getApplicableFrameworks helper for per-lang
 ## Task 3: Port Django resolver to new `extract()` with proper route→view references
 
 **Files:**
+
 - Modify: `src/resolution/frameworks/python.ts` (djangoResolver section, ~line 1-100)
 
 - [ ] **Step 1: Write the failing tests**
@@ -212,10 +229,10 @@ git commit -m "feat(resolution): add getApplicableFrameworks helper for per-lang
 Append to `__tests__/frameworks.test.ts`:
 
 ```typescript
-import { djangoResolver } from '../src/resolution/frameworks/python';
+import { djangoResolver } from "../src/resolution/frameworks/python";
 
-describe('djangoResolver.extract', () => {
-  it('extracts route node and reference for path() with CBV.as_view()', () => {
+describe("djangoResolver.extract", () => {
+  it("extracts route node and reference for path() with CBV.as_view()", () => {
     const src = `
 from django.urls import path
 from users.views import UserListView
@@ -224,48 +241,48 @@ urlpatterns = [
     path('users/', UserListView.as_view(), name='user-list'),
 ]
 `;
-    const { nodes, references } = djangoResolver.extract!('users/urls.py', src);
+    const { nodes, references } = djangoResolver.extract!("users/urls.py", src);
     expect(nodes).toHaveLength(1);
-    expect(nodes[0].kind).toBe('route');
-    expect(nodes[0].name).toBe('users/');
+    expect(nodes[0].kind).toBe("route");
+    expect(nodes[0].name).toBe("users/");
     expect(references).toHaveLength(1);
-    expect(references[0].referenceName).toBe('UserListView');
-    expect(references[0].referenceKind).toBe('references');
+    expect(references[0].referenceName).toBe("UserListView");
+    expect(references[0].referenceKind).toBe("references");
     expect(references[0].fromNodeId).toBe(nodes[0].id);
   });
 
-  it('extracts route for path() with dotted module.Class.as_view()', () => {
+  it("extracts route for path() with dotted module.Class.as_view()", () => {
     const src = `from django.urls import path\nfrom api.v1 import views as api_v1_views\nurlpatterns = [path('api/', api_v1_views.UserListView.as_view())]\n`;
-    const { nodes, references } = djangoResolver.extract!('api/urls.py', src);
+    const { nodes, references } = djangoResolver.extract!("api/urls.py", src);
     expect(nodes).toHaveLength(1);
-    expect(references[0].referenceName).toBe('UserListView');
+    expect(references[0].referenceName).toBe("UserListView");
   });
 
-  it('extracts route for path() with bare function view', () => {
+  it("extracts route for path() with bare function view", () => {
     const src = `from django.urls import path\nurlpatterns = [path('home/', home_view, name='home')]\n`;
-    const { nodes, references } = djangoResolver.extract!('home/urls.py', src);
-    expect(references[0].referenceName).toBe('home_view');
+    const { nodes, references } = djangoResolver.extract!("home/urls.py", src);
+    expect(references[0].referenceName).toBe("home_view");
   });
 
-  it('extracts route for path() with include()', () => {
+  it("extracts route for path() with include()", () => {
     const src = `from django.urls import path, include\nurlpatterns = [path('api/', include('api.urls'))]\n`;
-    const { nodes, references } = djangoResolver.extract!('root/urls.py', src);
+    const { nodes, references } = djangoResolver.extract!("root/urls.py", src);
     expect(nodes).toHaveLength(1);
-    expect(nodes[0].kind).toBe('route');
-    expect(references[0].referenceName).toBe('api.urls');
-    expect(references[0].referenceKind).toBe('imports');
+    expect(nodes[0].kind).toBe("route");
+    expect(references[0].referenceName).toBe("api.urls");
+    expect(references[0].referenceKind).toBe("imports");
   });
 
-  it('extracts routes for re_path and url', () => {
+  it("extracts routes for re_path and url", () => {
     const src = `from django.urls import re_path, url\nurlpatterns = [re_path(r'^users/$', UserView), url(r'^old/$', OldView)]\n`;
-    const { nodes } = djangoResolver.extract!('legacy/urls.py', src);
+    const { nodes } = djangoResolver.extract!("legacy/urls.py", src);
     expect(nodes).toHaveLength(2);
-    expect(nodes.map(n => n.name)).toEqual(['^users/$', '^old/$']);
+    expect(nodes.map((n) => n.name)).toEqual(["^users/$", "^old/$"]);
   });
 
-  it('returns empty result for a non-urls.py python file', () => {
+  it("returns empty result for a non-urls.py python file", () => {
     const src = `def foo(): return 1\n`;
-    const { nodes, references } = djangoResolver.extract!('views.py', src);
+    const { nodes, references } = djangoResolver.extract!("views.py", src);
     expect(nodes).toEqual([]);
     expect(references).toEqual([]);
   });
@@ -283,37 +300,77 @@ Replace the `djangoResolver` object in `src/resolution/frameworks/python.ts` (ap
 
 ```typescript
 export const djangoResolver: FrameworkResolver = {
-  name: 'django',
-  languages: ['python'],
+  name: "django",
+  languages: ["python"],
 
   detect(context) {
-    const requirements = context.readFile('requirements.txt');
-    if (requirements && requirements.toLowerCase().includes('django')) return true;
-    const setup = context.readFile('setup.py');
-    if (setup && setup.toLowerCase().includes('django')) return true;
-    const pyproject = context.readFile('pyproject.toml');
-    if (pyproject && pyproject.toLowerCase().includes('django')) return true;
-    return context.fileExists('manage.py');
+    const requirements = context.readFile("requirements.txt");
+    if (requirements && requirements.toLowerCase().includes("django"))
+      return true;
+    const setup = context.readFile("setup.py");
+    if (setup && setup.toLowerCase().includes("django")) return true;
+    const pyproject = context.readFile("pyproject.toml");
+    if (pyproject && pyproject.toLowerCase().includes("django")) return true;
+    return context.fileExists("manage.py");
   },
 
   resolve(ref, context) {
-    if (ref.referenceName.endsWith('Model') || /^[A-Z][a-z]+$/.test(ref.referenceName)) {
-      const result = resolveByNameAndKind(ref.referenceName, CLASS_KINDS, MODEL_DIRS, context);
-      if (result) return { original: ref, targetNodeId: result, confidence: 0.8, resolvedBy: 'framework' };
+    if (
+      ref.referenceName.endsWith("Model") ||
+      /^[A-Z][a-z]+$/.test(ref.referenceName)
+    ) {
+      const result = resolveByNameAndKind(
+        ref.referenceName,
+        CLASS_KINDS,
+        MODEL_DIRS,
+        context,
+      );
+      if (result)
+        return {
+          original: ref,
+          targetNodeId: result,
+          confidence: 0.8,
+          resolvedBy: "framework",
+        };
     }
-    if (ref.referenceName.endsWith('View') || ref.referenceName.endsWith('ViewSet')) {
-      const result = resolveByNameAndKind(ref.referenceName, VIEW_KINDS, VIEW_DIRS, context);
-      if (result) return { original: ref, targetNodeId: result, confidence: 0.8, resolvedBy: 'framework' };
+    if (
+      ref.referenceName.endsWith("View") ||
+      ref.referenceName.endsWith("ViewSet")
+    ) {
+      const result = resolveByNameAndKind(
+        ref.referenceName,
+        VIEW_KINDS,
+        VIEW_DIRS,
+        context,
+      );
+      if (result)
+        return {
+          original: ref,
+          targetNodeId: result,
+          confidence: 0.8,
+          resolvedBy: "framework",
+        };
     }
-    if (ref.referenceName.endsWith('Form')) {
-      const result = resolveByNameAndKind(ref.referenceName, CLASS_KINDS, FORM_DIRS, context);
-      if (result) return { original: ref, targetNodeId: result, confidence: 0.8, resolvedBy: 'framework' };
+    if (ref.referenceName.endsWith("Form")) {
+      const result = resolveByNameAndKind(
+        ref.referenceName,
+        CLASS_KINDS,
+        FORM_DIRS,
+        context,
+      );
+      if (result)
+        return {
+          original: ref,
+          targetNodeId: result,
+          confidence: 0.8,
+          resolvedBy: "framework",
+        };
     }
     return null;
   },
 
   extract(filePath, content) {
-    if (!filePath.endsWith('.py')) return { nodes: [], references: [] };
+    if (!filePath.endsWith(".py")) return { nodes: [], references: [] };
 
     const nodes: Node[] = [];
     const references: UnresolvedRef[] = [];
@@ -321,16 +378,17 @@ export const djangoResolver: FrameworkResolver = {
 
     // path('url', handler, name=...) / re_path(r'...', handler) / url(r'...', handler)
     // Capture groups: 1=function name, 2=url string, 3=rest of line up to closing )
-    const routeRegex = /\b(path|re_path|url)\s*\(\s*r?['"]([^'"]+)['"]\s*,\s*([^)]*?)(?:\)|,\s*name=)/g;
+    const routeRegex =
+      /\b(path|re_path|url)\s*\(\s*r?['"]([^'"]+)['"]\s*,\s*([^)]*?)(?:\)|,\s*name=)/g;
 
     let match: RegExpExecArray | null;
     while ((match = routeRegex.exec(content)) !== null) {
       const [, _fn, urlPath, handlerExpr] = match;
-      const line = content.slice(0, match.index).split('\n').length;
+      const line = content.slice(0, match.index).split("\n").length;
 
       const routeNode: Node = {
         id: `route:${filePath}:${line}:${urlPath}`,
-        kind: 'route',
+        kind: "route",
         name: urlPath,
         qualifiedName: `${filePath}::route:${urlPath}`,
         filePath,
@@ -338,7 +396,7 @@ export const djangoResolver: FrameworkResolver = {
         endLine: line,
         startColumn: 0,
         endColumn: match[0].length,
-        language: 'python',
+        language: "python",
         updatedAt: now,
       };
       nodes.push(routeNode);
@@ -353,7 +411,7 @@ export const djangoResolver: FrameworkResolver = {
           line,
           column: 0,
           filePath,
-          language: 'python',
+          language: "python",
         });
       }
     }
@@ -367,32 +425,34 @@ export const djangoResolver: FrameworkResolver = {
  *
  * Returns null for shapes we can't confidently link (e.g. lambdas).
  */
-function resolveHandlerName(expr: string): { name: string; kind: 'references' | 'imports' } | null {
+function resolveHandlerName(
+  expr: string,
+): { name: string; kind: "references" | "imports" } | null {
   // include('module.path') / include("module.path")
   const includeMatch = expr.match(/^include\s*\(\s*['"]([^'"]+)['"]/);
-  if (includeMatch) return { name: includeMatch[1], kind: 'imports' };
+  if (includeMatch) return { name: includeMatch[1], kind: "imports" };
 
   // Strip trailing .as_view(...) or .as_view call
-  let head = expr.replace(/\.as_view\s*\([^)]*\)\s*$/, '');
+  let head = expr.replace(/\.as_view\s*\([^)]*\)\s*$/, "");
 
   // Drop a trailing method call like .some_method()
-  head = head.replace(/\.\w+\s*\([^)]*\)\s*$/, '');
+  head = head.replace(/\.\w+\s*\([^)]*\)\s*$/, "");
 
   // Now head should be either a bare name or a dotted path. Take the last segment.
-  const dotted = head.split('.').filter(Boolean);
+  const dotted = head.split(".").filter(Boolean);
   if (dotted.length === 0) return null;
   const last = dotted[dotted.length - 1];
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(last)) return null;
 
-  return { name: last, kind: 'references' };
+  return { name: last, kind: "references" };
 }
 ```
 
 Also ensure the top of the file imports `UnresolvedRef` and `Node`:
 
 ```typescript
-import type { FrameworkResolver, UnresolvedRef } from '../types';
-import type { Node } from '../../types';
+import type { FrameworkResolver, UnresolvedRef } from "../types";
+import type { Node } from "../../types";
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
@@ -412,6 +472,7 @@ git commit -m "feat(django): emit route nodes and route->view references in extr
 ## Task 4: Port Flask and FastAPI resolvers
 
 **Files:**
+
 - Modify: `src/resolution/frameworks/python.ts` (flaskResolver and fastapiResolver sections)
 
 - [ ] **Step 1: Write the failing tests**
@@ -419,55 +480,58 @@ git commit -m "feat(django): emit route nodes and route->view references in extr
 Append to `__tests__/frameworks.test.ts`:
 
 ```typescript
-import { flaskResolver, fastapiResolver } from '../src/resolution/frameworks/python';
+import {
+  flaskResolver,
+  fastapiResolver,
+} from "../src/resolution/frameworks/python";
 
-describe('flaskResolver.extract', () => {
-  it('extracts route and reference from @app.route', () => {
+describe("flaskResolver.extract", () => {
+  it("extracts route and reference from @app.route", () => {
     const src = `
 @app.route('/users')
 def list_users():
     return []
 `;
-    const { nodes, references } = flaskResolver.extract!('app.py', src);
+    const { nodes, references } = flaskResolver.extract!("app.py", src);
     expect(nodes).toHaveLength(1);
-    expect(nodes[0].kind).toBe('route');
-    expect(nodes[0].name).toBe('GET /users');
-    expect(references[0].referenceName).toBe('list_users');
+    expect(nodes[0].kind).toBe("route");
+    expect(nodes[0].name).toBe("GET /users");
+    expect(references[0].referenceName).toBe("list_users");
   });
 
-  it('extracts blueprint routes', () => {
+  it("extracts blueprint routes", () => {
     const src = `
 @users_bp.route('/<id>', methods=['POST'])
 def create_user(id):
     pass
 `;
-    const { nodes, references } = flaskResolver.extract!('routes.py', src);
-    expect(nodes[0].name).toBe('POST /<id>');
-    expect(references[0].referenceName).toBe('create_user');
+    const { nodes, references } = flaskResolver.extract!("routes.py", src);
+    expect(nodes[0].name).toBe("POST /<id>");
+    expect(references[0].referenceName).toBe("create_user");
   });
 });
 
-describe('fastapiResolver.extract', () => {
-  it('extracts route and reference from @app.get', () => {
+describe("fastapiResolver.extract", () => {
+  it("extracts route and reference from @app.get", () => {
     const src = `
 @app.get('/users')
 async def list_users():
     return []
 `;
-    const { nodes, references } = fastapiResolver.extract!('main.py', src);
-    expect(nodes[0].name).toBe('GET /users');
-    expect(references[0].referenceName).toBe('list_users');
+    const { nodes, references } = fastapiResolver.extract!("main.py", src);
+    expect(nodes[0].name).toBe("GET /users");
+    expect(references[0].referenceName).toBe("list_users");
   });
 
-  it('extracts route from router.post', () => {
+  it("extracts route from router.post", () => {
     const src = `
 @router.post('/items')
 def create_item(item: Item):
     pass
 `;
-    const { nodes, references } = fastapiResolver.extract!('items.py', src);
-    expect(nodes[0].name).toBe('POST /items');
-    expect(references[0].referenceName).toBe('create_item');
+    const { nodes, references } = fastapiResolver.extract!("items.py", src);
+    expect(nodes[0].name).toBe("POST /items");
+    expect(references[0].referenceName).toBe("create_item");
   });
 });
 ```
@@ -483,83 +547,127 @@ Replace `flaskResolver` in `src/resolution/frameworks/python.ts` with:
 
 ```typescript
 export const flaskResolver: FrameworkResolver = {
-  name: 'flask',
-  languages: ['python'],
+  name: "flask",
+  languages: ["python"],
 
   detect(context) {
-    const requirements = context.readFile('requirements.txt');
+    const requirements = context.readFile("requirements.txt");
     if (requirements && /\bflask\b/i.test(requirements)) return true;
-    const pyproject = context.readFile('pyproject.toml');
+    const pyproject = context.readFile("pyproject.toml");
     if (pyproject && /\bflask\b/i.test(pyproject)) return true;
-    for (const file of ['app.py', 'application.py', 'main.py', '__init__.py']) {
+    for (const file of ["app.py", "application.py", "main.py", "__init__.py"]) {
       const content = context.readFile(file);
-      if (content && content.includes('Flask(__name__)')) return true;
+      if (content && content.includes("Flask(__name__)")) return true;
     }
     return false;
   },
 
   resolve(ref, context) {
-    if (ref.referenceName.endsWith('_bp') || ref.referenceName.endsWith('_blueprint')) {
-      const result = resolveByNameAndKind(ref.referenceName, VARIABLE_KINDS, [], context);
-      if (result) return { original: ref, targetNodeId: result, confidence: 0.8, resolvedBy: 'framework' };
+    if (
+      ref.referenceName.endsWith("_bp") ||
+      ref.referenceName.endsWith("_blueprint")
+    ) {
+      const result = resolveByNameAndKind(
+        ref.referenceName,
+        VARIABLE_KINDS,
+        [],
+        context,
+      );
+      if (result)
+        return {
+          original: ref,
+          targetNodeId: result,
+          confidence: 0.8,
+          resolvedBy: "framework",
+        };
     }
     return null;
   },
 
   extract(filePath, content) {
-    if (!filePath.endsWith('.py')) return { nodes: [], references: [] };
+    if (!filePath.endsWith(".py")) return { nodes: [], references: [] };
     return extractDecoratorRoutes(filePath, content, {
       // Flask: @x.route('/path', methods=[...])
-      decoratorRegex: /@(\w+)\.route\s*\(\s*['"]([^'"]+)['"](?:\s*,\s*methods\s*=\s*\[([^\]]+)\])?\s*\)\s*\n\s*(?:async\s+)?def\s+(\w+)/g,
-      defaultMethod: 'GET',
+      decoratorRegex:
+        /@(\w+)\.route\s*\(\s*['"]([^'"]+)['"](?:\s*,\s*methods\s*=\s*\[([^\]]+)\])?\s*\)\s*\n\s*(?:async\s+)?def\s+(\w+)/g,
+      defaultMethod: "GET",
       methodFromGroup: 3,
       pathGroup: 2,
       handlerGroup: 4,
-      language: 'python',
+      language: "python",
     });
   },
 };
 
 export const fastapiResolver: FrameworkResolver = {
-  name: 'fastapi',
-  languages: ['python'],
+  name: "fastapi",
+  languages: ["python"],
 
   detect(context) {
-    const requirements = context.readFile('requirements.txt');
+    const requirements = context.readFile("requirements.txt");
     if (requirements && /\bfastapi\b/i.test(requirements)) return true;
-    const pyproject = context.readFile('pyproject.toml');
+    const pyproject = context.readFile("pyproject.toml");
     if (pyproject && /\bfastapi\b/i.test(pyproject)) return true;
-    for (const file of ['app.py', 'main.py', 'api.py']) {
+    for (const file of ["app.py", "main.py", "api.py"]) {
       const content = context.readFile(file);
-      if (content && content.includes('FastAPI(')) return true;
+      if (content && content.includes("FastAPI(")) return true;
     }
     return false;
   },
 
   resolve(ref, context) {
-    if (ref.referenceName.endsWith('_router') || ref.referenceName === 'router') {
-      const result = resolveByNameAndKind(ref.referenceName, VARIABLE_KINDS, ROUTER_DIRS, context);
-      if (result) return { original: ref, targetNodeId: result, confidence: 0.8, resolvedBy: 'framework' };
+    if (
+      ref.referenceName.endsWith("_router") ||
+      ref.referenceName === "router"
+    ) {
+      const result = resolveByNameAndKind(
+        ref.referenceName,
+        VARIABLE_KINDS,
+        ROUTER_DIRS,
+        context,
+      );
+      if (result)
+        return {
+          original: ref,
+          targetNodeId: result,
+          confidence: 0.8,
+          resolvedBy: "framework",
+        };
     }
-    if (ref.referenceName.startsWith('get_') || ref.referenceName.startsWith('Depends')) {
-      const result = resolveByNameAndKind(ref.referenceName, FUNCTION_KINDS, DEP_DIRS, context);
-      if (result) return { original: ref, targetNodeId: result, confidence: 0.75, resolvedBy: 'framework' };
+    if (
+      ref.referenceName.startsWith("get_") ||
+      ref.referenceName.startsWith("Depends")
+    ) {
+      const result = resolveByNameAndKind(
+        ref.referenceName,
+        FUNCTION_KINDS,
+        DEP_DIRS,
+        context,
+      );
+      if (result)
+        return {
+          original: ref,
+          targetNodeId: result,
+          confidence: 0.75,
+          resolvedBy: "framework",
+        };
     }
     return null;
   },
 
   extract(filePath, content) {
-    if (!filePath.endsWith('.py')) return { nodes: [], references: [] };
+    if (!filePath.endsWith(".py")) return { nodes: [], references: [] };
     return extractDecoratorRoutes(filePath, content, {
       // FastAPI: @x.get('/path')
-      decoratorRegex: /@(\w+)\.(get|post|put|patch|delete|options|head)\s*\(\s*['"]([^'"]+)['"]/g,
-      defaultMethod: '',
+      decoratorRegex:
+        /@(\w+)\.(get|post|put|patch|delete|options|head)\s*\(\s*['"]([^'"]+)['"]/g,
+      defaultMethod: "",
       methodGroup: 2,
       pathGroup: 3,
       // handler follows on next def line; captured via post-scan
       handlerGroup: undefined,
       findHandler: true,
-      language: 'python',
+      language: "python",
     });
   },
 };
@@ -576,10 +684,14 @@ interface DecoratorRouteOpts {
   pathGroup: number;
   handlerGroup?: number;
   findHandler?: boolean;
-  language: 'python';
+  language: "python";
 }
 
-function extractDecoratorRoutes(filePath: string, content: string, opts: DecoratorRouteOpts) {
+function extractDecoratorRoutes(
+  filePath: string,
+  content: string,
+  opts: DecoratorRouteOpts,
+) {
   const nodes: Node[] = [];
   const references: UnresolvedRef[] = [];
   const now = Date.now();
@@ -593,11 +705,11 @@ function extractDecoratorRoutes(filePath: string, content: string, opts: Decorat
       const m = match[opts.methodFromGroup].match(/['"]([A-Z]+)['"]/i);
       if (m) method = m[1].toUpperCase();
     }
-    const line = content.slice(0, match.index).split('\n').length;
+    const line = content.slice(0, match.index).split("\n").length;
     const name = method ? `${method} ${routePath}` : routePath;
     const routeNode: Node = {
       id: `route:${filePath}:${line}:${method}:${routePath}`,
-      kind: 'route',
+      kind: "route",
       name,
       qualifiedName: `${filePath}::${method}:${routePath}`,
       filePath,
@@ -623,11 +735,11 @@ function extractDecoratorRoutes(filePath: string, content: string, opts: Decorat
       references.push({
         fromNodeId: routeNode.id,
         referenceName: handlerName,
-        referenceKind: 'references',
+        referenceKind: "references",
         line,
         column: 0,
         filePath,
-        language: 'python',
+        language: "python",
       });
     }
   }
@@ -652,6 +764,7 @@ git commit -m "feat(flask,fastapi): emit route nodes and route->handler referenc
 ## Task 5: Port Express resolver
 
 **Files:**
+
 - Modify: `src/resolution/frameworks/express.ts` (extractNodes section, ~line 83-117)
 
 - [ ] **Step 1: Write failing tests**
@@ -659,29 +772,29 @@ git commit -m "feat(flask,fastapi): emit route nodes and route->handler referenc
 Append to `__tests__/frameworks.test.ts`:
 
 ```typescript
-import { expressResolver } from '../src/resolution/frameworks/express';
+import { expressResolver } from "../src/resolution/frameworks/express";
 
-describe('expressResolver.extract', () => {
-  it('extracts route with inline handler reference', () => {
+describe("expressResolver.extract", () => {
+  it("extracts route with inline handler reference", () => {
     const src = `app.get('/users', listUsers);\n`;
-    const { nodes, references } = expressResolver.extract!('routes.ts', src);
+    const { nodes, references } = expressResolver.extract!("routes.ts", src);
     expect(nodes).toHaveLength(1);
-    expect(nodes[0].name).toBe('GET /users');
-    expect(references[0].referenceName).toBe('listUsers');
+    expect(nodes[0].name).toBe("GET /users");
+    expect(references[0].referenceName).toBe("listUsers");
   });
 
-  it('extracts route with router.post', () => {
+  it("extracts route with router.post", () => {
     const src = `router.post('/items', auth, createItem);\n`;
-    const { nodes, references } = expressResolver.extract!('items.ts', src);
-    expect(nodes[0].name).toBe('POST /items');
+    const { nodes, references } = expressResolver.extract!("items.ts", src);
+    expect(nodes[0].name).toBe("POST /items");
     // Multiple handlers: prefer the LAST one (convention: middleware comes first, handler last)
-    expect(references[0].referenceName).toBe('createItem');
+    expect(references[0].referenceName).toBe("createItem");
   });
 
-  it('extracts route with controller method reference', () => {
+  it("extracts route with controller method reference", () => {
     const src = `app.get('/x', userController.list);\n`;
-    const { nodes, references } = expressResolver.extract!('routes.ts', src);
-    expect(references[0].referenceName).toBe('list');
+    const { nodes, references } = expressResolver.extract!("routes.ts", src);
+    expect(references[0].referenceName).toBe("list");
   });
 });
 ```
@@ -747,11 +860,11 @@ Replace the existing `extractNodes` method on `expressResolver` (in `src/resolut
 And add near the top of the file:
 
 ```typescript
-import type { FrameworkResolver, UnresolvedRef } from '../types';
-import type { Node } from '../../types';
+import type { FrameworkResolver, UnresolvedRef } from "../types";
+import type { Node } from "../../types";
 
 function extractTailIdent(expr: string): string | null {
-  const cleaned = expr.replace(/\s+/g, '').replace(/\(\)$/, '');
+  const cleaned = expr.replace(/\s+/g, "").replace(/\(\)$/, "");
   const m = cleaned.match(/(?:\.|^)([A-Za-z_][A-Za-z0-9_]*)$/);
   return m ? m[1] : null;
 }
@@ -776,6 +889,7 @@ git commit -m "feat(express): emit route nodes and route->handler references"
 ## Task 6: Port Laravel, Rails, Spring, Gin (Go), Axum (Rust), ASP.NET (C#), Swift resolvers
 
 **Files:**
+
 - Modify: `src/resolution/frameworks/laravel.ts` / `ruby.ts` / `java.ts` / `go.ts` / `rust.ts` / `csharp.ts` / `swift.ts`
 
 Each framework follows the **same pattern** as Tasks 3–5 above:
@@ -881,6 +995,7 @@ These are UI frameworks where routes map to components, not handlers in the serv
 ## Task 7: Wire framework extraction into `ExtractionOrchestrator`
 
 **Files:**
+
 - Modify: `src/extraction/index.ts` (the per-file extraction result merging path)
 - Modify: `src/extraction/parse-worker.ts` (pass detected frameworks to worker if extraction runs there)
 
@@ -891,53 +1006,59 @@ This is the core wiring change. It runs after each file is parsed by tree-sitter
 Create `__tests__/frameworks-integration.test.ts`:
 
 ```typescript
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import { SolidKG } from '../src';
-import { initGrammars, loadAllGrammars } from '../src/extraction/grammars';
+import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+import { SolidKG } from "../src";
+import { initGrammars, loadAllGrammars } from "../src/extraction/grammars";
 
 beforeAll(async () => {
   await initGrammars();
   await loadAllGrammars();
 });
 
-describe('Django end-to-end', () => {
+describe("Django end-to-end", () => {
   let tmpDir: string;
   afterEach(() => {
     if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it('creates a route->view edge from urls.py to view class', async () => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cg-django-'));
-    fs.writeFileSync(path.join(tmpDir, 'manage.py'), '# marker');
-    fs.writeFileSync(path.join(tmpDir, 'requirements.txt'), 'django==4.2\n');
-    fs.mkdirSync(path.join(tmpDir, 'users'));
-    fs.writeFileSync(path.join(tmpDir, 'users/__init__.py'), '');
-    fs.writeFileSync(path.join(tmpDir, 'users/views.py'),
-      'class UserListView:\n    def get(self, request): pass\n');
-    fs.writeFileSync(path.join(tmpDir, 'users/urls.py'),
-      'from django.urls import path\n' +
-      'from users.views import UserListView\n' +
-      'urlpatterns = [path("users/", UserListView.as_view(), name="user-list")]\n');
+  it("creates a route->view edge from urls.py to view class", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cg-django-"));
+    fs.writeFileSync(path.join(tmpDir, "manage.py"), "# marker");
+    fs.writeFileSync(path.join(tmpDir, "requirements.txt"), "django==4.2\n");
+    fs.mkdirSync(path.join(tmpDir, "users"));
+    fs.writeFileSync(path.join(tmpDir, "users/__init__.py"), "");
+    fs.writeFileSync(
+      path.join(tmpDir, "users/views.py"),
+      "class UserListView:\n    def get(self, request): pass\n",
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "users/urls.py"),
+      "from django.urls import path\n" +
+        "from users.views import UserListView\n" +
+        'urlpatterns = [path("users/", UserListView.as_view(), name="user-list")]\n',
+    );
 
     const cg = new SolidKG(tmpDir);
     await cg.initialize();
     await cg.indexAll();
 
-    const nodes = cg.queries.searchNodes({ kinds: ['route'] });
+    const nodes = cg.queries.searchNodes({ kinds: ["route"] });
     expect(nodes.length).toBeGreaterThan(0);
-    const route = nodes.find(n => n.name === 'users/');
+    const route = nodes.find((n) => n.name === "users/");
     expect(route).toBeDefined();
 
-    const view = cg.queries.getNodesByName('UserListView').find(n => n.kind === 'class');
+    const view = cg.queries
+      .getNodesByName("UserListView")
+      .find((n) => n.kind === "class");
     expect(view).toBeDefined();
 
     const edges = cg.queries.getOutgoingEdges(route!.id);
-    const toView = edges.find(e => e.target === view!.id);
+    const toView = edges.find((e) => e.target === view!.id);
     expect(toView).toBeDefined();
-    expect(toView!.kind).toBe('references');
+    expect(toView!.kind).toBe("references");
 
     await cg.close();
   });
@@ -969,7 +1090,7 @@ if (detectedFrameworks && detectedFrameworks.length > 0) {
       result.errors.push({
         message: `Framework extractor '${fw.name}' failed: ${err instanceof Error ? err.message : String(err)}`,
         filePath,
-        severity: 'warning',
+        severity: "warning",
       });
     }
   }
@@ -1010,6 +1131,7 @@ git commit -m "feat(extraction): run framework extractors after tree-sitter pars
 ## Task 8: Remove dead regex code + update README
 
 **Files:**
+
 - Modify: `src/resolution/frameworks/*.ts` — confirm no dangling `extractNodes` remains
 - Modify: `README.md` — add a section on framework route extraction
 

@@ -1,7 +1,7 @@
 # Upstream CodeGraph v1.3.0 Review
 
-Reviewed range: `v1.0.1...v1.3.0`  
-Reviewed on: 2026-07-07  
+Reviewed range: `v1.0.1...v1.3.0`
+Reviewed on: 2026-07-07
 Upstream: `colbymchenry/codegraph`
 
 Durable action record: `.upstream-watch/reports/v1.0.1-to-v1.3.0.md`

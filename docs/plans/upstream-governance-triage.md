@@ -78,6 +78,6 @@ Resolution for this task: no code change. #120 becomes backlog coordination guid
 
 ## Tracking Summary
 
-* #423: maintainer evaluates or closes a funding solicitation outside code work.
-* #392: maintainer requests clarification for a sparse multilingual product request, then closes or opens a new scoped issue.
-* #120: maintainer uses a protected merge queue checklist before accepting backlog work.
+- #423: maintainer evaluates or closes a funding solicitation outside code work.
+- #392: maintainer requests clarification for a sparse multilingual product request, then closes or opens a new scoped issue.
+- #120: maintainer uses a protected merge queue checklist before accepting backlog work.
