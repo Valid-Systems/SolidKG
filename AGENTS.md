@@ -14,7 +14,7 @@ Use pnpm for local agent work in this repo. The package scripts are npm-compatib
 
 ```bash
 pnpm exec tsc           # TypeScript build/check
-pnpm run copy-assets    # copy schema.sql and *.wasm into dist/
+pnpm run copy-assets    # copy schema.sql and native-grammars.json into dist/
 node -e "require('fs').chmodSync('dist/bin/solidkg.js', 0o755)"  # executable bit
 
 pnpm run dev            # tsc --watch
@@ -22,17 +22,74 @@ pnpm run clean          # rm -rf dist
 
 pnpm test               # vitest run (all)
 pnpm run test:watch
-pnpm run test:eval      # only __tests__/evaluation/
-pnpm run eval           # build then run __tests__/evaluation/runner.ts via tsx
 
 # Single test file / pattern
 pnpm exec vitest run __tests__/installer-targets.test.ts
 pnpm exec vitest run __tests__/extraction.test.ts -t "TypeScript"
 ```
 
-`copy-assets` (called from `build`) copies `src/db/schema.sql` and all `src/extraction/wasm/*.wasm` files into `dist/`. **Any new SQL or grammar wasm must be copied or it won't ship.**
+`copy-assets` (called from `build`) copies `src/db/schema.sql` and `src/extraction/native-grammars.json` into `dist/`. `prepare:native-runtime` stages the host parser libraries in `.native-grammars/<platform>-<arch>`, and `build-bundle.sh` copies that allowlisted set into the platform bundle.
 
-Node engines: `>=24.0.0 <25.0.0`; use Node 24 LTS (v24.16.0) for local development when possible. The CLI hard-blocks Node <24 and Node 25.x unless explicitly overridden (see `src/bin/node-version-check.ts`). Released bundles ship their own Node runtime.
+Node engines: `>=24.0.0`; use Node 24 LTS for local development when possible. The CLI hard-blocks Node <24 unless explicitly overridden (see `src/bin/node-version-check.ts`). Released bundles ship their own Node runtime.
+
+## Public source checkout, repair, and MCP adoption
+
+Use this workflow when an agent is operating in a clone or GitHub source archive on a user's computer. The goal is to prove that the downloaded source is complete before changing any user-level coding-tool configuration.
+
+### Install and prove the checkout
+
+1. Confirm the checkout is running Node 24 and the exact pnpm version in `package.json#packageManager`. If pnpm is unavailable, offer to enable it with Corepack; do not change the user's global toolchain without permission.
+2. Install exactly the committed dependency graph and run the complete deterministic readiness suite:
+
+   ```bash
+   pnpm install --frozen-lockfile
+   pnpm run verify:source:full
+   ```
+
+   `verify:source:full` builds from TypeScript, verifies copied SQL/native grammar metadata and the staged host parser libraries, requires every maintained vendored SCIP source tree, indexes a fresh two-file project with real SQLite and tree-sitter, generates/imports/links a real TypeScript SCIP index, exercises library search, starts the real stdio MCP server, calls `solidkg_explore`, checks agent-install diagnostics are read-only, runs every Vitest file present in the checkout, and validates release-package file lists without publishing. The full internal repository contains additional maintainer-only benchmark/evidence contracts that are absent from the initial public archive.
+3. The top-level `vendored/` directory is part of the public source contract. It contains pinned SolidKG compatibility variants of the SCIP indexers, including SolidKG-specific changes where official upstream behavior diverges from the integration contract. Do not replace them with upstream HEAD or an arbitrary official binary when reproducing or repairing SolidKG behavior. `pnpm run build` does not compile every polyglot indexer: when the user needs a non-bundled SCIP language, use the matching `vendored/scip-*` README/toolchain, expose the command expected by `src/scip/index.ts` on `PATH`, run `solidkg scip generate --path <project>`, and confirm the generated/imported/linked state with `solidkg status <project>`.
+
+Both `vendored/` and `src/extraction/native-grammars.json` must be present in a public source download. The former preserves the supported indexer implementations; the latter is the allowlist used to stage parser libraries from the pinned language-pack release. Never "repair" either with a floating upstream revision, an empty placeholder, or an arbitrary grammar/indexer binary.
+
+### Correct a failed source install
+
+- Wrong Node major: switch to Node 24, remove only this checkout's `node_modules`, rerun `pnpm install --frozen-lockfile`, then rerun the verifier.
+- Wrong pnpm version: use the version pinned by `packageManager`; do not weaken or remove `--frozen-lockfile`.
+- Lockfile mismatch: stop and inspect the manifest/lock diff. A maintainer must deliberately refresh the appropriate lockfile; do not silently regenerate dependency resolutions just to obtain a pass.
+- Missing `src/db/schema.sql` or `src/extraction/native-grammars.json`: treat the download as incomplete and re-clone or re-download the same commit.
+- Missing `vendored/scip-*` source or its license/entrypoint: treat the public source archive as incomplete. Re-download the same commit; do not silently substitute an official upstream checkout because it may not contain SolidKG's compatibility changes.
+- Missing/stale `dist/` metadata or `.native-grammars/<platform>-<arch>` libraries: run `pnpm run build`; if verification still fails, repair the pinned staging/copy path rather than copying parser files manually.
+- Test failure: run the failing Vitest file or named test, fix the underlying source, then rerun `pnpm run verify:source:full`. Do not delete, skip, or loosen a failing test as an installation workaround.
+- Platform-specific failure: reproduce on the real affected platform using the Windows VM or Linux Docker procedure below. A pass on another OS is not equivalent evidence.
+
+### Offer to install SolidKG into the user's coding agent
+
+After the source verifier passes, offer—do not silently perform—the following migration:
+
+1. Identify the coding agent or harness the user actually uses and run the read-only diagnostic first:
+
+   ```bash
+   node dist/bin/solidkg.js install --check --target all --location global
+   ```
+
+2. Explain which config and instruction files would change. If the user wants this source checkout on `PATH`, ask before running `pnpm run install:source`; it writes to the pnpm global package/bin location. A released install may be used instead.
+3. With approval, configure the matching target (`claude`, `cursor`, `codex`, `opencode`, `hermes`, `antigravity`, `omp`, or `kimi`):
+
+   ```bash
+   solidkg install --target <target> --location <global-or-local>
+   ```
+
+   Use `solidkg install --print-config <target>` for a read-only manual snippet when automatic editing is unsupported or the config is malformed.
+4. If an existing CodeGraph or other knowledge-graph MCP server is active, show the user the exact competing entry and obtain approval to disable or remove it after SolidKG works. The installer already migrates recognized legacy CodeGraph entries on supported targets and preserves unrelated sibling servers. Do not delete an unknown MCP server, built-in search tool, instruction file, or user customization merely because it appears graph-related.
+5. Initialize and verify the user's project, restart the coding agent, and make one real graph call:
+
+   ```bash
+   solidkg init -i /path/to/project
+   solidkg status /path/to/project
+   solidkg install --check --target <target> --location <global-or-local>
+   ```
+
+   The acceptance check is that the restarted harness lists `solidkg_explore` and a query returns source plus an answer packet. Only then remove an approved predecessor. If the migration fails, restore the predecessor/config backup and keep the read-only diagnostic output for repair.
 
 ## Architecture
 
@@ -109,7 +166,7 @@ Cursor launches MCP subprocesses with the wrong cwd and doesn't pass `rootUri` i
 
 ## Retrieval performance & dynamic-dispatch coverage (do not regress)
 
-SolidKG's core value is letting an agent answer **structural/flow** questions ("how does X reach Y", trace, impact, callers) with a few **fast** solidkg calls and **zero Read/Grep**. The optimization target is **wall-clock latency + tool-call count** — *don't optimize for token cost*. In the matched OpenCode / `openai/gpt-5.6-sol` comparison, SolidKG used **16.7% fewer tool calls and 15.9% fewer tokens** than CodeGraph across the seven README repositories; both products had zero median Read/Grep/Glob calls in every repository. The matrix has four successful repeats per repository/product cell; see `docs/benchmarks/opencode-head-to-head-2026-07-10.md`. The mechanism that drives everything here: **an agent falls back to Read/Grep the instant a SolidKG answer is insufficient.** So every change is judged by one question — is SolidKG's answer sufficient enough to *stop* the agent from reading?
+SolidKG's core value is letting an agent answer **structural/flow** questions ("how does X reach Y", trace, impact, callers) with a few **fast** solidkg calls and **zero Read/Grep**. The optimization target is **wall-clock latency + tool-call count** — *don't optimize for token cost*. In a maintainer-reported matched OpenCode comparison, SolidKG used **16.7% fewer tool calls and 15.9% fewer tokens** than CodeGraph across seven repositories; both products had zero median Read/Grep/Glob calls in every repository. The supporting benchmark report is intentionally not part of the initial public archive. The mechanism that drives everything here: **an agent falls back to Read/Grep the instant a SolidKG answer is insufficient.** So every change is judged by one question — is SolidKG's answer sufficient enough to *stop* the agent from reading?
 
 **Target behavior:** a flow question resolves in **1 solidkg call on small repos, scaling to 3–5 on large**, with **Read/Grep = 0**. When reviewing a PR or trying something new, do not regress this.
 
@@ -133,7 +190,7 @@ What works is meeting the agent where it already is:
 
 What fails is requiring a fuzzy-input agent to discover precise endpoints before the tool can help. Retrieval must rank useful production evidence from the natural-language question; exact flow rendering remains conservative and activates only when explicit symbols are present.
 
-The remaining lever under this axis is **coverage**: every flow made to connect statically (a new dynamic-dispatch synthesizer) is then surfaced automatically by explore-flow/`trace`, no agent change needed. Reactive/reconciler runtimes (Halo's `ReactiveExtensionClient`, MediatR, Vue Proxy) are the frontier — flows there have no static edges, so nothing surfaces (correctly — silent beats wrong). Full investigation + A/B record: `docs/benchmarks/call-sequence-analysis.md`.
+The remaining lever under this axis is **coverage**: every flow made to connect statically (a new dynamic-dispatch synthesizer) is then surfaced automatically by explore-flow/`trace`, no agent change needed. Reactive/reconciler runtimes (Halo's `ReactiveExtensionClient`, MediatR, Vue Proxy) are the frontier — flows there have no static edges, so nothing surfaces (correctly — silent beats wrong). The supporting A/B record is maintained privately for the initial public release.
 
 ### Explore budget — keep BOTH budgets monotonic with repo size
 
@@ -162,10 +219,10 @@ For each **language × framework**, validate on **small, medium, and large** rea
 
 1. **Pick the canonical flow** for the framework ("how does X reach Y": state→render, request→handler→view, query→SQL, action→reducer→store…).
 2. **Deterministic probes** (`scripts/agent-eval/probe-{trace,node,context,explore}.mjs` against the built `dist/`): `trace(from,to)` connects end-to-end with no break; **no node/hyperedge explosion** (`select count(*) from nodes` and `hyperedges` stable before/after re-index); synthesized-edge and semantic-relation **precision** spot-check (`select … where provenance='heuristic'`).
-3. **Agent A/B** (`scripts/agent-eval/run-all.sh <repo> "<Q>"`): with vs without solidkg, **≥2 runs/arm** (run-to-run variance is large — never conclude from n=1). Record **duration, total tool calls, Read, Grep**. Optional forced-Read-0 sufficiency proof via the block-read hook (`scripts/agent-eval/hook-settings.json`).
-4. **Pass bar:** a normal flow question reaches **~0 Read/Grep within the repo's explore-call budget**, runs **faster** than without-solidkg, and shows **no regression on a control repo**. Record the numbers in `docs/design/dynamic-dispatch-coverage-playbook.md` (the coverage matrix).
+3. **Public pass bar:** the canonical traces connect end-to-end, returned source is sufficient for the named questions, re-indexing does not inflate node/hyperedge counts, and precision spot-checks find no false synthesized links.
+4. The broader agent A/B harness, raw trajectories, and coverage matrix are maintainer-only and intentionally omitted from the initial public archive. Do not present a new performance claim as independently reproducible until those materials are published.
 
-Full playbook + per-mechanism design: `docs/design/dynamic-dispatch-coverage-playbook.md` and `docs/design/callback-edge-synthesis.md`.
+Per-mechanism design: `docs/design/callback-edge-synthesis.md`.
 
 ### Worked example — Excalidraw (TS/React, medium, 643 files)
 
@@ -185,7 +242,7 @@ n=4 unhooked runs/stage, same prompt. After steering flow questions to `solidkg_
 Tests live in `__tests__/` and mirror the module they cover. Notable ones beyond the obvious:
 
 - `installer-targets.test.ts` — parameterized contract suite across all agent targets (see installer notes above).
-- `evaluation/` — `runner.ts` + `test-cases.ts` exercise solidkg against synthetic projects and score the results; run via `pnpm run eval` (builds first). Not part of `pnpm test`.
+- Maintainer-only benchmark/evidence harnesses and scoring fixtures are intentionally omitted from the initial public archive. They are not product test dependencies.
 - `hypergraph-storage.test.ts`, `hypergraph-synthesis.test.ts`, `hypergraph-traversal.test.ts`, `mcp-hyperedges.test.ts` — semantic hyperedge storage, synthesis, traversal, and MCP surfacing.
 - `sqlite-backend.test.ts` — covers the `node:sqlite` adapter and status reporting.
 - `pr19-improvements.test.ts`, `frameworks-integration.test.ts` — regression coverage for specific past PRs/incidents; don't rename these, the names anchor to git history.

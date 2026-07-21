@@ -1,166 +1,133 @@
 # SolidKG
 
 <p align="center">
-  <img width="500" alt="solidkg" src="https://github.com/user-attachments/assets/6c138932-b594-4dd2-8393-62197bc057de" />
+  <img width="500" alt="SolidKG" src="https://github.com/user-attachments/assets/6c138932-b594-4dd2-8393-62197bc057de" />
 </p>
 
-SolidKG turns a source repository into a local SQLite knowledge graph for AI coding agents, CLI workflows, and other tools. It stores deterministic AST-derived facts: files, symbols, calls, imports, references, semantic hyperedges, source snippets, and optional SCIP precise-reference data.
+Our take on a codebase knowledge graph for AI agents. We combined the best ideas we found in respected graph tools and research papers. Tested error-free indexing and use for 118 of the largest and most important OSS codebases.
 
-It is inspired by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), [Cartog](https://github.com/jrollin/cartog), and the Source Code Intelligence Protocol (SCIP).
+Current coverage: **43 language/source modes**, and **25 dedicated framework/runtime resolvers** that connect routes, middleware, controllers and views, UI components, dependency injection, and native bridges instead of leaving the agent to guess from raw AST calls.
 
-## Why use it
+SolidKG creates a database to store deterministic AST-derived facts: files, symbols, calls, imports, references, source chunks, semantic hyperedges, and optional SCIP compiler references. The benchmarks below include the wins, losses, and awkward parts. No spin.
 
-SolidKG is a local-first code knowledge graph designed for structural questions from coding agents. Agents often spend many turns rediscovering structure with `Read`, `Grep`, and shell searches. SolidKG gives them fine-tuned graph tools that answer structural questions directly:
+## Why SolidKG
 
-- where a symbol is defined
-- what calls or is called by a symbol
-- how one function reaches another through direct calls, framework routes, callbacks, UI render paths, or dynamic dispatch
-- what code may be affected by a change
-- what files, packages, and layers exist in a repository
+Our goal was the most correct, useful context without making the agent crawl the repository first. It's not about winning a token-count contest, or bragging about initial indexing speed (useless benchmark for something you build once and update incrementally).
 
-Indexing and retrieval run locally by default. External dense/vector embeddings, vector databases, rerankers, API calls, telemetry, and hybrid retrieval providers are not enabled by default. MCP clients can still send source returned by SolidKG to their configured model provider; use a local model or review that provider's data policy when source must remain on-device.
+SolidKG returns the source behind its answers, shows where synthesized links came from, and says when the evidence is incomplete. The same graph powers tracing and change work: impact analysis, affected tests, snapshots, and architecture views.
 
-## Related tools
+It is still static analysis. Meaning it won't catch reflection, generated code, runtime-only dispatch, and unsupported language tricks. When the graph doesn't, it tells the agent with honesty.
 
-This is a feature-scope comparison, not a universal ranking. It was verified on 2026-07-11 against the linked official snapshots. "Not documented" means the reviewed official sources did not document the capability. It does not prove that a future release lacks it. The Cartog and Tilth rows below describe product scope only, not results from benchmark-corpus repositories.
+## Benchmarks
 
-| Product | Documented focus and storage | Graph navigation | Dynamic dispatch | Semantic hyperedges | SCIP or compiler references | Local semantic or vector behavior |
-|---|---|---|---|---|---|---|
-| [SolidKG](#feature-map) | Per-project SQLite AST graph with ordered semantic hyperedges | Callers, callees, impact, and trace | Synthesized callback, render, and native bridges | Ordered semantic hyperedges | Optional SCIP | Local FTS and source chunks; external vectors disabled by default |
-| [CodeGraph](https://github.com/colbymchenry/codegraph/tree/ecc8b307ac2f8a7d06bff02ee513c4ea2380b2f8) | Per-project SQLite/FTS AST graph | Callers, callees, impact, and explore | Documented synthesized dispatch | Not documented | No official hyperedge or SCIP documentation found | Local FTS documented; vector behavior not documented |
-| [Sverklo](https://github.com/sverklo/sverklo/tree/3156effb9c25147edf7a310e1998f8fd18ee007f) | SQLite and sqlite-vec local semantic search, memory, import/dependency graph, and impact | Import/dependency graph and impact | No dedicated trace documentation found | Not documented | No dedicated SCIP documentation found | sqlite-vec local semantic search; offline after model download |
-| [Cartog](https://github.com/jrollin/cartog/tree/61fd98379e8240455856f167c1ce333f17297bb8) | SQLite tree-sitter graph with incremental Git, SHA, and Merkle indexing | Callers, callees, impact, and static trace | Explicitly unresolved | Not documented | No hyperedge or SCIP documentation found | Optional sqlite-vec and LSP |
-| [Tilth](https://github.com/jahala/tilth/tree/e7ef4647e0f8778491e3327e05c98260ff1b2d05) | tree-sitter and ripgrep local code reading and search | Outline, callers, one-hop callees, and file dependencies | Indirect dispatch unresolved | Not documented | No persistent graph DB, impact, hyperedge, or SCIP documentation found | Local text and structural search; vector behavior not documented |
+The latest run used OpenCode with `openai/gpt-5.6-sol`: ten repositories, seven arms, four repeats per repository/arm, 280 scheduled sessions, and 276 completed. CodeGraph's four .NET Runtime cells were unavailable in our frozen setup.
 
-## Measured results
+| Arm               | Completed | Mean F1 | Mean tokens | Tools/task | Session time | API-equivalent cost |
+| ----------------- | --------: | ------: | ----------: | ---------: | -----------: | ------------------: |
+| No graph baseline |        40 |   97.5% |      96,050 |       15.1 |   **57.9 s** |             $0.2316 |
+| SolidKG core      |        40 |   97.1% |  **72,755** |        4.8 |       67.4 s |         **$0.2124** |
+| SolidKG + SCIP    |        40 |   97.2% |      84,166 |    **4.0** |       59.8 s |         **$0.2179** |
+| CodeGraph         |        36 |   98.0% |      89,552 |       13.8 |       65.6 s |             $0.2249 |
+| Sverklo           |        40 |   98.1% |     109,315 |       15.1 |       78.6 s |             $0.2593 |
+| Cartog            |        40 |   97.4% |     124,735 |       15.9 |       74.0 s |             $0.2789 |
+| Tilth             |        40 |   98.1% |     107,748 |       14.2 |       74.7 s |             $0.2450 |
 
-### Seven-arm matched benchmark
+The short version: graph tools cut the agent's search work. In this benchmark they did not make the complete session faster or improve already-near-ceiling answer quality. Whether that changes real coding outcomes requires longer and more thorough benchmarks.
 
-The most complete local diagnostic used `openai/gpt-5.6-sol` on ten repositories, seven arms, and four repeats per repository-arm cell: 280 scheduled sessions, 276 completed answers, two independent blinded reviews per answer, and separate adjudication of scored-field disagreements. Its raw trajectories and source snapshots are not versioned here, so treat the exact figures as bounded local evidence rather than independently reproducible results.
+- SolidKG core used the fewest mean tokens and had the lowest estimated cost. SolidKG + SCIP used the fewest tools.
+- SolidKG core used 70.0% fewer paired tool calls than baseline; SCIP used 71.0% fewer. Big descriptive drops, but not statistically significant after the predeclared multiple-comparison correction (`Holm p = 0.140625`).
+- None of that made the full task faster. Baseline averaged 57.9 seconds. Core took 67.4; SCIP took 59.8. Every graph arm had a slower mean.
+- The low core token mean was not universal. Paired repository medians were +0.2% for core and +11.5% for SCIP. The VS Code repository in our benchmark was the huge win: 70,897 tokens versus baseline's 268,642.
+- Answer quality was effectively tied. Mean F1 stayed between 97.1% and 98.1%, with zero paired median difference from baseline for every arm.
+- Raw retrieval was not fastest either. Sverklo and Cartog posted lower direct MCP latency medians.
 
-| Arm | Mean answer F1 | Mean tokens | Tools/task | Direct retrieval p50 (cold / warm) |
-|---|---:|---:|---:|---:|
-| Baseline | 97.5% | 96,050 | 15.1 | - |
-| SolidKG core | 97.1% | 72,755 | **4.8** | 5,022 / 1,212 ms |
-| SolidKG + SCIP | 97.2% | 84,166 | **4.0** | 5,402 / 1,081 ms |
-| CodeGraph | 98.0% | 89,552 | 13.8 | 7,290 / 2,349 ms |
-| Sverklo | 98.1% | 109,315 | 15.1 | **200 / 100 ms** |
-| Cartog | 97.4% | 124,735 | 15.9 | 1,351 / **37 ms** |
-| Tilth | 98.1% | 107,748 | 14.2 | 14,844 / 239 ms |
+### Earlier internal runs
 
-Quality was near ceiling and paired median F1 differences from baseline were zero, so this does not support a universal answer-quality winner. SolidKG's clearest descriptive signal was tool economy: core used 70.0% fewer paired tool calls than baseline and SolidKG + SCIP used 71.0% fewer. The raw exact sign-flip p-value was 0.00195, but the predeclared Holm-adjusted value was 0.140625, so the report does not present this as a multiplicity-adjusted statistical finding. Tokens and end-to-end session time varied by repository and did not show a general SolidKG reduction. Sverklo and Cartog had the fastest direct retrieval medians; direct MCP latency and complete model-session time are different endpoints.
+| Run     | What happened                                                                       | Timing                                                                  |
+| ------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| July 10 | SolidKG used 16.7% fewer tools and 15.9% fewer tokens than CodeGraph across 7 repos | Omitted. The concurrent host could not support a fair speed comparison  |
+| July 11 | SolidKG used 34.6% fewer tools and 34.7% fewer tokens across 4 repos                | Nominally 3.3% lower, but concurrent and descriptive. Not a speed claim |
+| July 12 | SolidKG had the lowest mean-token, tools/task, and estimated-cost results           | Neither SolidKG arm beat baseline                                       |
 
-CodeGraph completed 36/40 cells because its four .NET Runtime indexing cells were terminal unavailable in this frozen setup. Sverklo remained available across the corpus; its documented support uses different parser tiers, including tree-sitter-capable support for TS/TSX/JS/Python/Go/Rust/C# and regex fallback for PHP/Java/Ruby and other registered languages.
+These were architecture-explanation tasks, not coding tasks. They say nothing about patch quality, tests, regressions, security work, or human productivity.
 
-See the [readable HTML results](docs/benchmarks/opencode-seven-arm-2026-07-12-presentation.html) for contextual comparison tables and API-equivalent cost estimates. The [full Markdown report](docs/benchmarks/opencode-seven-arm-2026-07-12.md) retains methodology, uncertainty, provenance, and limitations.
+The benchmark reports, raw trajectories, evidence bundles, and source snapshots are intentionally not part of this initial public release. These numbers are maintainer-reported claims and cannot be independently reproduced from this repository alone yet.
 
-### Earlier comparison diagnostics
+### Precision checks
 
-The current seven-arm report supersedes the README summaries of the smaller comparisons. Their evidence remains available for historical and mechanism-specific analysis:
+Here is what the separate 51-repository reference-quality sweep actually found. It was not a competitor benchmark.
 
-- [July 10 SolidKG/CodeGraph comparison](docs/benchmarks/opencode-head-to-head-2026-07-10.md): seven repositories, two products, four repeats.
-- [July 11 expanded comparison](docs/benchmarks/opencode-expanded-head-to-head-2026-07-11.md): Cartog, Tilth, Azure PowerShell, and Airflow, with [compact evidence JSON](docs/benchmarks/evidence/opencode-expanded-2026-07-11.json).
+| Check                            |                                                                                                                    Result |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------: |
+| Route-binding integrity          |                                                                                                      7,218 / 7,923; 91.1% |
+| Source-chunk attachment          |                                                                                                   95,420 / 137,352; 69.5% |
+| Capability-producer completeness |                                                                                                   85,963 / 117,482; 73.2% |
+| Default retrieval probes         | 4 required-source hits; 2 calibrated abstentions; 100% useful-source recall where labeled; 0 misleading-source intrusions |
+| Integrity errors                 |                                                                 0 file errors; 0 dangling edges; 0 duplicate repositories |
 
-### Reference-index diagnostics
+The supporting sweep report is not included in this initial public release. The repository does include the [tested codebases](docs/tested-codebases.md) list.
 
-A separate read-only sweep checks stored graph quality across a broader corpus. It is not a with-vs-without agent benchmark and does not claim universal current-build extraction quality.
+## Install
 
-| Diagnostic                         |                                                 Result |
-| ---------------------------------- | -----------------------------------------------------: |
-| Indexed repositories               |                  52 discovered · 51 measured · 1 empty |
-| Fair cross-file dependent coverage |      31,143 / 93,784 · 33.2% micro · 42.2% repo median |
-| Fair semantic dependent coverage   |      28,319 / 93,784 · 30.2% micro · 39.5% repo median |
-| Route-handler linkage              |                                 7,922 / 12,424 · 63.8% |
-| Route-binding integrity            |                                  7,218 / 7,923 · 91.1% |
-| Source-chunk attachment            |                              95,420 / 137,352 · 69.5% |
-| SCIP document coverage             |                                6,824 / 117,482 · 5.8% |
-| SCIP linked-node coverage          |                            25,506 / 1,122,980 · 2.3% |
-| Capability-producer completeness  |                              85,963 / 117,482 · 73.2% |
-| Graded default-surface probes      | 6 probes · 5 repeats each · 4 required-source hits · 2 calibrated abstentions · 100% useful-source recall where labeled · 0 misleading-source intrusions |
-| Integrity burden                   |             0 file errors · 0 dangling edges · 0 duplicate repositories |
-
-The graded probes include long, terse, and counterfactual forms on Airflow and Azure PowerShell. The four ordinary prompts returned their required production file. The two counterfactual prompts did not recover the required file, but now return a partial `missing_query_concept` packet rather than falsely claiming sufficiency. Across the six paired probes, median payload fell from 32,750 to 31,148 bytes (4.9%); this is a direct tool-output diagnostic, not an agent-task benchmark.
-
-See [`docs/benchmarks/research-integration-2026-07-10.md`](docs/benchmarks/research-integration-2026-07-10.md) for the research-to-implementation presentation, before/after interpretation, graph-invariance evidence, and remaining retrieval gap.
-
-Full definitions, per-language results, provenance, availability states, and repository rows are in [`docs/benchmarks/reference-quality-baseline.md`](docs/benchmarks/reference-quality-baseline.md). The methodology and claim boundary are in [`docs/benchmarks/reference-quality-sweep.md`](docs/benchmarks/reference-quality-sweep.md).
-
-## Quick start
-
-Install the published CLI:
+Requires Node.js 24.
 
 ```bash
 npm install -g solidkg
-solidkg --help
-```
-
-Index a project and ask for graph context:
-
-```bash
-solidkg init -i /path/to/project
-solidkg status /path/to/project
-solidkg context "how does auth work?" --path /path/to/project
-```
-
-Configure supported coding agents:
-
-```bash
+cd /path/to/project
 solidkg install
+solidkg init -i .
+solidkg status .
 ```
 
-The default MCP profile exposes only `solidkg_explore`. Give it a natural-language structural question or precise symbol/file terms; it returns ranked production source and graph evidence in one answer-producing call. Advanced tools remain available through an explicit full profile:
+`solidkg install` configures Claude Code, Cursor, Codex CLI, opencode, Hermes Agent, Antigravity, OMP / Pi, and Kimi Code.
+
+### Install from a GitHub checkout
+
+GitHub source archives include the pinned, SolidKG-maintained SCIP indexer sources under `vendored/`, the native parser manifest at `src/extraction/native-grammars.json`, and `src/db/schema.sql`. The first build stages the host platform's parser libraries from the pinned language-pack release; runtime indexing never downloads grammars. Unpublished benchmark/evidence documents, harnesses, and fixtures are omitted because they are not product inputs.
+
+```bash
+git clone https://github.com/Valid-Systems/SolidKG.git
+cd SolidKG
+corepack enable pnpm
+pnpm install --frozen-lockfile
+pnpm run verify:source:full
+```
+
+The pinned source toolchain is Node 24 plus the exact pnpm version in `package.json`. With permission to modify the user's global pnpm bin, `pnpm run install:source` makes this verified checkout's `solidkg` command available to coding agents. Run `solidkg install --check` before changing any harness configuration.
+
+### Why SolidKG ships maintained SCIP indexers
+
+The repositories under `vendored/` are not disposable examples and are not interchangeable with whatever happens to be the latest official release. They are pinned SolidKG compatibility variants: they preserve the command-line, output-file, project-root, symbol-encoding, and cross-platform behavior that SolidKG expects, including SolidKG-specific changes where upstream behavior diverges. Shipping the source makes the supported variants auditable and reproducible and prevents an unrelated upstream update from silently changing SolidKG behavior.
+
+The original projects remain the upstream authors and copyright holders; their licenses and notices are retained in each directory. Upstream fixes should be deliberately ported and retested rather than replacing these trees wholesale. See [`vendored/README.md`](vendored/README.md) for the source map and expected integration commands.
+
+`pnpm run build` builds SolidKG and its bundled TypeScript SCIP integration; it does not compile every polyglot indexer. For another language, build the matching maintained source with that project's documented toolchain, place its expected command on `PATH`, and then run `solidkg scip generate --path .`. Existing `.scip` output can be loaded with `solidkg scip import <file> --path .`.
+
+## Use it
+
+The default MCP profile exposes one tool: `solidkg_explore`. Ask a normal structural question. It returns ranked source and graph evidence in one response.
+
+```bash
+solidkg context "how does auth work?" --path .
+solidkg callers UserService --path .
+solidkg impact UserService --path .
+solidkg affected src/foo.ts --path .
+solidkg architecture analyze --path .
+```
+
+Need the full MCP surface for trace, SCIP, snapshots, architecture, status, search, or context?
 
 ```bash
 SOLIDKG_MCP_TOOLS=all solidkg serve --mcp
 ```
 
-Supported installer targets: Claude Code, Cursor, Codex CLI, opencode, Hermes Agent, Antigravity, OMP / Pi coding agent, and Kimi Code.
+Run `solidkg <command> --help` for everything else.
 
-Keep the index outside the source tree when needed:
+### Retrieval behavior
 
-```bash
-solidkg init -i --data-dir /local/solidkg-data/project-a /path/to/project
-```
+Local source-body/code-token chunks can seed or boost retrieval and appear as the `source_body_chunk` ranking reason; exact symbols, paths, flow evidence, semantic relations, and SCIP facts still rank higher. External dense/vector embeddings, vector databases, rerankers, and hybrid retrieval providers are not enabled by default; optional hybrid retrieval seams remain disabled.
 
-## Feature map
-
-| Area                | What SolidKG provides                                                                                                                                                                                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local graph         | SQLite storage for files, symbols, edges, semantic hyperedges, source chunks, snapshots, architecture reports, and optional SCIP facts.                                                                                                                                               |
-| MCP tools           | The compact/default MCP profile exposes only answer-producing `solidkg_explore`. `SOLIDKG_MCP_TOOLS=all` restores `solidkg_search`, `solidkg_context`, `solidkg_trace`, `solidkg_node`, `solidkg_callers`, `solidkg_callees`, `solidkg_impact`, `solidkg_files`, `solidkg_status`, `solidkg_snapshot`, `solidkg_architecture`, and `solidkg_precise_refs` when SCIP data is present. |
-| CLI                 | Project init/index/sync/status, repository overview, symbol queries, context, callers/callees, impact, affected-test discovery, snapshots, architecture rollups, SCIP generate/import, MCP server, install/uninstall, and stale-lock recovery.                                        |
-| TypeScript API      | Initialize/open projects, index/sync/watch, search nodes, traverse callers/callees/impact, build context, render overviews, inspect hyperedges, manage snapshots, analyze architecture, and import/generate SCIP.                                                                     |
-| Agent install       | Idempotent MCP configuration and provider-neutral instructions for supported agents, preserving existing comments and sibling config where formats allow it.                                                                                                                          |
-| Flow coverage       | Static calls plus validated framework/dynamic-dispatch links for routes, event channels, UI render chains, callbacks, native bridges, and type contracts.                                                                                                                             |
-| Retrieval evidence  | Answer packets, source-completeness labels, capability footprints, counterfactual concept coverage, and `source_body_chunk` ranking reasons from persisted local source-body/code-token chunks; exact symbol/path/trace evidence remains higher priority. Explicit exclusions are constraints, and uncovered concepts produce a partial `missing_query_concept` packet. |
-| Local-first posture | No network retrieval, embeddings, reranking services, API keys, or telemetry in the default graph/query path.                                                                                                                                                                         |
-
-Static analysis still has limits. Generated code, reflection-heavy systems, anonymous closures outside validated patterns, and runtime-only dispatch can still require direct source inspection.
-
-## Common commands
-
-```bash
-solidkg init -i [path]                 # initialize and index
-solidkg index [path]                  # full graph rebuild
-solidkg sync [path]                   # incremental update after edits
-solidkg status [path]                 # index health, counts, SCIP state
-solidkg files --format overview --path [path]
-solidkg overview [path]
-solidkg query "UserService" --path [path]
-solidkg context "task" --path [path]
-solidkg callers UserService --path [path]
-solidkg callees UserService --path [path]
-solidkg impact UserService --path [path]
-solidkg affected src/foo.ts --path [path]
-solidkg snapshot create before-refactor --path [path]
-solidkg architecture analyze --path [path]
-solidkg scip generate --path [path]
-solidkg scip import index.scip --path [path]
-solidkg serve --mcp
-solidkg unlock [path]
-```
-
-Run `solidkg <command> --help` for command-specific options.
+Explicit exclusions such as "not tests" are retrieval constraints, not positive search terms. A `missing_query_concept` label means the returned source did not cover every explicit counterfactual concept, so the answer packet is intentionally partial.
 
 ## TypeScript API
 
@@ -168,113 +135,32 @@ Run `solidkg <command> --help` for command-specific options.
 import SolidKG from "solidkg";
 
 const graph = await SolidKG.init("/path/to/project", { index: true });
-
 const matches = graph.searchNodes("UserService");
 const impact = graph.getImpactRadius("UserService");
-const overview = graph.getOverviewText({ maxDepth: 2, expandPaths: ["src"] });
-
-console.log(matches.length, impact.length, overview);
-
 graph.close();
 ```
 
-The API covers the same core surfaces as the CLI/MCP server: indexing, syncing, graph traversal, context building, overview projection, hyperedges, snapshots, architecture reports, and SCIP import/generation.
+The API also covers sync/watch, context, overviews, hyperedges, snapshots, architecture, and SCIP.
 
-## SCIP support
+## Coverage
 
-SCIP data is optional and additive. SolidKG can generate or import `.scip` indexes, link SCIP symbols back to graph nodes, and expose compiler-grade definitions, references, implementations, and type-definition relationships when the data exists.
+The 43 modes are 41 symbol-extraction modes plus YAML and Twig file/framework tracking. The 25 framework/runtime resolvers detect conventions, resolve framework-specific references, create route and middleware nodes, connect them to handlers, and emit semantic relation hints for higher-order flows.
 
-The low SCIP percentages in the reference-index diagnostic describe **data availability in a mixed historical corpus**, not a failed integration. Most stored indexes were created before SCIP was generated/imported for them or on machines without the matching external indexer. Normal AST indexing remains complete without SCIP.
-
-Default indexer commands:
-
-| Language              | Command           |
-| --------------------- | ----------------- |
-| TypeScript/JavaScript | `scip-typescript` |
-| Go                    | `scip-go`         |
-| Rust                  | `scip-rust`       |
-| Python                | `scip-python`     |
-| C#                    | `scip-dotnet`     |
-
-If an indexer is missing or no SCIP file is imported, the AST graph still works.
-
-- `solidkg init -i` uses SCIP `auto`: it imports generated data when a supported indexer is installed and otherwise continues with the AST graph.
-- `solidkg index` and the library `indexAll()` default to SCIP `off`; pass `--scip auto` to opt in or `--scip required` to fail when generation is unavailable.
-- `solidkg scip generate`, `solidkg scip import`, `solidkg status`, and `solidkg_precise_refs` provide explicit generation, import, health, and query surfaces.
-
-The remaining SCIP work is measurement and coverage, not basic plumbing: rebuild a pinned corpus with the current build and installed indexers, then improve symbol-to-AST linking only where that fresh run still reports low linked-node coverage.
-
-## Supported code
-
-SolidKG extracts symbols for ArkTS, Astro, Bash, C/C++, C#, Dart, Fortran, Go, Groovy, HCL/Terraform, Java, JavaScript/JSX, Jinja/HTML, Julia, Kotlin, Liquid, Lua/Luau, Nix, Objective-C/C++, Pascal/Delphi, PHP, PowerShell, Python, R, Razor, Ruby, Rust, Scala, SCL, Solidity, SQL, Svelte, Swift, SystemVerilog, TypeScript/TSX, VB.NET, and Vue.
-
-It also tracks Twig, YAML, and XML at file/framework level. Framework resolvers add routes and relationships for Express, Hono, Django, Flask, FastAPI, Rails, Laravel, Spring, Gin, Axum, ASP.NET, Vapor, React Router, SvelteKit, Vue/Nuxt, NestJS, and Drupal.
-
-Capability notes, measured benchmark summaries, validated repositories, and known frontiers live in:
-
-- [`docs/code-intelligence-capabilities.md`](docs/code-intelligence-capabilities.md)
-- [`docs/tested-codebases.md`](docs/tested-codebases.md)
-- [`docs/benchmarks/`](docs/benchmarks/)
-- [`docs/design/dynamic-dispatch-coverage-playbook.md`](docs/design/dynamic-dispatch-coverage-playbook.md)
+Exact lists and known gaps: [language registry](src/types.ts), [framework registry](src/resolution/frameworks/index.ts), and [capability matrix](docs/code-intelligence-capabilities.md).
 
 ## Development
 
-Requirements:
-
-- Node.js `>=24.0.0 <25.0.0`
-- pnpm
-
-From source:
-
 ```bash
-pnpm install
-pnpm run build
-node dist/bin/solidkg.js --help
+pnpm install --frozen-lockfile
+pnpm run verify:source:full
 ```
 
-Useful checks:
+`verify:source:full` builds the CLI, checks the SQL/native-parser metadata and host parser cache, indexes a fresh fixture, exercises the real stdio MCP server and `solidkg_explore`, runs the public product test suite, and validates release-package contents without publishing. Maintainer-only benchmark/evidence document contracts are not part of that public suite.
 
-```bash
-pnpm exec tsc
-pnpm test
-pnpm exec vitest run __tests__/installer-targets.test.ts
-```
+The repository root is marked `private: true`. Releases are generated as npm shims and per-platform bundles by GitHub Actions. Do not publish the root package directly.
 
-`pnpm run build` compiles TypeScript, copies `src/db/schema.sql` and tree-sitter WASM assets into `dist/`, strips CLI bin comments, and marks the built CLI executable.
+## License
 
-Published installs use small npm launcher packages plus per-platform release bundles. The bundles include Node 24, the compiled app, schema files, tree-sitter WASM grammars, and production dependencies.
+SolidKG is available under the [SolidKG Evaluation and Personal Use License](LICENSE). It allows a 15-day honor-based evaluation and personal, non-commercial use. Commercial use after the evaluation requires a separate commercial license.
 
-## Troubleshooting
-
-Use Node 24 for source installs:
-
-```bash
-node --version
-```
-
-If results look stale:
-
-```bash
-solidkg sync /path/to/project
-solidkg status /path/to/project
-```
-
-If a lock file is stale:
-
-```bash
-solidkg unlock /path/to/project
-```
-
-If indexing stops or appears stalled, inspect the lifecycle diagnostic in the index data directory:
-
-```text
-<data-dir>/index-lifecycle.json
-```
-
-`index` and the initial index run by `init -i` attempt to update this record immediately through a random exclusive temporary file followed by atomic replacement. On successful publication, phase, detail, completion, and terminal state replace the previous record atomically. Counts during a running index are periodically checkpointed, so they reflect the latest successful checkpoint rather than the instant you inspect the file. Where POSIX modes apply, it is owner-only. It can include absolute paths and stack traces, so treat it as sensitive diagnostic output and review it before sharing.
-
-On Windows network drives or SMB shares, put `--data-dir` on a local disk to avoid SQLite locking issues.
-
-## License notices
-
-Third-party notices are kept in [`docs/THIRD_PARTY_LICENSES.md`](docs/THIRD_PARTY_LICENSES.md) and [`docs/third-party-licenses/`](docs/third-party-licenses/).
+Third-party notices: [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md) and [docs/third-party-licenses/](docs/third-party-licenses/).
