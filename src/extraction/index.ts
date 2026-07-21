@@ -37,29 +37,22 @@ import type { IndexProfile } from '../profiling';
  */
 const FILE_IO_BATCH_SIZE = 10;
 
-// PARSER_RESET_INTERVAL moved to parse-worker.ts (runs in worker thread)
-
 /**
  * Maximum time (ms) to wait for a single file to parse in the worker thread.
- * If tree-sitter hangs or WASM runs out of memory, this prevents the entire
+ * If tree-sitter hangs, this prevents the entire
  * indexing run from freezing. The worker is restarted after a timeout.
  */
 const PARSE_TIMEOUT_MS = 10_000;
 const MAX_PARSE_TIMEOUT_MS = 30_000;
 
 /**
- * Number of files to parse before recycling the worker thread.
- * WASM linear memory can grow but NEVER shrink (WebAssembly spec limitation).
- * The only way to reclaim tree-sitter's WASM heap is to destroy the entire
- * V8 isolate by terminating the worker thread and spawning a fresh one.
- * This interval balances memory usage against the cost of reloading grammars.
+ * Number of files to parse before recycling the worker thread. This bounds
+ * native parser allocations during large indexing runs.
  */
 const WORKER_RECYCLE_INTERVAL = 250;
 
 /**
- * Large files are the ones most likely to trip over accumulated tree-sitter
- * WASM state. Give them a fresh worker instead of spending the whole timeout
- * budget on a parser heap that already grew on earlier files.
+ * Large files get a fresh worker instead of sharing accumulated parser state.
  */
 export const LARGE_FILE_FRESH_WORKER_BYTES = 256 * 1024;
 
@@ -1023,7 +1016,7 @@ export class ExtractionOrchestrator {
     }
 
     // --- Worker lifecycle management ---
-    // The worker can crash (OOM in WASM) or hang on pathological files.
+    // The worker can crash or hang on pathological files.
     // We track pending parse promises and handle both cases:
     //   - Timeout: terminate + restart the worker, reject the timed-out request
     //   - Crash: reject all pending promises, restart for remaining files
@@ -1098,7 +1091,7 @@ export class ExtractionOrchestrator {
     }
 
     /**
-     * Recycle the worker thread to reclaim WASM memory.
+     * Recycle the worker thread to reclaim parser memory.
      * Terminates the current worker and clears the reference so
      * ensureWorker() will spawn a fresh one on the next call.
      */
@@ -1108,7 +1101,7 @@ export class ExtractionOrchestrator {
       const w = parseWorker;
       parseWorker = null;
       workerParseCount = 0;
-      // Fire-and-forget: worker.terminate() can hang if WASM is stuck
+      // Fire-and-forget: worker.terminate() can hang if native parsing is stuck
       w.terminate().catch(() => {});
     }
 
@@ -1124,8 +1117,7 @@ export class ExtractionOrchestrator {
       }
 
       // Recycle the worker before the next parse if we've hit the threshold.
-      // This destroys the WASM linear memory (which can grow but never shrink)
-      // and starts a fresh worker with a clean heap.
+      // This starts a fresh worker with clean parser state.
       if (
         workerParseCount >= WORKER_RECYCLE_INTERVAL ||
         shouldRecycleWorkerForLargeFile(content.length, workerParseCount)
@@ -1145,7 +1137,7 @@ export class ExtractionOrchestrator {
         const timer = setTimeout(() => {
           pendingParses.delete(id);
           log(`TIMEOUT: ${filePath} exceeded ${timeoutMs}ms — killing worker`);
-          // Reject FIRST — worker.terminate() can hang if WASM is stuck
+          // Reject first because terminating a stuck worker can take time.
           parseWorker = null;
           workerParseCount = 0;
           reject(new Error(`Parse timed out after ${timeoutMs}ms`));
@@ -1235,7 +1227,7 @@ export class ExtractionOrchestrator {
 
         // Honour MAX_FILE_SIZE. Without this check, vendored generated
         // headers, minified bundles, and other multi-MB files get indexed,
-        // wasting WASM heap and the worker recycle budget on inputs with no
+        // wasting parser memory and the worker recycle budget on inputs with no
         // useful symbols. The single-file extractFile path already enforces
         // this; the bulk path used to silently skip the check.
         const maxFileSizeBytes = this.maxFileSizeBytes();
@@ -1345,16 +1337,14 @@ export class ExtractionOrchestrator {
     // so synchronous work here blocks the animation from rendering.
     await new Promise(resolve => setImmediate(resolve));
 
-    // Retry pass: files that failed due to WASM memory corruption may succeed
-    // on a fresh worker with a clean heap. Recycle before each attempt so
-    // every file gets the absolute cleanest WASM state possible.
+    // Retry files whose worker exited unexpectedly on a fresh worker.
     const retryableErrors = errors.filter(
       (e) => e.code === 'parse_error' && e.filePath &&
-        (e.message.includes('Worker exited') || e.message.includes('memory access out of bounds'))
+        e.message.includes('Worker exited')
     );
 
     if (retryableErrors.length > 0 && WorkerClass) {
-      log(`Retrying ${retryableErrors.length} files that failed due to WASM memory errors...`);
+      log(`Retrying ${retryableErrors.length} files whose parse worker exited...`);
 
       const stillFailing: typeof retryableErrors = [];
 
@@ -1362,7 +1352,7 @@ export class ExtractionOrchestrator {
         const filePath = errEntry.filePath!;
         if (signal?.aborted) break;
 
-        // Fresh worker for every retry — maximum WASM headroom
+        // Use a fresh worker for every retry.
         recycleWorker();
 
         let content: string;
@@ -1403,7 +1393,7 @@ export class ExtractionOrchestrator {
       }
 
       // Last resort: for files that still crash on a clean worker, strip
-      // comment-only lines to reduce WASM memory pressure. Many compiler
+      // comment-only lines to reduce parser memory pressure. Many compiler
       // test files are 90%+ comments (CHECK directives) that don't contribute
       // code nodes but consume parser memory.
       if (stillFailing.length > 0) {
@@ -1765,7 +1755,7 @@ export class ExtractionOrchestrator {
    * `git pull`/`checkout`/`merge`/`rebase` that `git status` cannot see.
    */
   async sync(onProgress?: (progress: IndexProgress) => void): Promise<SyncResult> {
-    await initGrammars(); // Initialize WASM runtime (grammars loaded lazily below)
+    await initGrammars();
     const startTime = Date.now();
     let filesChecked = 0;
     let filesAdded = 0;

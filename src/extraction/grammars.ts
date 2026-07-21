@@ -1,56 +1,58 @@
 /**
  * Grammar Loading and Caching
  *
- * Uses web-tree-sitter (WASM) for universal cross-platform support.
- * Grammars are loaded lazily — only languages actually present in the project
- * are compiled, keeping V8 WASM memory pressure low on large codebases.
+ * Grammars are loaded lazily from the native libraries staged with SolidKG.
  */
 
+import * as fs from 'fs';
 import * as path from 'path';
-import { Parser, Language as WasmLanguage } from 'web-tree-sitter';
-import { Language } from '../types';
+import {
+  configure as configureLanguagePack,
+  getParser as getNativeParser,
+} from '@xberg-io/tree-sitter-language-pack';
+import type { Language } from '../types';
+import { Parser } from './native-tree-sitter';
+import nativeGrammars from './native-grammars.json';
 
 export type GrammarLanguage = Exclude<Language, 'svelte' | 'vue' | 'liquid' | 'astro' | 'jinja' | 'razor' | 'arkts' | 'scl' | 'yaml' | 'twig' | 'unknown'>;
 
-/**
- * WASM filename map — maps each language to its .wasm grammar file
- * in the tree-sitter-wasms package.
- */
-const WASM_GRAMMAR_FILES: Record<GrammarLanguage, string> = {
-  typescript: 'tree-sitter-typescript.wasm',
-  tsx: 'tree-sitter-tsx.wasm',
-  javascript: 'tree-sitter-javascript.wasm',
-  jsx: 'tree-sitter-javascript.wasm',
-  python: 'tree-sitter-python.wasm',
-  go: 'tree-sitter-go.wasm',
-  rust: 'tree-sitter-rust.wasm',
-  java: 'tree-sitter-java.wasm',
-  c: 'tree-sitter-c.wasm',
-  cpp: 'tree-sitter-cpp.wasm',
-  csharp: 'tree-sitter-c_sharp.wasm',
-  php: 'tree-sitter-php.wasm',
-  ruby: 'tree-sitter-ruby.wasm',
-  swift: 'tree-sitter-swift.wasm',
-  kotlin: 'tree-sitter-kotlin.wasm',
-  dart: 'tree-sitter-dart.wasm',
-  pascal: 'tree-sitter-pascal.wasm',
-  scala: 'tree-sitter-scala.wasm',
-  lua: 'tree-sitter-lua.wasm',
-  luau: 'tree-sitter-luau.wasm',
-  objc: 'tree-sitter-objc.wasm',
-  systemverilog: 'tree-sitter-systemverilog.wasm',
-  julia: 'tree-sitter-julia.wasm',
-  fortran: 'tree-sitter-fortran.wasm',
-  r: 'tree-sitter-r.wasm',
-  groovy: 'tree-sitter-groovy.wasm',
-  vbnet: 'tree-sitter-vb_dotnet.wasm',
-  sql: 'tree-sitter-sql.wasm',
-  hcl: 'tree-sitter-terraform.wasm',
-  nix: 'tree-sitter-nix.wasm',
-  solidity: 'tree-sitter-solidity.wasm',
-  bash: 'tree-sitter-bash.wasm',
-  powershell: 'tree-sitter-powershell.wasm',
-};
+type NativeGrammarConfig = Readonly<{
+  packageName: string;
+  libraryName: string;
+}>;
+
+const NATIVE_GRAMMARS: Record<GrammarLanguage, NativeGrammarConfig> = nativeGrammars;
+const GRAMMAR_LANGUAGES: readonly GrammarLanguage[] = [
+  'typescript', 'tsx', 'javascript', 'jsx', 'python', 'go', 'rust', 'java',
+  'c', 'cpp', 'csharp', 'php', 'ruby', 'swift', 'kotlin', 'dart', 'pascal',
+  'scala', 'lua', 'luau', 'objc', 'systemverilog', 'julia', 'fortran', 'r',
+  'groovy', 'vbnet', 'sql', 'hcl', 'nix', 'solidity', 'bash', 'powershell',
+];
+
+function isGrammarLanguage(language: Language): language is GrammarLanguage {
+  return Object.prototype.hasOwnProperty.call(NATIVE_GRAMMARS, language);
+}
+
+function nativeLibraryFileName(libraryName: string): string {
+  if (process.platform === 'win32') return `tree_sitter_${libraryName}.dll`;
+  if (process.platform === 'darwin') return `libtree_sitter_${libraryName}.dylib`;
+  return `libtree_sitter_${libraryName}.so`;
+}
+
+function grammarDirectoryCandidates(): readonly string[] {
+  const target = `${process.platform}-${process.arch}`;
+  return [
+    process.env.SOLIDKG_NATIVE_GRAMMAR_DIR,
+    path.join(__dirname, 'native', target),
+    path.resolve(__dirname, '..', '..', '.native-grammars', target),
+  ].filter((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0);
+}
+
+function hasAllNativeGrammars(directory: string): boolean {
+  return GRAMMAR_LANGUAGES.every((language) =>
+    fs.existsSync(path.join(directory, nativeLibraryFileName(NATIVE_GRAMMARS[language].libraryName)))
+  );
+}
 
 /**
  * File extension to Language mapping
@@ -181,27 +183,31 @@ export function isPlayRoutesFile(filePath: string): boolean {
  * Caches for loaded grammars and parsers
  */
 const parserCache = new Map<Language, Parser>();
-const languageCache = new Map<Language, WasmLanguage>();
+const loadedLanguages = new Set<Language>();
 const unavailableGrammarErrors = new Map<Language, string>();
 
 let parserInitialized = false;
 
 /**
- * Initialize the tree-sitter WASM runtime. Must be called before loading grammars.
- * Does NOT load any grammar WASM files — use loadGrammarsForLanguages() for that.
+ * Initialize the native tree-sitter runtime against SolidKG's staged grammar set.
  * Idempotent — safe to call multiple times.
  */
 export async function initGrammars(): Promise<void> {
   if (parserInitialized) return;
-
-  await Parser.init();
-
+  const cacheDir = grammarDirectoryCandidates().find(hasAllNativeGrammars);
+  if (!cacheDir) {
+    throw new Error(
+      `SolidKG native grammar assets are missing for ${process.platform}-${process.arch}. ` +
+      'Reinstall SolidKG or run pnpm run prepare:native-runtime from a source checkout.'
+    );
+  }
+  configureLanguagePack({ cacheDir });
   parserInitialized = true;
 }
 
 /**
- * Load grammar WASM files for specific languages only.
- * Skips languages that are already loaded or have no WASM grammar.
+ * Load native grammars for specific languages only.
+ * Skips languages that are already loaded or use a standalone extractor.
  * Must be called after initGrammars().
  */
 export async function loadGrammarsForLanguages(languages: Language[]): Promise<void> {
@@ -209,32 +215,17 @@ export async function loadGrammarsForLanguages(languages: Language[]): Promise<v
     await initGrammars();
   }
 
-  // Deduplicate and filter to languages that have WASM grammars and aren't already loaded
   const toLoad = [...new Set(languages)].filter(
     (lang): lang is GrammarLanguage =>
-      lang in WASM_GRAMMAR_FILES &&
-      !languageCache.has(lang) &&
+      isGrammarLanguage(lang) &&
+      !loadedLanguages.has(lang) &&
       !unavailableGrammarErrors.has(lang)
   );
 
-  // Load grammars sequentially to avoid web-tree-sitter WASM race condition on Node 20+
-  // See: https://github.com/tree-sitter/tree-sitter/issues/2338
   for (const lang of toLoad) {
-    const wasmFile = WASM_GRAMMAR_FILES[lang];
     try {
-      // Some grammars ship their own WASMs (not in tree-sitter-wasms, or the
-      // tree-sitter-wasms build is too old). Lua: tree-sitter-wasms ships an
-      // ABI-13 build that corrupts the shared WASM heap under web-tree-sitter
-      // 0.25 (drops nested calls/imports on every file after the first); we
-      // vendor the upstream ABI-15 wasm instead. Bash also uses the vendored
-      // upstream wasm because the tree-sitter-wasms build imports external
-      // scanner functions as GOT globals, which web-tree-sitter 0.25 resolves
-      // as non-callable values for case/heredoc/arithmetic syntax.
-      const wasmPath = (lang === 'pascal' || lang === 'scala' || lang === 'lua' || lang === 'luau' || lang === 'systemverilog' || lang === 'julia' || lang === 'fortran' || lang === 'r' || lang === 'groovy' || lang === 'vbnet' || lang === 'sql' || lang === 'hcl' || lang === 'nix' || lang === 'bash' || lang === 'powershell')
-        ? path.join(__dirname, 'wasm', wasmFile)
-        : require.resolve(`tree-sitter-wasms/out/${wasmFile}`);
-      const language = await WasmLanguage.load(wasmPath);
-      languageCache.set(lang, language);
+      parserCache.set(lang, new Parser(getNativeParser(NATIVE_GRAMMARS[lang].packageName)));
+      loadedLanguages.add(lang);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[SolidKG] Failed to load ${lang} grammar — parsing will be unavailable: ${message}`);
@@ -244,12 +235,11 @@ export async function loadGrammarsForLanguages(languages: Language[]): Promise<v
 }
 
 /**
- * Load ALL grammar WASM files. Convenience function for tests and
+ * Load every native grammar. Convenience function for tests and
  * backward compatibility. Prefer loadGrammarsForLanguages() in production.
  */
 export async function loadAllGrammars(): Promise<void> {
-  const allLanguages = Object.keys(WASM_GRAMMAR_FILES) as GrammarLanguage[];
-  await loadGrammarsForLanguages(allLanguages);
+  await loadGrammarsForLanguages([...GRAMMAR_LANGUAGES]);
 }
 
 /**
@@ -264,19 +254,23 @@ export function isGrammarsInitialized(): boolean {
  * Returns synchronously from pre-loaded cache.
  */
 export function getParser(language: Language): Parser | null {
-  if (parserCache.has(language)) {
-    return parserCache.get(language)!;
-  }
-
-  const lang = languageCache.get(language);
-  if (!lang) {
+  const cached = parserCache.get(language);
+  if (cached) return cached;
+  if (!parserInitialized || !isGrammarLanguage(language) || unavailableGrammarErrors.has(language)) {
     return null;
   }
 
-  const parser = new Parser();
-  parser.setLanguage(lang);
-  parserCache.set(language, parser);
-  return parser;
+  try {
+    const parser = new Parser(getNativeParser(NATIVE_GRAMMARS[language].packageName));
+    parserCache.set(language, parser);
+    loadedLanguages.add(language);
+    return parser;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[SolidKG] Failed to load ${language} grammar — parsing will be unavailable: ${message}`);
+    unavailableGrammarErrors.set(language, message);
+    return null;
+  }
 }
 
 /**
@@ -331,7 +325,7 @@ export function isLanguageSupported(language: Language): boolean {
   if (language === 'yaml') return true; // file-level tracking only; Drupal routing extraction via framework resolver
   if (language === 'twig') return true; // file-level tracking only
   if (language === 'unknown') return false;
-  return language in WASM_GRAMMAR_FILES;
+  return isGrammarLanguage(language);
 }
 
 /**
@@ -342,29 +336,14 @@ export function isGrammarLoaded(language: Language): boolean {
   if (language === 'astro' || language === 'jinja' || language === 'razor') return true;
   if (language === 'arkts' || language === 'scl') return true;
   if (language === 'yaml' || language === 'twig') return true; // no WASM grammar needed
-  return languageCache.has(language);
+  return loadedLanguages.has(language);
 }
 
 /**
  * Get all supported languages (those with grammar definitions).
  */
 export function getSupportedLanguages(): Language[] {
-  return [...(Object.keys(WASM_GRAMMAR_FILES) as GrammarLanguage[]), 'svelte', 'vue', 'liquid', 'astro', 'jinja', 'razor', 'arkts', 'scl'];
-}
-
-/**
- * Reset the cached parser for a language to reclaim WASM heap memory.
- * The tree-sitter WASM runtime accumulates fragmented memory over thousands
- * of parses. Deleting and recreating the Parser instance forces the WASM
- * heap to reset, preventing "memory access out of bounds" crashes in
- * large repos.
- */
-export function resetParser(language: Language): void {
-  const old = parserCache.get(language);
-  if (old) {
-    old.delete();
-    parserCache.delete(language);
-  }
+  return [...GRAMMAR_LANGUAGES, 'svelte', 'vue', 'liquid', 'astro', 'jinja', 'razor', 'arkts', 'scl'];
 }
 
 /**
@@ -375,8 +354,7 @@ export function clearParserCache(): void {
     parser.delete();
   }
   parserCache.clear();
-  // Note: languageCache is NOT cleared — WASM languages persist.
-  // To fully re-init, set parserInitialized = false and call initGrammars() again.
+  loadedLanguages.clear();
   unavailableGrammarErrors.clear();
 }
 
