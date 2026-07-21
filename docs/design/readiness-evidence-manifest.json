@@ -1,54 +1,54 @@
 {
-  "$schema": "https://solidkg.local/schemas/readiness-evidence-manifest.v1.json",
-  "manifestVersion": 1,
-  "updatedAt": "2026-06-04T00:00:00.000Z",
-  "description": "Durable index for readiness and evaluation evidence artifacts. Generated run artifacts live under .omo/evidence; this manifest records the sample command and expected artifact path without storing private source.",
-  "entries": [
-    {
-      "task": "task-6",
-      "purpose": "Evidence schema and private-source redaction smoke",
-      "command": "node scripts/readiness/write-evidence.mjs --sample --out .omo/evidence/task-6-sample-evidence.json",
-      "expectedResult": "pass",
-      "timestamp": "2026-06-04T00:00:00.000Z",
-      "evidencePath": ".omo/evidence/task-6-sample-evidence.json",
-      "schemaName": "solidkg.readiness-evidence.v1",
-      "privacy": "metadata_only; raw private source excluded by default"
-    },
-    {
-      "task": "task-8",
-      "purpose": "Synthetic mixed-stack evaluation probes for route flow, callback/render flow, architecture coupling, and SCIP precise refs",
-      "command": "node scripts/agent-eval/task-8-mixed-stack-probes.mjs",
-      "expectedResult": "pass",
-      "timestamp": "2026-06-04T00:00:00.000Z",
-      "evidencePath": ".omo/evidence/task-8-mixed-stack-probes.json",
-      "schemaName": "solidkg.readiness-evidence.v1",
-      "privacy": "metadata_only; synthetic fixture metadata only; no real corpus source snippets stored",
-      "corpusManifest": "fixtures/evaluation-corpus/manifest.json",
-      "syntheticFixture": "synthetic://evaluation-corpus/task-8-mixed-stack"
-    },
-    {
-      "task": "cog-adoption-evaluation",
-      "purpose": "Offline deterministic Code-on-Graph adoption evaluation schema and exclusion-gate smoke",
-      "command": "node scripts/agent-eval/cog-evaluation.mjs --sample --out .omo/evidence/cog-adoption-evaluation-sample.json",
-      "expectedResult": "pass",
-      "timestamp": "2026-06-04T00:00:00.000Z",
-      "evidencePath": ".omo/evidence/cog-adoption-evaluation-sample.json",
-      "schemaName": "solidkg.cog-adoption-evaluation.v1",
-      "privacy": "metadata_only; synthetic evaluation metadata only; no real corpus source snippets stored",
-      "corpusManifest": "fixtures/evaluation-corpus/manifest.json",
-      "syntheticFixture": "synthetic://evaluation-corpus/cog-adoption-evaluation"
-    },
-    {
-      "task": "cog-local-evaluation",
-      "purpose": "Local deterministic CoG follow-up diagnostics for failure situations, stability overlap, raw-count baselines, high-fanout payload pain, overhead gates, semantic negative controls, and candidate gates",
-      "command": "node scripts/agent-eval/cog-evaluation.mjs --run-local --out .omo/evidence/cog-adoption-evaluation-local.json",
-      "expectedResult": "pass",
-      "timestamp": "2026-06-04T00:00:00.000Z",
-      "evidencePath": ".omo/evidence/cog-adoption-evaluation-local.json",
-      "schemaName": "solidkg.cog-local-evaluation.v1",
-      "privacy": "metadata_only; synthetic local evaluation metadata only; no real corpus source snippets stored",
-      "corpusManifest": "fixtures/evaluation-corpus/manifest.json",
-      "syntheticFixture": "synthetic://evaluation-corpus/cog-local-evaluation"
-    }
-  ]
+    "$schema": "https://solidkg.local/schemas/readiness-evidence-manifest.v1.json",
+    "manifestVersion": 1,
+    "updatedAt": "2026-06-04T00:00:00.000Z",
+    "description": "Durable index for readiness and evaluation evidence artifacts. Generated run artifacts live under .omo/evidence; this manifest records the sample command and expected artifact path without storing private source.",
+    "entries": [
+        {
+            "task": "task-6",
+            "purpose": "Evidence schema and private-source redaction smoke",
+            "command": "node scripts/readiness/write-evidence.mjs --sample --out .omo/evidence/task-6-sample-evidence.json",
+            "expectedResult": "pass",
+            "timestamp": "2026-06-04T00:00:00.000Z",
+            "evidencePath": ".omo/evidence/task-6-sample-evidence.json",
+            "schemaName": "solidkg.readiness-evidence.v1",
+            "privacy": "metadata_only; raw private source excluded by default"
+        },
+        {
+            "task": "task-8",
+            "purpose": "Synthetic mixed-stack evaluation probes for route flow, callback/render flow, architecture coupling, and SCIP precise refs",
+            "command": "node scripts/agent-eval/task-8-mixed-stack-probes.mjs",
+            "expectedResult": "pass",
+            "timestamp": "2026-06-04T00:00:00.000Z",
+            "evidencePath": ".omo/evidence/task-8-mixed-stack-probes.json",
+            "schemaName": "solidkg.readiness-evidence.v1",
+            "privacy": "metadata_only; synthetic fixture metadata only; no real corpus source snippets stored",
+            "corpusManifest": "fixtures/evaluation-corpus/manifest.json",
+            "syntheticFixture": "synthetic://evaluation-corpus/task-8-mixed-stack"
+        },
+        {
+            "task": "cog-adoption-evaluation",
+            "purpose": "Offline deterministic Code-on-Graph adoption evaluation schema and exclusion-gate smoke",
+            "command": "node scripts/agent-eval/cog-evaluation.mjs --sample --out .omo/evidence/cog-adoption-evaluation-sample.json",
+            "expectedResult": "pass",
+            "timestamp": "2026-06-04T00:00:00.000Z",
+            "evidencePath": ".omo/evidence/cog-adoption-evaluation-sample.json",
+            "schemaName": "solidkg.cog-adoption-evaluation.v1",
+            "privacy": "metadata_only; synthetic evaluation metadata only; no real corpus source snippets stored",
+            "corpusManifest": "fixtures/evaluation-corpus/manifest.json",
+            "syntheticFixture": "synthetic://evaluation-corpus/cog-adoption-evaluation"
+        },
+        {
+            "task": "cog-local-evaluation",
+            "purpose": "Local deterministic CoG follow-up diagnostics for failure situations, stability overlap, raw-count baselines, high-fanout payload pain, overhead gates, semantic negative controls, and candidate gates",
+            "command": "node scripts/agent-eval/cog-evaluation.mjs --run-local --out .omo/evidence/cog-adoption-evaluation-local.json",
+            "expectedResult": "pass",
+            "timestamp": "2026-06-04T00:00:00.000Z",
+            "evidencePath": ".omo/evidence/cog-adoption-evaluation-local.json",
+            "schemaName": "solidkg.cog-local-evaluation.v1",
+            "privacy": "metadata_only; synthetic local evaluation metadata only; no real corpus source snippets stored",
+            "corpusManifest": "fixtures/evaluation-corpus/manifest.json",
+            "syntheticFixture": "synthetic://evaluation-corpus/cog-local-evaluation"
+        }
+    ]
 }

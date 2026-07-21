@@ -4,7 +4,7 @@ This matrix is a conservative execution plan for install and platform readiness.
 
 ## Runtime Assumptions
 
-- Source checkout requires Node 24, matching the repository engine range `>=24.0.0 <25.0.0` and the current `node:sqlite` runtime dependency.
+- Source checkout requires Node 24 or newer, matching the repository engine range `>=24.0.0` and the current `node:sqlite` runtime dependency. Node 24 LTS remains the preferred development runtime.
 - Released bundles use a vendored Node runtime. A standalone bundle or per-platform npm optional package must not require system Node to run SolidKG itself.
 - The npm shim may need a user Node only as a thin launcher. The real SolidKG process runs from the bundled Node inside the optional dependency or local bundle cache.
 - Supported bundle targets are `darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`, `win32-x64`, and `win32-arm64`.
