@@ -1,1 +1,81 @@
 install.sh text eol=lf
+/.gitattributes text eol=lf
+/.gitignore text eol=lf
+*.sh text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.mts text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.md text eol=lf
+*.mdc text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.sql text eol=lf
+*.css text eol=lf
+*.astro text eol=lf
+/LICENSE text eol=lf
+*.wasm binary
+
+# The top-level vendored repositories are pinned, SolidKG-maintained SCIP
+# indexer sources. Keep them in GitHub source archives so users can audit and
+# rebuild the exact compatibility-tested variants instead of substituting a
+# floating upstream release. Native parser metadata is tracked in source; the
+# target libraries are staged from the pinned language-pack release at build time.
+
+# Initial public archives ship the user/legal documentation, not the internal
+# benchmark reports, evidence bundles, research notes, or planning packets.
+/research export-ignore
+/research/** export-ignore
+/docs/benchmarks export-ignore
+/docs/benchmarks/** export-ignore
+/docs/plans export-ignore
+/docs/plans/** export-ignore
+/docs/arxiv-technology-assessment-2026-07.md export-ignore
+/docs/current-analysis.md export-ignore
+/docs/fallow-baseline-review-packet.md export-ignore
+/docs/fallow-mining-plan.md export-ignore
+/docs/rust-port-decision-report.md export-ignore
+/docs/rust-port-hyperplan-unspecified-high.md export-ignore
+/docs/SEARCH_QUALITY_LOOP.md export-ignore
+/docs/design/agent-steering-hyperplan-report.md export-ignore
+/docs/design/agent-graph-query-accelerator.md export-ignore
+/docs/design/claims-register.md export-ignore
+/docs/design/code-mapper-capability-footprint-plan.md export-ignore
+/docs/design/cog-adoption-evaluation-plan.md export-ignore
+/docs/design/evaluation-corpus-policy.md export-ignore
+/docs/design/install-readiness-matrix.md export-ignore
+/docs/design/readiness-evidence-manifest.json export-ignore
+/docs/design/solidkg-10-10-readiness-rubric.md export-ignore
+/docs/design/dynamic-dispatch-coverage-playbook.md export-ignore
+
+# Keep unpublished benchmark/evidence implementations and their private
+# fixtures/contracts out of the initial public archive as one coherent unit.
+/scripts/agent-eval/** export-ignore
+/scripts/agent-eval/probe-context.mjs -export-ignore
+/scripts/agent-eval/probe-explore.mjs -export-ignore
+/scripts/agent-eval/probe-node.mjs -export-ignore
+/scripts/agent-eval/probe-trace.mjs -export-ignore
+/scripts/retrieval-quality export-ignore
+/scripts/retrieval-quality/** export-ignore
+/scripts/add-lang/bench.sh export-ignore
+/scripts/readiness/evidence-schema.mjs export-ignore
+/scripts/readiness/write-evidence.mjs export-ignore
+/fixtures export-ignore
+/fixtures/** export-ignore
+/__tests__/agent-eval export-ignore
+/__tests__/agent-eval/** export-ignore
+/__tests__/agent-eval-hyperedges.test.ts export-ignore
+/__tests__/cog-evaluation-plan.test.ts export-ignore
+/__tests__/evaluation export-ignore
+/__tests__/evaluation/** export-ignore
+/__tests__/evaluation-corpus-manifest.test.ts export-ignore
+/__tests__/peer-structural-benchmark.test.ts export-ignore
+/__tests__/readiness-evidence.test.ts export-ignore
+/__tests__/retrieval-plan-gate.test.ts export-ignore
+/__tests__/retrieval-quality.test.ts export-ignore
+/__tests__/task-success-evaluation.test.ts export-ignore

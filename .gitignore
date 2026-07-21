@@ -1,7 +1,9 @@
 # Dependencies
 node_modules/
+.native-grammars/
 **/node_modules/
 **/.git/
+.pnpm-store/
 
 # Build output
 dist/
@@ -18,6 +20,7 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Test coverage
 /coverage/
@@ -41,6 +44,9 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # TypeScript build info
 *.tsbuildinfo
@@ -48,6 +54,10 @@ npm-debug.log*
 # SQLite WAL mode files
 *.db-wal
 *.db-shm
+*.db-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
 
 # Local Claude settings
 .claude/settings.local.json
@@ -80,12 +90,23 @@ release/
 .mypy_cache/
 tmpopencode/
 /hyper-solidkg.png
+.playwright-mcp/
+playwright-report/
+test-results/
 
 # Local-only agent configuration and skills
 .agents/
 .claude/
 .cursor/
+!.cursor/
+.cursor/*
+!.cursor/rules/
+.cursor/rules/*
+!.cursor/rules/solidkg.mdc
 skills-lock.json
+
+# Local planning prompt (not product documentation)
+/COMMERCIAL_FEATURE_ENGINEERING_PROMPT.md
 
 # Accidental local binary artifact under docs
 docs/maintenance.exe
