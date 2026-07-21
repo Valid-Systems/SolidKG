@@ -346,13 +346,14 @@ describe('Installer instructions template', () => {
     expect(guidanceSurfaces.cursorRule).toContain('ONE call usually answers a structural question.');
   });
 
-  it('keeps package benchmark claims tied to reproducible context', () => {
+  it('keeps package metadata focused on the shipped product rather than unpublished benchmark claims', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8')) as {
       description?: string;
     };
 
-    expect(pkg.description).toContain('benchmark suite');
-    expect(pkg.description).not.toMatch(/\b35%\b|\b71%\b|\b100%\b/);
+    expect(pkg.description).toContain('code intelligence');
+    expect(pkg.description).toContain('MCP server');
+    expect(pkg.description).not.toMatch(/benchmark|\b35%\b|\b71%\b|\b100%\b/i);
   });
 
   it('keeps @types/node out of runtime dependencies', () => {

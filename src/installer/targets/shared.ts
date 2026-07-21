@@ -24,7 +24,7 @@ export function getMcpServerConfig(): { type: string; command: string; args: str
     return {
       type: 'stdio',
       command: process.execPath,
-      args: ['--liftoff-only', currentEntry, 'serve', '--mcp'],
+      args: [currentEntry, 'serve', '--mcp'],
     };
   }
 
