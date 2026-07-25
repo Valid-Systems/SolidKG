@@ -27,7 +27,7 @@ Tested error-free on 118 of the largest and most impactful OSS codebases across 
 
 ## Quick start
 
-Requires Node.js 24.
+Published packages bundle the Node.js 24 runtime SolidKG executes on, so you do not need Node.js 24 installed separately.
 
 ```bash
 npm install -g solidkg
@@ -35,6 +35,8 @@ solidkg install
 solidkg init -i .
 solidkg status .
 ```
+
+[Standalone GitHub Release bundles](https://github.com/Valid-Systems/SolidKG/releases) also include the runtime and require no separately installed Node.js, npm, or build tools.
 
 Then ask your coding agent a normal question:
 
@@ -73,7 +75,7 @@ See the exact [language and framework coverage](docs/code-intelligence-capabilit
 
 ## Measured, not magic
 
-In the latest matched benchmark, SolidKG substantially reduced agent search work while keeping answer quality effectively tied with the no-graph baseline.
+In a July 2026 local OpenCode diagnostic across ten repositories and seven retrieval arms, SolidKG core used fewer tools and tokens than the no-graph baseline while mean answer F1 was similar and mean session time was higher.
 
 | | No graph | SolidKG core |
 |---|---:|---:|
@@ -82,9 +84,9 @@ In the latest matched benchmark, SolidKG substantially reduced agent search work
 | Mean answer F1 | 97.5% | 97.1% |
 | Mean session time | **57.9 s** | 67.4 s |
 
-That is the honest result: fewer tools and fewer tokens did **not** make the full session faster in this run. Static analysis also cannot see every reflection-heavy, generated, or runtime-only path. SolidKG surfaces those limits rather than inventing confidence.
+These are maintainer-reported, scope-limited results, not a universal performance claim. Fewer tools and fewer tokens did **not** make the full session faster in this run. Static analysis also cannot see every reflection-heavy, generated, or runtime-only path. SolidKG surfaces those limits rather than inventing confidence.
 
-The benchmark covered ten repositories, seven retrieval arms, four repeats per repository and arm, and 276 completed sessions. The raw benchmark bundle is not included in this public source release, so treat the figures as maintainer-reported rather than independently reproducible.
+The benchmark used four repeats per repository and arm and completed 276 sessions. This repository contains summarized evidence, but not the raw trajectories and source snapshots needed for independent reproduction.
 
 ## Built for real codebases
 
@@ -135,6 +137,8 @@ Set `SOLIDKG_MCP_TOOLS=all` on the MCP server to expose the advanced trace, prec
 
 The public source archive includes the maintained SCIP integrations and pinned native grammar manifest needed to reproduce supported behavior.
 
+Source checkout and development require Node.js 24 and the pnpm version pinned in `package.json` (`10.34.5`).
+
 ```bash
 git clone https://github.com/Valid-Systems/SolidKG.git
 cd SolidKG
@@ -147,6 +151,6 @@ pnpm run verify:source:full
 
 ## License
 
-SolidKG is source-available under the [SolidKG Evaluation and Personal Use License](LICENSE): a 15-day evaluation plus personal, non-commercial use. Commercial use after the evaluation requires a separate license.
+SolidKG is source-available, not open source. The [SolidKG Evaluation and Personal Use License](LICENSE) permits personal, non-commercial use and a 15-day evaluation. Use for or on behalf of a business, organization, or commercial service requires a separate written license.
 
 Third-party notices are in [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md). SolidKG builds on ideas explored by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), and [Cartog](https://github.com/jrollin/cartog).
