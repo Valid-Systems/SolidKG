@@ -4,11 +4,7 @@
   <img width="360" alt="SolidKG code intelligence graph for AI coding agents" src="assets/logo.png" />
 </p>
 
-<p align="center"><strong>Give coding agents a map of your codebase, not another search problem.</strong></p>
-
-<p align="center">
-  SolidKG turns source code into a local knowledge graph that agents can query for exact symbols, relationships, call paths, impact, and relevant source.
-</p>
+<p align="center"><strong>The best static intelligence for agents.</strong></p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
@@ -19,9 +15,9 @@
 
 ## Why SolidKG
 
-Coding agents are good at reasoning once they have the right code. Finding that code is the expensive part.
+Coding agents are good at reasoning once they have the right code. Finding that code requires fine-tuned automated assistance.
 
-SolidKG indexes a project once, keeps it in sync, and gives agents a compact structural view instead of making them repeatedly scan files and reconstruct relationships from text.
+SolidKG custom-indexes a project once, keeps it in sync, and gives agents a compact structural view.
 
 - **Follow real flows.** Trace callers, routes, callbacks, UI render chains, framework conventions, and cross-language bridges.
 - **Return evidence, not summaries.** Results include verbatim source, graph relationships, provenance, and explicit uncertainty when static analysis cannot prove a path.
