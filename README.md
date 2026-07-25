@@ -17,7 +17,7 @@
 
 Coding agents are good at reasoning once they have the right code. Finding that code requires fine-tuned automated assistance.
 
-SolidKG custom-indexes a project once, keeps it in sync, and gives agents a compact structural view.
+Tested error-free on 118 of the largest and most impactful OSS codebases across 40+ languages and frameworks, SolidKG indexes a project once, keeps it in sync, and gives agents a compact structural view.
 
 - **Follow real flows.** Trace callers, routes, callbacks, UI render chains, framework conventions, and cross-language bridges.
 - **Return evidence, not summaries.** Results include verbatim source, graph relationships, provenance, and explicit uncertainty when static analysis cannot prove a path.
