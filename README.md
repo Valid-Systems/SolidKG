@@ -4,7 +4,7 @@
   <img width="360" alt="SolidKG code intelligence graph for AI coding agents" src="assets/logo.png" />
 </p>
 
-<p align="center"><strong>The best static intelligence for agents.</strong></p>
+<p align="center"><strong>The best static intelligence for agents*.</strong></p>
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
@@ -17,7 +17,7 @@
 
 Coding agents are good at reasoning once they have the right code. Finding that code requires fine-tuned automated assistance.
 
-Tested error-free on 118 of the largest and most impactful OSS codebases across 40+ languages and frameworks, SolidKG indexes a project once, keeps it in sync, and gives agents a compact structural view.
+Tested error-free on 112 of the largest and most impactful OSS codebases, SolidKG indexes a project once, keeps it in sync, and gives agents a compact structural view.
 
 - **Follow real flows.** Trace callers, routes, callbacks, UI render chains, framework conventions, and cross-language bridges.
 - **Return evidence, not summaries.** Results include verbatim source, graph relationships, provenance, and explicit uncertainty when static analysis cannot prove a path.
@@ -28,6 +28,8 @@ Tested error-free on 118 of the largest and most impactful OSS codebases across 
 ## Quick start
 
 Published packages bundle the Node.js 24 runtime SolidKG executes on, so you do not need Node.js 24 installed separately.
+
+> **Agent-led setup:** For a first installation, give [`docs/setup.md`](docs/setup.md) to your coding agent. It guides the agent through read-only preflight, approved configuration changes, project indexing, and a real `solidkg_explore` acceptance check.
 
 ```bash
 npm install -g solidkg
@@ -69,7 +71,20 @@ compiler-grade definitions + references + implementations
 MCP + CLI + TypeScript API
 ```
 
-Today that covers **43 language/source modes** and **25 framework/runtime resolvers**. It understands common application boundaries across JavaScript/TypeScript, Python, Ruby, PHP, Java, Go, Rust, C#, Swift, and more.
+Today that covers **43 language/source modes** and **25 framework/runtime resolvers**:
+
+| Ecosystem | Language/source modes | Framework/runtime resolvers |
+|---|---|---|
+| Web and JavaScript | TypeScript, JavaScript, TSX, JSX, Svelte, Vue, Astro, Liquid | Hono, Express/Koa-style routing, NestJS, React/React Router, Svelte/SvelteKit, Vue/Nuxt |
+| Python and templates | Python, Jinja | Django/DRF, Flask/Flask-RESTful, FastAPI |
+| JVM | Java, Kotlin, Scala, Groovy | Spring, Play Framework |
+| Native and Apple | C, C++, Objective-C, Swift, SystemVerilog | SwiftUI, UIKit, Vapor, Swift–Objective-C bridge |
+| .NET | C#, VB.NET, Razor | ASP.NET Core |
+| PHP and Ruby | PHP, Ruby, Twig | Laravel, Drupal, Rails |
+| Go and Rust | Go, Rust | Go routers (Gin, chi, gorilla/mux), Rust web (Axum, actix-web, Rocket) |
+| Mobile bridges | Dart, ArkTS | React Native (legacy/TurboModules), Expo Modules, React Native Fabric/Codegen |
+| Scripting and scientific | Lua, Luau, Julia, Fortran, R, Pascal | — |
+| Data, config, and shell | SQL, HCL, Nix, SCL, Solidity, Bash, PowerShell, YAML | dbt |
 
 See the exact [language and framework coverage](docs/code-intelligence-capabilities.md) and the [tested codebases](docs/tested-codebases.md).
 
@@ -93,7 +108,7 @@ The benchmark used four repeats per repository and arm and completed 276 session
 SolidKG goes beyond a flat symbol index:
 
 - **Semantic hyperedges** preserve multi-symbol relationships such as route bindings, event channels, UI render chains, dynamic dispatch, native bridges, and type contracts.
-- **Framework resolvers** connect conventions that syntax alone misses, including Express, Django, FastAPI, Rails, Laravel, Spring, ASP.NET, React, SvelteKit, Vue/Nuxt, and native/mobile bridges.
+- **Framework resolvers** connect routes, handlers, composition, and native bridges that syntax alone misses.
 - **Optional SCIP** adds compiler-grade navigation without replacing the always-available AST graph.
 - **Source-body retrieval** improves natural-language discovery while exact symbol, path, trace, semantic, and SCIP evidence stays higher priority.
 - **Architecture and snapshots** make package coupling and graph changes explicit instead of leaving them as review intuition.
@@ -151,6 +166,8 @@ pnpm run verify:source:full
 
 ## License
 
-SolidKG is source-available, not open source. The [SolidKG Evaluation and Personal Use License](LICENSE) permits personal, non-commercial use and a 15-day evaluation. Use for or on behalf of a business, organization, or commercial service requires a separate written license.
+SolidKG is open source under the [MIT License](LICENSE).
 
 Third-party notices are in [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md). SolidKG builds on ideas explored by [Codegraph](https://github.com/colbymchenry/codegraph), [Sverklo](https://github.com/sverklo/sverklo), [Tilth](https://github.com/jahala/tilth), and [Cartog](https://github.com/jrollin/cartog).
+
+\* “The best static intelligence for agents” is based on SolidKG's analyses of non-commercial alternatives; commercial offerings were excluded.
