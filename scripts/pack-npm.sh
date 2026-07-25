@@ -61,7 +61,7 @@ for archive in "${archives[@]}"; do
         name: `solidkg-${process.env.TARGET}`,
         version: process.env.VERSION,
         description: `SolidKG self-contained bundle for ${process.env.TARGET}`,
-        license: "SEE LICENSE IN LICENSE",
+        license: "MIT",
         os: [process.env.OSV], cpu: [process.env.ARCHV],
         files: [process.env.NODEFILE, "lib", "bin", "LICENSE"]
       }, null, 2) + "\n");
@@ -84,7 +84,7 @@ VERSION="$VERSION" TARGETS="${targets[*]}" \
       name: "solidkg",
       version: process.env.VERSION,
       description: "Local-first code intelligence for AI agents (MCP). Self-contained — bundles its own runtime.",
-      license: "SEE LICENSE IN LICENSE",
+      license: "MIT",
       bin: { solidkg: "npm-shim.js" },
       optionalDependencies: opt,
       files: ["npm-shim.js","README.md","LICENSE"]

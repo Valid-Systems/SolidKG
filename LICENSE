@@ -1,92 +1,21 @@
-SolidKG Evaluation and Personal Use License
+MIT License
 
 Copyright (c) 2026 Valid Systems
 
-This license governs use of SolidKG and its source code, binaries, packages,
-documentation, and related materials (the "Software"). This Software is not
-open source. Commercial use requires a separate written commercial license from
-the copyright holder.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1. Definitions
-
-"Personal Use" means use by an individual for personal, non-commercial projects,
-learning, experimentation, or research, where the Software is not used for or on
-behalf of any business, employer, client, government, nonprofit, or other
-organization.
-
-"Evaluation Use" means testing, trial, benchmarking, review, or proof-of-concept
-use to decide whether to obtain a commercial license.
-
-"Commercial Use" means any use of the Software for or on behalf of a business,
-employer, client, government, nonprofit, or other organization, or any use that
-is intended to generate revenue, reduce business operating costs, support a
-commercial product or service, provide services to others, or support internal
-business operations.
-
-2. 15-Day Evaluation License
-
-You may copy, install, run, test, and internally evaluate the Software, including
-an evaluation performed for or on behalf of an organization, for no more than
-15 calendar days. The period starts on the first day you or the organization
-accesses, downloads, installs, runs, or otherwise uses the Software.
-
-The evaluation limit is honor-based and is not technically enforced by the
-Software. You are responsible for tracking the start date and stopping use when
-the evaluation period expires.
-
-After the 15-day Evaluation Use period ends, you must stop using the Software
-unless your use qualifies as Personal Use or you have obtained a separate
-commercial license.
-
-3. Personal Use License
-
-You may copy, install, run, and modify the Software for Personal Use. Personal
-Use does not include Commercial Use.
-
-4. Commercial Use Requires a Separate License
-
-Commercial Use is not permitted under this license. Any Commercial Use requires
-a separate written commercial license from the copyright holder before such use
-begins, except for Evaluation Use during the 15-day evaluation period described
-above.
-
-5. Restrictions
-
-Except as expressly allowed by this license or a separate written agreement, you
-may not:
-
-- use the Software for Commercial Use;
-- sell, rent, lease, sublicense, host, or provide the Software as a service;
-- distribute modified or unmodified copies of the Software to third parties;
-- remove or alter copyright, license, or attribution notices;
-- use the Software to develop or provide a competing commercial product or
-  service.
-
-6. Third-Party Components
-
-Third-party components included with or referenced by the Software are governed
-by their own licenses. Those licenses are not changed by this license.
-
-7. No Warranty
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
-
-8. Limitation of Liability
-
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER AND CONTRIBUTORS
-WILL NOT BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM OR
-RELATED TO THE SOFTWARE OR THIS LICENSE, WHETHER IN CONTRACT, TORT, OR
-OTHERWISE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-
-9. Termination
-
-This license terminates automatically if you violate its terms. Upon
-termination, you must stop using the Software and delete any copies in your
-possession or control, except where retention is required by law.
-
-10. Commercial Licensing
-
-For Commercial Use, obtain a separate written commercial license from the
-copyright holder.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
