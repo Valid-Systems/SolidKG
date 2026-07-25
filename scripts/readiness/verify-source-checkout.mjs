@@ -126,10 +126,10 @@ function checkSourceInputs() {
     'Update the lock with the repository release workflow or a reviewed npm --package-lock-only change; do not hand-edit dependency resolutions.',
   );
   assertReady(
-    packageJson.license === 'SEE LICENSE IN LICENSE' &&
+    packageJson.license === 'MIT' &&
       packageLock.packages?.['']?.license === packageJson.license,
-    'source and lock manifests reference the shipped project license',
-    'Restore LICENSE and keep package.json plus package-lock.json license metadata set to SEE LICENSE IN LICENSE.',
+    'source and lock manifests declare the MIT license',
+    'Restore LICENSE and keep package.json plus package-lock.json license metadata set to MIT.',
   );
 
   const grammarMappings = Object.values(nativeGrammarMap);
@@ -305,6 +305,9 @@ async function smokeGraphAndMcp() {
     mkdirSync(pnpmHome, { recursive: true });
     const sourceInstallEnv = {
       ...isolatedEnv,
+      // The Windows Corepack shim resolves pnpm from LOCALAPPDATA. Keep that
+      // bootstrap location available while PNPM_HOME isolates the linked CLI.
+      LOCALAPPDATA: process.env.LOCALAPPDATA,
       PNPM_HOME: pnpmHome,
       PATH: `${pnpmHome}${delimiter}${process.env.PATH ?? ''}`,
     };

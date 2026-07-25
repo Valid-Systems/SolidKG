@@ -164,7 +164,7 @@ describe('npm bundle guardrails', () => {
     expect(shim).toContain('SOLIDKG_DOWNLOAD_BASE');
     expect(packNpm).toContain('bin: { solidkg: "npm-shim.js" }');
     expect(packNpm).toContain('optionalDependencies: opt');
-    expect(packNpm).toContain('license: "SEE LICENSE IN LICENSE"');
+    expect(packNpm).toContain('license: "MIT"');
     expect(packNpm).toContain('files: ["npm-shim.js","README.md","LICENSE"]');
     expect(packNpm).toContain('files: [process.env.NODEFILE, "lib", "bin", "LICENSE"]');
   });

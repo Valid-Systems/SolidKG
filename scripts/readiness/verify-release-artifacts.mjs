@@ -136,7 +136,7 @@ function writeSyntheticPlatformPackage(pkgDir, target) {
     name: `solidkg-${target}`,
     version,
     description: `SolidKG self-contained bundle for ${target}`,
-    license: 'SEE LICENSE IN LICENSE',
+    license: 'MIT',
     os: [osName],
     cpu: [cpu],
     files: ['node', 'lib', 'bin', 'LICENSE'],
@@ -161,7 +161,7 @@ function verifyPackNpmWithSyntheticBundles() {
       name: 'solidkg',
       version,
       description: 'Local-first code intelligence for AI agents (MCP). Self-contained - bundles its own runtime.',
-      license: 'SEE LICENSE IN LICENSE',
+      license: 'MIT',
       bin: { solidkg: 'npm-shim.js' },
       optionalDependencies,
       files: ['npm-shim.js', 'README.md', 'LICENSE'],
@@ -169,7 +169,7 @@ function verifyPackNpmWithSyntheticBundles() {
 
     const mainPackage = JSON.parse(readFileSync(join(mainDir, 'package.json'), 'utf8'));
     assert(mainPackage.bin?.solidkg === 'npm-shim.js', 'main npm package maps bin.solidkg to npm-shim.js');
-    assert(mainPackage.license === 'SEE LICENSE IN LICENSE', 'main npm package references LICENSE file');
+    assert(mainPackage.license === 'MIT', 'main npm package declares the MIT license');
     assert(JSON.stringify(mainPackage.files) === JSON.stringify(['npm-shim.js', 'README.md', 'LICENSE']), 'main npm package file whitelist is npm-shim.js, README.md, and LICENSE');
     for (const target of syntheticTargets) {
       assert(mainPackage.optionalDependencies?.[`solidkg-${target}`] === version, `main npm optionalDependencies maps solidkg-${target} to package version`);
@@ -186,7 +186,7 @@ function verifyPackNpmWithSyntheticBundles() {
       const files = listFiles(pkgDir);
       record(`solidkg-${target} staged files:`);
       for (const file of files) record(`  ${file}`);
-      assert(pkg.license === 'SEE LICENSE IN LICENSE', `solidkg-${target} package references LICENSE file`);
+      assert(pkg.license === 'MIT', `solidkg-${target} package declares the MIT license`);
       assert(JSON.stringify(pkg.files) === JSON.stringify(['node', 'lib', 'bin', 'LICENSE']), `solidkg-${target} package whitelist is node/lib/bin/LICENSE`);
       assert(pkg.os?.[0] === target.split('-')[0], `solidkg-${target} package os matches target`);
       assert(pkg.cpu?.[0] === target.split('-')[1], `solidkg-${target} package cpu matches target`);
@@ -227,7 +227,7 @@ function verifyScriptAndWorkflowGuards() {
   assert(buildBundle.includes('--package-root "$STAGE/lib"'), 'build-bundle repairs the staged native addon');
   assert(workflow.includes('ubuntu-24.04-arm') && workflow.includes('windows-11-arm') && workflow.includes('macos-15-intel'), 'release workflow uses native runners for ARM64 and Intel targets');
   assert(workflow.includes('actions/upload-artifact@v7') && workflow.includes('actions/download-artifact@v8'), 'release workflow hands native archives to one publish job');
-  assert(packNpm.includes('license: "SEE LICENSE IN LICENSE"'), 'pack-npm packages reference LICENSE file');
+  assert(packNpm.includes('license: "MIT"'), 'pack-npm packages declare the MIT license');
   assert(packNpm.includes('files: [process.env.NODEFILE, "lib", "bin", "LICENSE"]'), 'pack-npm platform packages whitelist node/lib/bin/LICENSE');
   assert(packNpm.includes('files: ["npm-shim.js","README.md","LICENSE"]'), 'pack-npm main package whitelist is shim plus README plus LICENSE');
   assert(shim.includes('SOLIDKG_NO_DOWNLOAD'), 'npm shim supports SOLIDKG_NO_DOWNLOAD');
