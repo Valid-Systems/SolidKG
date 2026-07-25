@@ -24,7 +24,7 @@ import { loadProjectAliases, type AliasMap } from './path-aliases';
 import { logDebug } from '../errors';
 import type { ReExport } from './types';
 import { LRUCache } from './lru-cache';
-import { buildSourceRoots, type ExtractionOrchestratorOptions, type SourceRoot } from '../extraction';
+import { buildSourceRoots, type SourceRoot, type SourceRootOptions } from '../source-roots';
 import { normalizePath, validatePathWithinRoot } from '../utils';
 
 /**
@@ -218,7 +218,7 @@ export class ReferenceResolver {
   // resolver's lifetime; callers re-create the resolver if config changes.
   private projectAliases: AliasMap | null | undefined = undefined;
 
-  constructor(projectRoot: string, queries: QueryBuilder, sourceOptions: ExtractionOrchestratorOptions = {}) {
+  constructor(projectRoot: string, queries: QueryBuilder, sourceOptions: SourceRootOptions = {}) {
     this.projectRoot = projectRoot;
     this.queries = queries;
     this.sourceRoots = buildSourceRoots(this.projectRoot, sourceOptions.extraRoots ?? []);
@@ -949,7 +949,7 @@ export class ReferenceResolver {
 export function createResolver(
   projectRoot: string,
   queries: QueryBuilder,
-  sourceOptions: ExtractionOrchestratorOptions = {}
+  sourceOptions: SourceRootOptions = {}
 ): ReferenceResolver {
   const resolver = new ReferenceResolver(projectRoot, queries, sourceOptions);
   resolver.initialize();

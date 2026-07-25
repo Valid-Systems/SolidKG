@@ -37,7 +37,7 @@ import { buildContextBudget, type ContextBudget } from './budget';
 import { buildOverviewTree, formatOverviewTree } from '../overview';
 import { logDebug } from '../errors';
 import { validatePathWithinRoot, normalizePath } from '../utils';
-import { buildSourceRoots, ExtractionOrchestratorOptions, SourceRoot } from '../extraction';
+import { buildSourceRoots, type SourceRoot, type SourceRootOptions } from '../source-roots';
 import {
   isTestFile,
   extractSearchTerms,
@@ -420,7 +420,7 @@ export class ContextBuilder {
     projectRoot: string,
     queries: QueryBuilder,
     traverser: GraphTraverser,
-    sourceOptions: ExtractionOrchestratorOptions = {}
+    sourceOptions: SourceRootOptions = {}
   ) {
     this.queries = queries;
     this.traverser = traverser;
@@ -2201,7 +2201,7 @@ export function createContextBuilder(
   projectRoot: string,
   queries: QueryBuilder,
   traverser: GraphTraverser,
-  sourceOptions: ExtractionOrchestratorOptions = {}
+  sourceOptions: SourceRootOptions = {}
 ): ContextBuilder {
   return new ContextBuilder(projectRoot, queries, traverser, sourceOptions);
 }
