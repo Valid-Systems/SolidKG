@@ -9,21 +9,20 @@
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#why-solidkg">Why SolidKG</a> ·
-  <a href="#measured-not-magic">Benchmarks</a> ·
+  <a href="#benchmark-results">Benchmarks</a> ·
   <a href="docs/code-intelligence-capabilities.md">Capabilities</a>
 </p>
 
 ## Why SolidKG
 
-Coding agents are good at reasoning once they have the right code. Finding that code requires fine-tuned automated assistance.
+Coding agents are good at reasoning once they have the right context. Finding that requires fine-tuned automated assistance.
 
-Tested error-free on 112 of the largest and most impactful OSS codebases, SolidKG indexes a project once, keeps it in sync, and gives agents a compact structural view.
+Tested error-free on 112 of the largest and most impactful OSS codebases, SolidKG indexes a project once, keeps it in sync, and gives agents an optimized structural view.
 
 - **Follow real flows.** Trace callers, routes, callbacks, UI render chains, framework conventions, and cross-language bridges.
 - **Return evidence, not summaries.** Results include verbatim source, graph relationships, provenance, and explicit uncertainty when static analysis cannot prove a path.
 - **Understand change risk.** Query callers, callees, impact radius, affected tests, snapshots, package boundaries, and layer coupling.
 - **Stay local.** SQLite, tree-sitter, and optional SCIP run on your machine. No source uploads, embeddings, vector database, API keys, or telemetry are required.
-- **Meet agents where they already work.** One installer configures Claude Code, Cursor, Codex CLI, opencode, Hermes Agent, Antigravity, OMP/Pi, and Kimi Code.
 
 ## Quick start
 
@@ -88,20 +87,25 @@ Today that covers **43 language/source modes** and **25 framework/runtime resolv
 
 See the exact [language and framework coverage](docs/code-intelligence-capabilities.md) and the [tested codebases](docs/tested-codebases.md).
 
-## Measured, not magic
+## Benchmark results
 
-In a July 2026 local OpenCode diagnostic across ten repositories and seven retrieval arms, SolidKG core used fewer tools and tokens than the no-graph baseline while mean answer F1 was similar and mean session time was higher.
+A [July 2026 local OpenCode benchmark](docs/benchmarks/opencode-seven-arm-2026-07-12.md) ran 276 completed post-indexing sessions across ten repository-specific architecture questions, seven retrieval arms, and four repeats per launchable cell. Mean answer F1 was similar across all arms at 97.1% to 98.1%. SolidKG core had the lowest mean API-equivalent cost, while SolidKG + SCIP used the fewest agent tool calls.
 
-| | No graph | SolidKG core |
-|---|---:|---:|
-| Mean tokens | 96,050 | **72,755** |
-| Tools per task | 15.1 | **4.8** |
-| Mean answer F1 | 97.5% | 97.1% |
-| Mean session time | **57.9 s** | 67.4 s |
+| Arm | Completed | Mean F1 | Mean tokens | Tools/task | Session time | API-equivalent cost |
+|---|---:|---:|---:|---:|---:|---:|
+| No graph baseline | 40 | 97.5% | 96,050 | 15.1 | **57.9 s** | $0.2316 |
+| SolidKG core | 40 | 97.1% | **72,755** | 4.8 | 67.4 s | **$0.2124** |
+| SolidKG + SCIP | 40 | 97.2% | 84,166 | **4.0** | 59.8 s | $0.2179 |
+| CodeGraph | 36 | 98.0% | 89,552 | 13.8 | 65.6 s | $0.2249 |
+| Sverklo | 40 | **98.1%** | 109,315 | 15.1 | 78.6 s | $0.2593 |
+| Cartog | 40 | 97.4% | 124,735 | 15.9 | 74.0 s | $0.2789 |
+| Tilth | 40 | **98.1%** | 107,748 | 14.2 | 74.7 s | $0.2450 |
 
-These are maintainer-reported, scope-limited results, not a universal performance claim. Fewer tools and fewer tokens did **not** make the full session faster in this run. Static analysis also cannot see every reflection-heavy, generated, or runtime-only path. SolidKG surfaces those limits rather than inventing confidence.
+Against the no-graph baseline, SolidKG core used a paired median 8 fewer tool calls per task, or 70.0% fewer; SolidKG + SCIP used 8.5 fewer, or 71.0% fewer. The default SolidKG profile packages retrieval into one answer-producing tool, so this measures agent interaction efficiency rather than computation alone. The raw exact sign-flip p-value was 0.00195, while the predeclared Holm-adjusted value was 0.140625.
 
-The benchmark used four repeats per repository and arm and completed 276 sessions. This repository contains summarized evidence, but not the raw trajectories and source snapshots needed for independent reproduction.
+The aggregate mean token values remain useful descriptive results, but the paired analysis did not show a reliable token or session-time reduction. The lower SolidKG core token mean was driven largely by the VS Code runs. CodeGraph completed 36 of 40 cells because its four .NET Runtime cells were unavailable, so its aggregate covers a different task mixture.
+
+Indexing time was excluded. The benchmark used one architecture question per public repository and did not test patches, builds, regressions, security, maintenance, or developer productivity. Two blinded reviewers from the same model family disagreed in at least one scored field on 269 of 276 answers, followed by separate AI adjudication. Raw trajectories, exact source snapshots, resolved configurations, scoring inputs, and the analysis package are not published here; see the detailed report for the complete methodology and limitations.
 
 ## Built for real codebases
 
