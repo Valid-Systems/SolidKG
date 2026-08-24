@@ -15,6 +15,8 @@
 
 ## Why SolidKG
 
+**KG** = Knowledge Graph
+
 Coding agents are good at reasoning once they have the right context. Finding that requires fine-tuned automated assistance.
 
 Tested error-free on 112 of the largest and most impactful OSS codebases, SolidKG indexes a project once, keeps it in sync, and gives agents an optimized structural view.
