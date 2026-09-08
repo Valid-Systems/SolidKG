@@ -3041,8 +3041,19 @@ export class ToolHandler {
     if (text.length <= maxChars) return text;
 
     const marker = '... (output truncated to budget; Source completeness: truncated. The response was cut at a markdown boundary and the omitted tail remains outside the selected answer scope.)';
-    const prefix = text.slice(0, maxChars);
-    const completePrefix = prefix.endsWith('\n') ? prefix : prefix.slice(0, prefix.lastIndexOf('\n'));
+    const markerSuffix = `\n\n${marker}`;
+    const markdownRepairAllowance = 5;
+    if (markerSuffix.length + markdownRepairAllowance > maxChars) {
+      return marker.slice(0, maxChars);
+    }
+
+    const prefix = text.slice(0, maxChars - markerSuffix.length - markdownRepairAllowance);
+    const lastNewline = prefix.lastIndexOf('\n');
+    const completePrefix = prefix.endsWith('\n')
+      ? prefix
+      : lastNewline === -1
+        ? ''
+        : prefix.slice(0, lastNewline);
     const lines = completePrefix.split('\n');
     let offset = 0;
     let fenceCount = 0;
@@ -3068,7 +3079,7 @@ export class ToolHandler {
       safe = safe.trimEnd() + '\n---\n';
     }
 
-    return `${safe.trimEnd()}\n\n${marker}`;
+    return `${safe.trimEnd()}${markerSuffix}`;
   }
 
   private isExploreMarkdownBoundary(line: string): boolean {
