@@ -41,6 +41,15 @@ import {
   SourceChunkSearchResult,
 } from '../types';
 import type { CapabilityAnalysisRun, CapabilityAssertion } from '../capabilities';
+import {
+  ARCHITECTURE_HEALTH_ANALYSIS_KIND,
+  ARCHITECTURE_HEALTH_ANALYSIS_VERSION,
+  canonicalizeArchitectureHealthReport,
+  canonicalJson,
+  normalizeArchitectureHealthOptions,
+  type SnapshotArchitectureHealthBundle,
+  type StoredSnapshotAnalysisRow,
+} from '../analysis';
 import { safeJsonParse } from '../utils';
 import { getScipGenerationStatus } from '../scip';
 import { buildSourceChunkFtsQuery, isTestFile, kindBonus, nameMatchBonus, scorePathRelevance } from '../search/query-utils';
@@ -392,6 +401,14 @@ interface JsonPayloadRow {
   payload: string;
 }
 
+interface SnapshotAnalysisRow {
+  snapshot_label: string;
+  analysis_kind: 'architecture_health';
+  analysis_version: 1;
+  options_json: string;
+  payload_json: string;
+}
+
 /**
  * Convert database row to Node object
  */
@@ -625,6 +642,32 @@ function parsePayloadRows<T>(rows: JsonPayloadRow[]): T[] {
     if (parsed !== null) records.push(parsed);
   }
   return records;
+}
+
+function assertCanonicalSnapshotAnalysis(row: StoredSnapshotAnalysisRow, snapshotLabel: string): void {
+  if (row.snapshotLabel !== snapshotLabel) throw new Error('snapshot analysis label must match snapshot metadata');
+  if (row.analysisKind !== ARCHITECTURE_HEALTH_ANALYSIS_KIND || row.analysisVersion !== ARCHITECTURE_HEALTH_ANALYSIS_VERSION) {
+    throw new Error('unsupported snapshot analysis contract');
+  }
+
+  let options: unknown;
+  let payload: SnapshotArchitectureHealthBundle;
+  try {
+    options = JSON.parse(row.optionsJson);
+    payload = JSON.parse(row.payloadJson) as SnapshotArchitectureHealthBundle;
+  } catch {
+    throw new Error('snapshot analysis JSON must be valid');
+  }
+
+  const normalizedOptions = normalizeArchitectureHealthOptions(options as { layers?: [] });
+  if (row.optionsJson !== canonicalJson(normalizedOptions)) throw new Error('snapshot analysis options must be canonical');
+  const canonicalPayload = {
+    options: normalizedOptions,
+    architecture: payload.architecture,
+    health: canonicalizeArchitectureHealthReport(payload.health),
+  };
+  if (row.payloadJson !== canonicalJson(canonicalPayload)) throw new Error('snapshot analysis payload must be canonical');
+  if (canonicalJson(payload.options) !== row.optionsJson) throw new Error('snapshot analysis options must match payload');
 }
 
 function storedEdgeKey(edge: StoredSnapshotEdgeRecord): string {
@@ -3638,7 +3681,11 @@ export class QueryBuilder {
     return result;
   }
 
-  saveSnapshot(metadata: StoredSnapshotMetadata, graph: StoredSnapshotGraph): void {
+  saveSnapshot(
+    metadata: StoredSnapshotMetadata,
+    graph: StoredSnapshotGraph,
+    analyses: readonly StoredSnapshotAnalysisRow[] = [],
+  ): void {
     this.db.transaction(() => {
       this.deleteSnapshotRows(metadata.label);
       this.db.prepare(`
@@ -3675,6 +3722,20 @@ export class QueryBuilder {
       for (const member of graph.hyperedgeMembers) {
         insertMember.run(metadata.label, storedMemberKey(member), JSON.stringify(member));
       }
+
+      const insertAnalysis = this.db.prepare(
+        'INSERT INTO graph_snapshot_analyses (snapshot_label, analysis_kind, analysis_version, options_json, payload_json) VALUES (?, ?, ?, ?, ?)'
+      );
+      for (const analysis of analyses) {
+        assertCanonicalSnapshotAnalysis(analysis, metadata.label);
+        insertAnalysis.run(
+          analysis.snapshotLabel,
+          analysis.analysisKind,
+          analysis.analysisVersion,
+          analysis.optionsJson,
+          analysis.payloadJson,
+        );
+      }
     })();
   }
 
@@ -3699,6 +3760,22 @@ export class QueryBuilder {
         hyperedgeMembers: parsePayloadRows<StoredSnapshotHyperedgeMemberRecord>(members),
       },
     };
+  }
+
+  getSnapshotAnalyses(label: string): StoredSnapshotAnalysisRow[] {
+    const rows = this.db.prepare(`
+      SELECT snapshot_label, analysis_kind, analysis_version, options_json, payload_json
+      FROM graph_snapshot_analyses
+      WHERE snapshot_label = ?
+      ORDER BY analysis_kind, analysis_version
+    `).all(label) as SnapshotAnalysisRow[];
+    return rows.map((row) => ({
+      snapshotLabel: row.snapshot_label,
+      analysisKind: row.analysis_kind,
+      analysisVersion: row.analysis_version,
+      optionsJson: row.options_json,
+      payloadJson: row.payload_json,
+    }));
   }
 
   deleteSnapshot(label: string): boolean {
@@ -3759,6 +3836,7 @@ export class QueryBuilder {
   }
 
   private deleteSnapshotRows(label: string): void {
+    this.db.prepare('DELETE FROM graph_snapshot_analyses WHERE snapshot_label = ?').run(label);
     this.db.prepare('DELETE FROM graph_snapshot_hyperedge_members WHERE snapshot_label = ?').run(label);
     this.db.prepare('DELETE FROM graph_snapshot_hyperedges WHERE snapshot_label = ?').run(label);
     this.db.prepare('DELETE FROM graph_snapshot_edges WHERE snapshot_label = ?').run(label);

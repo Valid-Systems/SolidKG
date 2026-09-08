@@ -126,6 +126,24 @@ export class DatabaseError extends SolidKGError {
   }
 }
 
+export class SchemaUpgradeRequiredError extends SolidKGError {
+  readonly currentVersion: number;
+  readonly requiredVersion: number;
+  readonly dbPath: string;
+
+  constructor(currentVersion: number, requiredVersion: number, dbPath: string) {
+    super(
+      `Database schema version ${currentVersion} is older than ${requiredVersion}; read-only open cannot run migrations`,
+      "SCHEMA_UPGRADE_REQUIRED",
+      { currentVersion, requiredVersion, dbPath },
+    );
+    this.name = "SchemaUpgradeRequiredError";
+    this.currentVersion = currentVersion;
+    this.requiredVersion = requiredVersion;
+    this.dbPath = dbPath;
+  }
+}
+
 /**
  * Error with search operations
  */

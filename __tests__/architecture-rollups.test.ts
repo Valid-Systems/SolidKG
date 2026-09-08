@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import SolidKG from '../src/index';
+import type { DatabaseConnection } from '../src/db';
 import { ToolHandler } from '../src/mcp/tools';
 
 interface ArchitectureLayerRule {
@@ -61,6 +62,10 @@ interface ArchitectureSolidKG {
     matchedFileCount?: number;
   };
   getCoupling(): Promise<ArchitectureReport['coupling']> | ArchitectureReport['coupling'];
+}
+
+interface ArchitectureProjectionSolidKG {
+  projectArchitecture(options?: AnalyzeArchitectureOptions): ArchitectureReport;
 }
 
 let testDir: string | undefined;
@@ -260,6 +265,82 @@ export function featureOnly(): string {
     expect(current.packages).toEqual([]);
   });
 
+  it('pure projection matches analysis without updating the stored architecture row', async () => {
+    await createProject({
+      'packages/api/package.json': JSON.stringify({ name: 'api' }),
+      'packages/api/src/index.ts': `
+import { readRecord } from '../../data/src/store';
+
+export function handleRequest(): string {
+  return readRecord();
+}
+`,
+      'packages/data/package.json': JSON.stringify({ name: 'data' }),
+      'packages/data/src/store.ts': `
+export function readRecord(): string {
+  return 'record';
+}
+`,
+    });
+
+    const analyzed = await architectureApi(cg!).analyzeArchitecture();
+    const database = architectureDatabase(cg!);
+    const before = database.getDb().prepare(`
+      SELECT payload, updated_at
+      FROM architecture_reports
+      WHERE id = 'current'
+    `).get();
+
+    const projected = architectureProjectionApi(cg!).projectArchitecture();
+
+    const after = database.getDb().prepare(`
+      SELECT payload, updated_at
+      FROM architecture_reports
+      WHERE id = 'current'
+    `).get();
+
+    expect(projected).toEqual(analyzed);
+    expect(after).toEqual(before);
+  });
+
+  it('pure projection works on an uncached read-only project without storing a report', async () => {
+    await createProject({
+      'package.json': JSON.stringify({ name: 'readonly-app' }),
+      'src/index.ts': `
+export function readOnly(): string {
+  return 'read-only';
+}
+`,
+    });
+
+    const writable = cg;
+    const expected = architectureProjectionApi(writable!).projectArchitecture();
+    const writableDatabase = architectureDatabase(writable!);
+    const before = writableDatabase.getDb().prepare(`
+      SELECT payload, updated_at
+      FROM architecture_reports
+      WHERE id = 'current'
+    `).get();
+    writable!.close();
+    cg = undefined;
+
+    const readonly = await SolidKG.open(testDir!, { readOnly: true });
+    try {
+      const projected = architectureProjectionApi(readonly).projectArchitecture();
+      const after = architectureDatabase(readonly).getDb().prepare(`
+        SELECT payload, updated_at
+        FROM architecture_reports
+        WHERE id = 'current'
+      `).get();
+
+      expect(projected).toEqual(expected);
+      expect(after).toEqual(before);
+      expect(() => readonly.analyzeArchitecture()).toThrow(/read-only/i);
+    } finally {
+      readonly.close();
+    }
+  });
+
   it('package lookup keeps manifest names exact and explains path ownership', async () => {
     await createProject({
       'package.json': JSON.stringify({ name: 'solidkg' }),
@@ -352,6 +433,14 @@ async function createProject(files: Record<string, string>): Promise<void> {
 
 function architectureApi(instance: SolidKG): ArchitectureSolidKG {
   return instance as unknown as ArchitectureSolidKG;
+}
+
+function architectureProjectionApi(instance: SolidKG): ArchitectureProjectionSolidKG {
+  return instance as unknown as ArchitectureProjectionSolidKG;
+}
+
+function architectureDatabase(instance: SolidKG): DatabaseConnection {
+  return (instance as unknown as { db: DatabaseConnection }).db;
 }
 
 function packageNames(report: ArchitectureReport): string[] {

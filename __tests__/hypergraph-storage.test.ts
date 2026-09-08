@@ -246,7 +246,7 @@ describe('hypergraph storage schema', () => {
 
     try {
       expect(conn.getSchemaVersion()?.version).toBe(CURRENT_SCHEMA_VERSION);
-      expect(CURRENT_SCHEMA_VERSION).toBe(10);
+      expect(CURRENT_SCHEMA_VERSION).toBe(11);
       expectHyperedgeSchema(conn.getDb());
       expectEdgeDedupeIndex(conn.getDb());
     } finally {

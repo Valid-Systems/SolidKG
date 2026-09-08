@@ -33,7 +33,11 @@ export type SqliteBackend = 'node-sqlite';
 
 const NODE_SQLITE_EXPERIMENTAL_WARNING = 'SQLite is an experimental feature and might change at any time';
 
-function loadNodeSqlite(): { DatabaseSync: new (dbPath: string) => any } {
+interface DatabaseOpenOptions {
+  readonly readOnly?: boolean;
+}
+
+function loadNodeSqlite(): { DatabaseSync: new (dbPath: string, options?: DatabaseOpenOptions) => any } {
   const emitWarning = process.emitWarning.bind(process);
   process.emitWarning = ((warning: string | Error, typeOrOptions?: string | NodeJS.EmitWarningOptions, code?: string, ctor?: Function) => {
     const message = warning instanceof Error ? warning.message : String(warning);
@@ -70,9 +74,9 @@ class NodeSqliteAdapter implements SqliteDatabase {
   private transactionDepth = 0;
   private savepointCounter = 0;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, options: DatabaseOpenOptions = {}) {
     const { DatabaseSync } = loadNodeSqlite();
-    this._db = new DatabaseSync(dbPath);
+    this._db = new DatabaseSync(dbPath, options);
   }
 
   get open(): boolean {
@@ -170,9 +174,12 @@ class NodeSqliteAdapter implements SqliteDatabase {
  * report it per-instance — MCP can open multiple project DBs in one process, so
  * a process-global would race.
  */
-export function createDatabase(dbPath: string): { db: SqliteDatabase; backend: SqliteBackend } {
+export function createDatabase(
+  dbPath: string,
+  options: DatabaseOpenOptions = {},
+): { db: SqliteDatabase; backend: SqliteBackend } {
   try {
-    return { db: new NodeSqliteAdapter(dbPath), backend: 'node-sqlite' };
+    return { db: new NodeSqliteAdapter(dbPath, options), backend: 'node-sqlite' };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     throw new Error(
