@@ -3,7 +3,7 @@ import { spawnSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import SolidKG from '../src/index';
+import SolidKG, { getDatabasePath } from '../src/index';
 import packageJson from '../package.json';
 
 const BIN = path.resolve(__dirname, '../dist/bin/solidkg.js');
@@ -226,6 +226,103 @@ describe('standalone CLI JSON contracts', () => {
     expect(result.stdout).toContain('symbols');
     expectNoAnsiEscapeSequences(result.stdout);
     expectNoTerminalFrames(result.stdout);
+  });
+
+  it('architecture health emits API-equivalent clean JSON and bounded human output', async () => {
+    const layers = [{ name: 'source', paths: ['src/**'] }];
+    const readOnly = await SolidKG.open(testDir, { readOnly: true });
+    let expected: unknown;
+    try {
+      expected = readOnly.getArchitectureHealth({ layers });
+      const db = (readOnly as unknown as { db: { getDb(): { prepare(sql: string): { run(): void } } } }).db.getDb();
+      expect(() => db.prepare('CREATE TABLE cli_read_only_rejection (id INTEGER)').run()).toThrow();
+    } finally {
+      readOnly.destroy();
+    }
+
+    const json = runCli(['architecture', 'health', '--path', testDir, '--layers', JSON.stringify(layers), '--json']);
+    const human = runCli(['architecture', 'health', '--path', testDir, '--layers', JSON.stringify(layers)]);
+
+    expect(json.status).toBe(0);
+    expect(json.stderr).toBe('');
+    expect(JSON.parse(json.stdout)).toEqual(expected);
+    expectNoAnsiEscapeSequences(json.stdout);
+    expectNoTerminalFrames(json.stdout);
+    expect(human.status).toBe(0);
+    expect(human.stderr).toBe('');
+    expect(human.stdout).toContain('## Architecture Health');
+    expectNoAnsiEscapeSequences(human.stdout);
+    expectNoTerminalFrames(human.stdout);
+  });
+
+  it.each([
+    { command: ['architecture', 'health'], name: 'architecture health' },
+    { command: ['snapshot', 'drift', 'baseline'], name: 'snapshot drift' },
+  ])('$name reports schema 10 remediation without changing database bytes', async ({ command }) => {
+    const writable = await SolidKG.open(testDir);
+    try {
+      const db = (writable as unknown as { db: { getDb(): { exec(sql: string): void; prepare(sql: string): { run(...params: unknown[]): void } } } }).db.getDb();
+      db.exec('DELETE FROM schema_versions');
+      db.prepare('INSERT INTO schema_versions (version, applied_at, description) VALUES (?, ?, ?)').run(10, Date.now(), 'test schema');
+    } finally {
+      writable.destroy();
+    }
+    const dbPath = getDatabasePath(testDir);
+    const before = fs.readFileSync(dbPath);
+    const result = runCli([...command, '--path', testDir, '--json']);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('SolidKG schema 10 must be upgraded to 11 before architecture health or snapshot drift can be read. Run "solidkg sync <project>" once with write access, then retry.\n');
+    expect(fs.readFileSync(dbPath)).toEqual(before);
+  });
+
+  it('snapshot create layers persists normalized options for API-equivalent drift', async () => {
+    const layers = [{ name: 'source', paths: ['./src/**', 'src/**'] }];
+    const create = runCli(['snapshot', 'create', 'baseline', '--path', testDir, '--layers', JSON.stringify(layers), '--json']);
+
+    expect(create.status).toBe(0);
+    expect(create.stderr).toBe('');
+    expect(JSON.parse(create.stdout)).toMatchObject({ label: 'baseline' });
+
+    fs.appendFileSync(path.join(testDir, 'src', 'service.ts'), 'export const changed = entry();\n');
+    const writable = await SolidKG.open(testDir);
+    try {
+      await writable.sync();
+    } finally {
+      writable.destroy();
+    }
+    const readOnly = await SolidKG.open(testDir, { readOnly: true });
+    let expected: unknown;
+    try {
+      expected = await readOnly.getSnapshotHealthDrift('baseline');
+    } finally {
+      readOnly.destroy();
+    }
+
+    const drift = runCli(['snapshot', 'drift', 'baseline', '--path', testDir, '--json']);
+
+    expect(drift.status).toBe(0);
+    expect(drift.stderr).toBe('');
+    expect(JSON.parse(drift.stdout)).toEqual(expected);
+    expectNoAnsiEscapeSequences(drift.stdout);
+    expectNoTerminalFrames(drift.stdout);
+  });
+
+  it('snapshot drift rejects layers and architecture health rejects malformed layers', () => {
+    const drift = runCli(['snapshot', 'diff', 'baseline', '--path', testDir, '--layers', '[]']);
+    const malformed = runCli(['architecture', 'health', '--path', testDir, '--layers', '[']);
+    const duplicate = runCli(['architecture', 'health', '--path', testDir, '--layers', '[{"name":"source","paths":["src/**"]},{"name":"source","paths":["lib/**"]}]']);
+
+    expect(drift.status).toBe(1);
+    expect(drift.stdout).toBe('');
+    expect(drift.stderr).toContain('--layers is only supported for snapshot create');
+    expect(malformed.status).toBe(1);
+    expect(malformed.stdout).toBe('');
+    expect(malformed.stderr).toContain('layersJson is invalid JSON:');
+    expect(duplicate.status).toBe(1);
+    expect(duplicate.stdout).toBe('');
+    expect(duplicate.stderr).toContain('duplicate layer name: source');
   });
 
   it('rejects too many overview expand paths through files command', () => {
