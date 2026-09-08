@@ -9,7 +9,7 @@ import { SqliteDatabase } from './sqlite-adapter';
 /**
  * Current schema version
  */
-export const CURRENT_SCHEMA_VERSION = 10;
+export const CURRENT_SCHEMA_VERSION = 11;
 
 /**
  * Migration definition
@@ -431,6 +431,25 @@ const migrations: Migration[] = [
           INSERT INTO source_chunks_fts(rowid, id, node_id, file_path, language, symbol_kind, content, code_token_text)
           VALUES (NEW.rowid, NEW.id, NEW.node_id, NEW.file_path, NEW.language, NEW.symbol_kind, NEW.content, NEW.code_token_text);
         END;
+      `);
+    },
+  },
+  {
+    version: 11,
+    description: 'Add snapshot-scoped architecture analysis storage',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS graph_snapshot_analyses (
+          snapshot_label TEXT NOT NULL,
+          analysis_kind TEXT NOT NULL,
+          analysis_version INTEGER NOT NULL,
+          options_json TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          PRIMARY KEY (snapshot_label, analysis_kind, analysis_version),
+          FOREIGN KEY (snapshot_label) REFERENCES graph_snapshots(label) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_graph_snapshot_analyses_label ON graph_snapshot_analyses(snapshot_label);
+        PRAGMA user_version = 11;
       `);
     },
   },

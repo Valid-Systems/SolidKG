@@ -419,9 +419,43 @@ export interface UnresolvedReference {
   /** Possible qualified names it might resolve to */
   candidates?: string[];
 
+  memberCall?: MemberCallEvidence;
+
   /** Semantic relation member metadata to carry through reference resolution */
   relationHint?: FrameworkRelationHintRef;
 }
+
+export interface MemberCallEvidence {
+  receiver: string;
+  member: string;
+  ownerName?: string;
+  ownerIsStatic?: boolean;
+  ownerStartLine?: number;
+  ownerStartColumn?: number;
+  binding?: MemberCallBinding;
+}
+
+export type MemberCallBinding =
+  | {
+      kind: 'local';
+      ownerFilePath: string;
+      ownerStartLine: number;
+      ownerStartColumn: number;
+      access: 'instance' | 'static';
+    }
+  | {
+      kind: 'import';
+      localName: string;
+      exportPath: string[];
+      access: 'instance' | 'static' | 'namespace';
+    }
+  | {
+      kind: 'native';
+      moduleName: string;
+    }
+  | {
+      kind: 'unknown';
+    };
 
 export type FrameworkRelationHintMemberRole =
   | "route"
@@ -766,10 +800,15 @@ export interface ReturnedEvidenceActionability {
 }
 
 export type UncertaintyLabel =
+  | "architecture_health_partial"
   | "ambiguous_symbol"
+  | "ambiguous_snapshot_label"
   | "bounded_no_results"
   | "bounded_no_static_path"
   | "missing_query_concept"
+  | "snapshot_health_drift_incompatible"
+  | "snapshot_health_drift_unavailable"
+  | "snapshot_label_required"
   | "source_partial"
   | "heuristic_edge";
 

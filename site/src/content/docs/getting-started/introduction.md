@@ -5,7 +5,7 @@ description: What SolidKG is, and how it reduces AI coding-agent rediscovery wor
 
 SolidKG is a **local-first code-intelligence tool**. It parses your codebase with [tree-sitter](https://tree-sitter.github.io/), stores every symbol, edge, and file in a local SQLite database, and exposes the result as a queryable **knowledge graph** — over the [Model Context Protocol (MCP)](/solidkg/reference/mcp-server/), a CLI, and a TypeScript library.
 
-It exists to help AI coding agents — Claude Code, Cursor, Codex CLI, opencode, and Hermes Agent — **answer structural questions with less file scanning**. Instead of relying exclusively on `grep`, `glob`, and `Read` to reconstruct how code fits together, an agent can query a pre-built index first and fall back to source when graph evidence is incomplete.
+SolidKG helps AI coding agents **answer structural questions with less file scanning**. Installer targets include Claude Code, Cursor, Codex CLI, opencode, Hermes Agent, Antigravity, OMP / Pi coding agent, and Kimi Code. An agent can query a pre-built index instead of relying exclusively on `grep`, `glob`, and `Read` to reconstruct code relationships. When graph evidence is incomplete, the agent can fall back to source.
 
 ## Why it matters
 

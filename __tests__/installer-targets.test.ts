@@ -480,6 +480,45 @@ describe('Installer instructions template', () => {
     }
   });
 
+  it('documents architecture health and snapshot drift consistently', () => {
+    const guidanceSurfaces = {
+      serverInstructions: fs.readFileSync(path.join(process.cwd(), 'src', 'mcp', 'server-instructions.ts'), 'utf-8'),
+      installerTemplate: fs.readFileSync(path.join(process.cwd(), 'src', 'installer', 'instructions-template.ts'), 'utf-8'),
+      agents: fs.readFileSync(path.join(process.cwd(), 'AGENTS.md'), 'utf-8'),
+      cursorRules: fs.readFileSync(path.join(process.cwd(), '.cursor', 'rules', 'solidkg.mdc'), 'utf-8'),
+      readme: fs.readFileSync(path.join(process.cwd(), 'README.md'), 'utf-8'),
+      siteMcpDocs: fs.readFileSync(path.join(process.cwd(), 'site', 'src', 'content', 'docs', 'reference', 'mcp-server.md'), 'utf-8'),
+    };
+    const compatibilityStates = [
+      'comparable',
+      'partially_compatible',
+      'incompatible_analysis',
+      'baseline_analysis_unavailable',
+    ];
+
+    for (const [surface, content] of Object.entries(guidanceSurfaces)) {
+      expect.soft(content, `${surface} should name the architecture health action`).toContain('solidkg_architecture');
+      expect.soft(content, `${surface} should name the health action`).toMatch(/action=\\?"health\\?"/);
+      expect.soft(content, `${surface} should name the snapshot drift action`).toContain('solidkg_snapshot');
+      expect.soft(content, `${surface} should name the drift action`).toMatch(/action=\\?"drift\\?"/);
+      expect.soft(content, `${surface} should document read-only behavior`).toMatch(/read-only/i);
+      expect.soft(content, `${surface} should document the required schema`).toContain('schema 11');
+      expect.soft(content, `${surface} should identify complete CLI JSON output`).toContain('--json');
+      expect.soft(content, `${surface} should document presentation bounds`).toMatch(/20 items/i);
+      expect.soft(content, `${surface} should limit static unreferenced evidence`).toMatch(/unreferenced.*candidates?/i);
+      for (const status of compatibilityStates) {
+        expect.soft(content, `${surface} should document ${status}`).toContain(status);
+      }
+    }
+
+    expect(INSTRUCTIONS_TEMPLATE).toContain('Show repository architecture health');
+    expect(INSTRUCTIONS_TEMPLATE).toContain('match one saved snapshot label exactly');
+    expect(INSTRUCTIONS_TEMPLATE).not.toMatch(/new (?:MCP )?tool/i);
+    expect(INSTRUCTIONS_TEMPLATE.indexOf('### Retrieval extensions')).toBeGreaterThan(
+      INSTRUCTIONS_TEMPLATE.indexOf('### Architecture health and snapshot drift'),
+    );
+  });
+
   it('documents SCIP generation status in installed agent guidance', () => {
     expect(INSTRUCTIONS_TEMPLATE).toContain('SCIP');
     expect(INSTRUCTIONS_TEMPLATE).toContain('generation state');

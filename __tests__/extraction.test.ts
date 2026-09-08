@@ -531,6 +531,270 @@ function main() {
     const calls = result.unresolvedReferences.filter((r) => r.referenceKind === 'calls');
     expect(calls.some((c) => c.referenceName === 'processData')).toBe(true);
   });
+
+  it('should attach owner evidence only to defensible member-call receivers', () => {
+    const result = extractFromSource('service.ts', `
+class Service { run(): void {} }
+function use(client: Service): void {
+  client.run();
+  const fresh = new Service();
+  fresh.run();
+  unknown.run();
+  getClient().run();
+  new Map().run();
+}
+function getClient(): unknown { return {}; }
+`);
+    const calls = result.unresolvedReferences.filter((reference) => reference.referenceKind === 'calls');
+    expect(calls.find((reference) => reference.referenceName === 'client.run')?.memberCall).toMatchObject({
+      receiver: 'client',
+      member: 'run',
+      ownerName: 'Service',
+    });
+    expect(calls.find((reference) => reference.referenceName === 'fresh.run')?.memberCall).toMatchObject({
+      receiver: 'fresh',
+      member: 'run',
+      ownerName: 'Service',
+    });
+    expect(calls.find((reference) => reference.referenceName === 'unknown.run')?.memberCall?.ownerName).toBeUndefined();
+    expect(calls.find((reference) => reference.memberCall?.receiver === 'getClient()')?.memberCall?.ownerName).toBeUndefined();
+    expect(calls.find((reference) => reference.memberCall?.receiver === 'new Map()')?.memberCall?.ownerName).toBeUndefined();
+  });
+
+  it('should respect lexical bindings and this semantics when inferring member-call owners', () => {
+    const result = extractFromSource('service.ts', `
+import { Service as ImportedService } from './external';
+
+class Service { run(): void {} }
+class Other { run(): void {} }
+namespace Models { export class Service { run(): void {} } }
+
+function declarationInAnotherScope(): void {
+  const leaked: Service = new Service();
+  leaked.run();
+}
+
+function outsideDeclarationScope(): void {
+  leaked.run();
+}
+
+function shadowedBinding(): void {
+  const shadowedClient = new Service();
+  function inner(shadowedClient: Other): void {
+    shadowedClient.run();
+  }
+  inner();
+}
+
+function untypedShadow(): void {
+  const shadowedClient: Service = new Service();
+  function inner(): void {
+    const shadowedClient = getClient();
+    shadowedClient.run();
+  }
+  inner();
+}
+
+function unionBinding(unionClient: Service | Other): void {
+  unionClient.run();
+}
+
+function reassignedBinding(): void {
+  let reassignedClient: Service = new Service();
+  reassignedClient = getClient();
+  reassignedClient.run();
+}
+
+function reassignedParameter(reassignedClient: Service): void {
+  reassignedClient = getClient() as Service;
+  reassignedClient.run();
+}
+
+function qualifiedType(qualifiedClient: Models.Service): void {
+  qualifiedClient.run();
+}
+
+function builtInType(map: Map<string, string>): void {
+  map.get('key');
+}
+
+function callBeforeDeclaration(): void {
+  laterClient.run();
+}
+const laterClient: Service = new Service();
+
+class FieldHolder {
+  client: Service;
+  invoke(): void { this.client.run(); }
+}
+
+class Owner {
+  direct(): void { this.directTarget(); }
+  arrow = (): void => this.arrowTarget();
+  static invokeStatic(): void { this.staticTarget(); }
+  dynamic(): void {
+    function callback(this: { dynamicTarget(): void }): void {
+      this.dynamicTarget();
+    }
+    callback.call(this);
+  }
+  directTarget(): void {}
+  arrowTarget(): void {}
+  static staticTarget(): void {}
+  dynamicTarget(): void {}
+}
+
+function staticOwner(): void { Owner.staticTarget(); }
+
+class Cache { get(): void {} }
+function outerCache(): void {
+  const cache = new Cache();
+  cache.get();
+}
+function nestedCache(): void {
+  class Cache { get(): void {} }
+  const cache = new Cache();
+  cache.get();
+}
+
+function shadowImportedClass(): void {
+  class ImportedService { instanceShared(): void {} }
+  const localService = new ImportedService();
+  localService.instanceShared();
+}
+
+function getClient(): unknown { return {}; }
+`);
+    const calls = result.unresolvedReferences.filter((reference) => reference.referenceKind === 'calls');
+    const evidenceFor = (receiver: string, member: string): NonNullable<typeof calls[number]['memberCall']> | undefined =>
+      calls.find((reference) =>
+        reference.memberCall?.receiver === receiver && reference.memberCall.member === member
+      )?.memberCall;
+    const ownersFor = (receiver: string, member: string): Array<string | undefined> =>
+      calls
+        .filter((reference) => reference.memberCall?.receiver === receiver && reference.memberCall.member === member)
+        .map((reference) => reference.memberCall?.ownerName);
+    const ownerFor = (receiver: string, member: string): string | undefined => evidenceFor(receiver, member)?.ownerName;
+
+    expect(ownersFor('leaked', 'run')).toEqual(['Service', undefined]);
+    expect(ownerFor('shadowedClient', 'run')).toBe('Other');
+    expect(ownersFor('shadowedClient', 'run')).toContain(undefined);
+    expect(ownerFor('unionClient', 'run')).toBeUndefined();
+    expect(ownersFor('reassignedClient', 'run')).toEqual([undefined, undefined]);
+    expect(ownerFor('qualifiedClient', 'run')).toBe('Service');
+    expect(ownerFor('map', 'get')).toBeUndefined();
+    expect(ownerFor('laterClient', 'run')).toBeUndefined();
+    expect(ownerFor('this.client', 'run')).toBe('Service');
+    expect(evidenceFor('this', 'directTarget')).toMatchObject({ ownerName: 'Owner', ownerIsStatic: false });
+    expect(evidenceFor('this', 'arrowTarget')).toMatchObject({ ownerName: 'Owner', ownerIsStatic: false });
+    expect(evidenceFor('this', 'staticTarget')).toMatchObject({ ownerName: 'Owner', ownerIsStatic: true });
+    expect(evidenceFor('Owner', 'staticTarget')).toMatchObject({ ownerName: 'Owner', ownerIsStatic: true });
+    expect(ownerFor('this', 'dynamicTarget')).toBeUndefined();
+    const callerName = new Map(result.nodes.map((node) => [node.id, node.name]));
+    const outerCache = calls.find((reference) => callerName.get(reference.fromNodeId) === 'outerCache' && reference.memberCall?.member === 'get')?.memberCall;
+    const nestedCache = calls.find((reference) => callerName.get(reference.fromNodeId) === 'nestedCache' && reference.memberCall?.member === 'get')?.memberCall;
+    const localImportedService = calls.find((reference) =>
+      callerName.get(reference.fromNodeId) === 'shadowImportedClass' &&
+      reference.memberCall?.receiver === 'localService' &&
+      reference.memberCall.member === 'instanceShared'
+    )?.memberCall;
+    const localImportedServiceClass = result.nodes.find((node) =>
+      node.kind === 'class' && node.name === 'ImportedService'
+    );
+    expect(outerCache?.ownerStartLine).toBeDefined();
+    expect(nestedCache?.ownerStartLine).toBeDefined();
+    expect(nestedCache?.ownerStartLine).not.toBe(outerCache?.ownerStartLine);
+    expect(localImportedService).toMatchObject({
+      ownerName: 'ImportedService',
+      ownerIsStatic: false,
+      ownerStartLine: localImportedServiceClass?.startLine,
+      ownerStartColumn: localImportedServiceClass?.startColumn,
+    });
+  });
+
+  it('should emit lexical bindings for JavaScript and TypeScript member calls', () => {
+    const result = extractFromSource('bindings.ts', `
+import { Service as ImportedService, requireNativeModule as nativeFactory } from 'expo-modules-core';
+import * as api from './api';
+
+class LocalService { run(): void {} }
+class FieldHost {
+  invoke(): void { this.later.run(); }
+  later: LocalService = new LocalService();
+}
+
+const NativeModule = nativeFactory('ExpoHaptics');
+
+function typed(client: ImportedService): void { client.run(); }
+function constructed(): void {
+  const local = new LocalService();
+  local.run();
+  ImportedService.run();
+  api.create();
+}
+function shadowed(ImportedService: LocalService): void { ImportedService.run(); }
+function ambient(map: Map<string, string>): void { map.get('key'); }
+function bridge(): void { NativeModule.perform(); }
+`);
+    const calls = result.unresolvedReferences.filter((reference) => reference.referenceKind === 'calls');
+    const bindingFor = (referenceName: string) =>
+      calls.find((reference) => reference.referenceName === referenceName)?.memberCall?.binding;
+    const bindingForReceiver = (receiver: string, member: string) =>
+      calls.find((reference) =>
+        reference.memberCall?.receiver === receiver && reference.memberCall.member === member
+      )?.memberCall?.binding;
+    const bindingForCaller = (caller: string, receiver: string, member: string) => {
+      const callerName = new Map(result.nodes.map((node) => [node.id, node.name]));
+      return calls.find((reference) =>
+        callerName.get(reference.fromNodeId) === caller &&
+        reference.memberCall?.receiver === receiver &&
+        reference.memberCall.member === member
+      )?.memberCall?.binding;
+    };
+    const localService = result.nodes.find((node) => node.kind === 'class' && node.name === 'LocalService');
+
+    expect(bindingFor('client.run')).toEqual({
+      kind: 'import',
+      localName: 'ImportedService',
+      exportPath: ['Service'],
+      access: 'instance',
+    });
+    expect(bindingFor('local.run')).toEqual({
+      kind: 'local',
+      ownerFilePath: 'bindings.ts',
+      ownerStartLine: localService?.startLine,
+      ownerStartColumn: localService?.startColumn,
+      access: 'instance',
+    });
+    expect(bindingFor('ImportedService.run')).toEqual({
+      kind: 'import',
+      localName: 'ImportedService',
+      exportPath: ['Service'],
+      access: 'static',
+    });
+    expect(bindingForCaller('shadowed', 'ImportedService', 'run')).toEqual({
+      kind: 'local',
+      ownerFilePath: 'bindings.ts',
+      ownerStartLine: localService?.startLine,
+      ownerStartColumn: localService?.startColumn,
+      access: 'instance',
+    });
+    expect(bindingFor('api.create')).toEqual({
+      kind: 'import',
+      localName: 'api',
+      exportPath: ['create'],
+      access: 'namespace',
+    });
+    expect(bindingFor('map.get')).toEqual({ kind: 'unknown' });
+    expect(bindingFor('NativeModule.perform')).toEqual({ kind: 'native', moduleName: 'ExpoHaptics' });
+    expect(bindingForReceiver('this.later', 'run')).toEqual({
+      kind: 'local',
+      ownerFilePath: 'bindings.ts',
+      ownerStartLine: localService?.startLine,
+      ownerStartColumn: localService?.startColumn,
+      access: 'instance',
+    });
+  });
 });
 
 describe('Arrow Function Export Extraction', () => {

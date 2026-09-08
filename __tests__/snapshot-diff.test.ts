@@ -3,7 +3,14 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import SolidKG from '../src/index';
-import { QueryBuilder } from '../src/db/queries';
+import { DatabaseConnection } from '../src/db';
+import { QueryBuilder, type StoredSnapshotGraph } from '../src/db/queries';
+import {
+  canonicalizeArchitectureHealthReport,
+  canonicalJson,
+  normalizeArchitectureHealthOptions,
+  type StoredSnapshotAnalysisRow,
+} from '../src/analysis';
 import { ToolHandler } from '../src/mcp/tools';
 import type { Edge, Hyperedge, HyperedgeMember, Node } from '../src/types';
 
@@ -48,6 +55,15 @@ interface SnapshotSolidKG {
   listSnapshots(): Promise<SnapshotMetadata[]>;
   deleteSnapshot(label: string): Promise<boolean>;
   diffSnapshot(label: string): Promise<SnapshotDiff>;
+}
+
+interface SnapshotAnalysisQueries {
+  saveSnapshot(
+    metadata: SnapshotMetadata,
+    graph: StoredSnapshotGraph,
+    analyses?: readonly StoredSnapshotAnalysisRow[],
+  ): void;
+  getSnapshotAnalyses(label: string): StoredSnapshotAnalysisRow[];
 }
 
 describe('graph snapshots and diffs', () => {
@@ -305,12 +321,173 @@ export function second(): number {
     expect(diff.content[0]?.text).toContain('second');
   });
 
+  it('analysis storage round-trips canonical rows and replaces them with a snapshot', async () => {
+    await createProject({
+      'src/index.ts': 'export const answer = 42;\n',
+    });
+
+    const queries = getQueries(cg!);
+    const metadata: SnapshotMetadata = {
+      label: 'analysis-baseline',
+      createdAt: 1,
+      nodeCount: 0,
+      edgeCount: 0,
+      hyperedgeCount: 0,
+      hyperedgeMemberCount: 0,
+    };
+    const analysis = analysisFor(metadata.label);
+
+    snapshotAnalysisQueries(queries).saveSnapshot(metadata, emptySnapshotGraph(), [analysis]);
+
+    expect(snapshotAnalysisQueries(queries).getSnapshotAnalyses(metadata.label)).toEqual([analysis]);
+
+    snapshotAnalysisQueries(queries).saveSnapshot({ ...metadata, createdAt: 2 }, emptySnapshotGraph());
+
+    expect(snapshotAnalysisQueries(queries).getSnapshotAnalyses(metadata.label)).toEqual([]);
+  });
+
+  it('stores analyses after every nonempty snapshot graph record family', () => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solidkg-snapshot-analysis-order-'));
+    const connection = DatabaseConnection.initialize(path.join(testDir!, 'solidkg.db'));
+    try {
+      const db = connection.getDb();
+      db.exec(`
+        CREATE TRIGGER reject_analysis_before_snapshot_graph
+        BEFORE INSERT ON graph_snapshot_analyses
+        WHEN
+          (SELECT COUNT(*) FROM graph_snapshot_nodes WHERE snapshot_label = NEW.snapshot_label) = 0
+          OR (SELECT COUNT(*) FROM graph_snapshot_edges WHERE snapshot_label = NEW.snapshot_label) = 0
+          OR (SELECT COUNT(*) FROM graph_snapshot_hyperedges WHERE snapshot_label = NEW.snapshot_label) = 0
+          OR (SELECT COUNT(*) FROM graph_snapshot_hyperedge_members WHERE snapshot_label = NEW.snapshot_label) = 0
+        BEGIN
+          SELECT RAISE(ABORT, 'snapshot analysis inserted before graph rows');
+        END;
+      `);
+
+      const metadata: SnapshotMetadata = {
+        label: 'analysis-after-graph',
+        createdAt: 1,
+        nodeCount: 1,
+        edgeCount: 1,
+        hyperedgeCount: 1,
+        hyperedgeMemberCount: 1,
+      };
+      const graph = nonemptySnapshotGraph();
+      const analysis = analysisFor(metadata.label);
+      const queries = new QueryBuilder(db);
+
+      snapshotAnalysisQueries(queries).saveSnapshot(metadata, graph, [analysis]);
+
+      expect(queries.getSnapshot(metadata.label)).toEqual({ metadata, graph });
+      expect(snapshotAnalysisQueries(queries).getSnapshotAnalyses(metadata.label)).toEqual([analysis]);
+    } finally {
+      connection.close();
+    }
+  });
+
+  it('analysis storage migrates v10 databases, explicitly deletes children, and preserves legacy snapshots', () => {
+    testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solidkg-snapshot-analysis-migration-'));
+    const dbPath = path.join(testDir!, 'solidkg.db');
+    const seeded = DatabaseConnection.initialize(dbPath);
+    try {
+      const db = seeded.getDb();
+      new QueryBuilder(db).saveSnapshot({
+        label: 'legacy', createdAt: 1, nodeCount: 0, edgeCount: 0, hyperedgeCount: 0, hyperedgeMemberCount: 0,
+      }, emptySnapshotGraph());
+      db.exec(`
+        DROP TABLE IF EXISTS graph_snapshot_analyses;
+        DELETE FROM schema_versions WHERE version > 10;
+        INSERT OR IGNORE INTO schema_versions (version, applied_at, description)
+        VALUES (10, strftime('%s', 'now') * 1000, 'v10 snapshot fixture');
+      `);
+    } finally {
+      seeded.close();
+    }
+
+    const migrated = DatabaseConnection.open(dbPath);
+    try {
+      const db = migrated.getDb();
+      expect(migrated.getSchemaVersion()?.version).toBe(11);
+      expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 11 });
+      expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'graph_snapshot_analyses'").get()).toBeTruthy();
+
+      const queries = new QueryBuilder(db);
+      expect(queries.getSnapshot('legacy')?.metadata.label).toBe('legacy');
+      expect(snapshotAnalysisQueries(queries).getSnapshotAnalyses('legacy')).toEqual([]);
+
+      snapshotAnalysisQueries(queries).saveSnapshot({
+        label: 'delete-me', createdAt: 2, nodeCount: 0, edgeCount: 0, hyperedgeCount: 0, hyperedgeMemberCount: 0,
+      }, emptySnapshotGraph(), [analysisFor('delete-me')]);
+      expect(queries.deleteSnapshot('delete-me')).toBe(true);
+      expect(db.prepare('SELECT COUNT(*) AS count FROM graph_snapshot_analyses WHERE snapshot_label = ?').get('delete-me')).toEqual({ count: 0 });
+    } finally {
+      migrated.close();
+    }
+  });
+
+  it('analysis storage rolls back a failed replacement without changing the prior snapshot', async () => {
+    await createProject({});
+    const queries = getQueries(cg!);
+    const metadata: SnapshotMetadata = {
+      label: 'rollback', createdAt: 1, nodeCount: 1, edgeCount: 1, hyperedgeCount: 1, hyperedgeMemberCount: 1,
+    };
+    const initial = analysisFor(metadata.label);
+    const initialGraph = nonemptySnapshotGraph();
+    snapshotAnalysisQueries(queries).saveSnapshot(metadata, initialGraph, [initial]);
+    const beforeSnapshot = queries.getSnapshot(metadata.label);
+    const beforeAnalyses = snapshotAnalysisQueries(queries).getSnapshotAnalyses(metadata.label);
+
+    expect(() => snapshotAnalysisQueries(queries).saveSnapshot(
+      { ...metadata, createdAt: 2 },
+      nonemptySnapshotGraph(),
+      [analysisFor(metadata.label), analysisFor(metadata.label)],
+    )).toThrow();
+
+    expect(queries.getSnapshot(metadata.label)).toEqual(beforeSnapshot);
+    expect(snapshotAnalysisQueries(queries).getSnapshotAnalyses(metadata.label)).toEqual(beforeAnalyses);
+  });
+
+  it('captures health with a snapshot and reports drift for saved or legacy analyses', async () => {
+    await createProject({
+      'src/index.ts': 'export const answer = 42;\n',
+    });
+
+    const options = { layers: [{ name: 'source', paths: ['src/**'] }] };
+    const health = cg!.getArchitectureHealth(options);
+    expect(health.options).toEqual(normalizeArchitectureHealthOptions(options));
+
+    await cg!.createSnapshot('health-baseline', { architecture: options });
+    const analyses = snapshotAnalysisQueries(getQueries(cg!)).getSnapshotAnalyses('health-baseline');
+    expect(analyses).toHaveLength(1);
+    expect(JSON.parse(analyses[0]!.payloadJson)).toMatchObject({
+      options: normalizeArchitectureHealthOptions(options),
+      health: { analysisKind: 'architecture_health', analysisVersion: 1 },
+    });
+
+    const drift = await cg!.getSnapshotHealthDrift('health-baseline');
+    expect(drift.comparisonStatus).toBe('comparable');
+    expect(drift.graphDiffCounts).toEqual({
+      addedNodes: 0, removedNodes: 0, changedNodes: 0,
+      addedEdges: 0, removedEdges: 0, changedEdges: 0,
+      addedHyperedges: 0, removedHyperedges: 0, changedHyperedges: 0,
+      addedHyperedgeMembers: 0, removedHyperedgeMembers: 0, changedHyperedgeMembers: 0,
+    });
+
+    snapshotAnalysisQueries(getQueries(cg!)).saveSnapshot({
+      label: 'legacy-health', createdAt: 1, nodeCount: 0, edgeCount: 0, hyperedgeCount: 0, hyperedgeMemberCount: 0,
+    }, emptySnapshotGraph());
+    await expect(cg!.getSnapshotHealthDrift('legacy-health')).resolves.toMatchObject({
+      comparisonStatus: 'baseline_analysis_unavailable',
+      reasons: ['baseline_analysis_unavailable'],
+    });
+  });
+
   async function createProject(files: Record<string, string>): Promise<void> {
     testDir = fs.mkdtempSync(path.join(os.tmpdir(), 'solidkg-snapshot-diff-'));
     for (const [relativePath, contents] of Object.entries(files)) {
       writeProjectFile(relativePath, contents);
     }
-    cg = SolidKG.initSync(testDir);
+    cg = SolidKG.initSync(testDir!);
     await cg.indexAll();
   }
 
@@ -328,6 +505,69 @@ function snapshotApi(cg: SolidKG): SnapshotSolidKG {
 
 function getQueries(cg: SolidKG): QueryBuilder {
   return (cg as unknown as { queries: QueryBuilder }).queries;
+}
+
+function snapshotAnalysisQueries(queries: QueryBuilder): SnapshotAnalysisQueries {
+  return queries as unknown as SnapshotAnalysisQueries;
+}
+
+function emptySnapshotGraph(): StoredSnapshotGraph {
+  return { nodes: [], edges: [], hyperedges: [], hyperedgeMembers: [] };
+}
+
+function nonemptySnapshotGraph(): StoredSnapshotGraph {
+  return {
+    nodes: [{
+      id: 'snapshot-node',
+      kind: 'function',
+      name: 'snapshotNode',
+      qualifiedName: 'snapshotNode',
+      filePath: 'src/snapshot.ts',
+      language: 'typescript',
+      startLine: 1,
+      endLine: 1,
+      startColumn: 0,
+      endColumn: 12,
+    }],
+    edges: [{ source: 'snapshot-node', target: 'snapshot-node', kind: 'calls' }],
+    hyperedges: [{ id: 'snapshot-hyperedge', kind: 'event_channel' }],
+    hyperedgeMembers: [{
+      hyperedgeId: 'snapshot-hyperedge',
+      nodeId: 'snapshot-node',
+      role: 'publisher',
+      ordinal: 0,
+    }],
+  };
+}
+
+function analysisFor(snapshotLabel: string): StoredSnapshotAnalysisRow {
+  const options = normalizeArchitectureHealthOptions();
+  const health = canonicalizeArchitectureHealthReport({
+    analysisKind: 'architecture_health',
+    analysisVersion: 1,
+    options,
+    producer: { solidkgVersion: '0.8.0', schemaVersion: 11, graphFactPolicy: 'all_indexed_architecture_edges_v1' },
+    observedGraphFacts: {
+      edgeKinds: [],
+      edgeProvenanceCounts: [],
+      scip: { status: 'unavailable', documentCount: 0, occurrenceCount: 0, relationshipCount: 0 },
+    },
+    metrics: [],
+    signals: [],
+  });
+  return {
+    snapshotLabel,
+    analysisKind: 'architecture_health',
+    analysisVersion: 1,
+    optionsJson: canonicalJson(options),
+    payloadJson: canonicalJson({
+      options,
+      architecture: {
+        packages: [], layers: [], fileAssignments: [], packageDependencies: [], layerDependencies: [], coupling: { packages: [], layers: [] },
+      },
+      health,
+    }),
+  };
 }
 
 function requireNode(queries: QueryBuilder, name: string): Node {

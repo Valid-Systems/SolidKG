@@ -10,7 +10,6 @@ import { existsSync, readFileSync } from "fs";
 import {
   Node,
   Edge,
-  EdgeKind,
   FileRecord,
   ExtractionResult,
   Subgraph,
@@ -98,6 +97,23 @@ import {
   estimateSourceChunkProjectionFileBytes,
   shouldFlushSourceChunkProjectionBatch,
 } from "./source-chunks";
+import {
+  buildArchitectureReport,
+  type ArchitectureManifestPackage,
+} from "./analysis/architecture-report";
+import {
+  canonicalJson,
+  compareSnapshotHealthDrift,
+  deriveArchitectureHealth,
+  normalizeArchitectureHealthOptions,
+  type ArchitectureHealthReport,
+  type NormalizedArchitectureHealthOptions,
+  type SnapshotArchitectureHealthBundle,
+  type SnapshotDiffCounts,
+  type SnapshotHealthDrift,
+  type StoredSnapshotAnalysisRow,
+} from "./analysis";
+import { SOLIDKG_VERSION } from "./version";
 
 // Re-export types for consumers
 export * from "./types";
@@ -132,6 +148,7 @@ export {
   FileError,
   ParseError,
   DatabaseError,
+  SchemaUpgradeRequiredError,
   SearchError,
   VectorError,
   ConfigError,
@@ -155,6 +172,33 @@ export * from "./scip";
 export * from "./profiling";
 export * from "./capabilities";
 export * from "./overview";
+export {
+  ARCHITECTURE_HEALTH_ANALYSIS_KIND,
+  ARCHITECTURE_HEALTH_ANALYSIS_VERSION,
+} from "./analysis";
+export type {
+  ArchitectureHealthCoverage,
+  ArchitectureHealthCoverageStatus,
+  ArchitectureHealthEvidenceAnchor,
+  ArchitectureHealthFinding,
+  ArchitectureHealthFindingFactKey,
+  ArchitectureHealthMetric,
+  ArchitectureHealthMetricDelta,
+  ArchitectureHealthObservedGraphFacts,
+  ArchitectureHealthProducerIdentity,
+  ArchitectureHealthReport,
+  ArchitectureHealthScalarMetricKey,
+  ArchitectureHealthSignal,
+  ArchitectureHealthSignalCoverageRecord,
+  ArchitectureHealthSignalReasonCode,
+  ArchitectureHealthSignalKind,
+  NormalizedArchitectureHealthOptions,
+  SnapshotArchitectureHealthBundle,
+  SnapshotDiffCounts,
+  SnapshotHealthComparisonStatus,
+  SnapshotHealthDriftReasonCode,
+  SnapshotHealthDrift,
+} from "./analysis";
 
 /**
  * Options for initializing a new SolidKG project
@@ -228,6 +272,7 @@ export interface OpenOptions {
 export interface SnapshotMetadataInput {
   description?: string;
   metadata?: Record<string, unknown>;
+  architecture?: AnalyzeArchitectureOptions;
 }
 
 export interface SnapshotMetadata {
@@ -389,16 +434,6 @@ interface SnapshotGraph {
   hyperedges: SnapshotHyperedgeRecord[];
   hyperedgeMembers: SnapshotHyperedgeMemberRecord[];
 }
-
-const ARCHITECTURE_EDGE_KINDS = new Set<EdgeKind>([
-  "imports",
-  "references",
-  "calls",
-  "extends",
-  "implements",
-  "instantiates",
-  "type_of",
-]);
 
 function snapshotNode(node: Node): SnapshotNodeRecord {
   const { updatedAt: _updatedAt, ...record } = node;
@@ -579,6 +614,23 @@ function diffRecords<T>(
   return { added, removed, changed };
 }
 
+function snapshotDiffCounts(diff: SnapshotDiff): SnapshotDiffCounts {
+  return {
+    addedNodes: diff.addedNodes.length,
+    removedNodes: diff.removedNodes.length,
+    changedNodes: diff.changedNodes.length,
+    addedEdges: diff.addedEdges.length,
+    removedEdges: diff.removedEdges.length,
+    changedEdges: diff.changedEdges.length,
+    addedHyperedges: diff.addedHyperedges.length,
+    removedHyperedges: diff.removedHyperedges.length,
+    changedHyperedges: diff.changedHyperedges.length,
+    addedHyperedgeMembers: diff.addedHyperedgeMembers.length,
+    removedHyperedgeMembers: diff.removedHyperedgeMembers.length,
+    changedHyperedgeMembers: diff.changedHyperedgeMembers.length,
+  };
+}
+
 function normalizePath(value: string): string {
   return (
     value.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/$/, "") || "."
@@ -612,40 +664,6 @@ function parentDir(dir: string): string | null {
   if (dir === ".") return null;
   const index = dir.lastIndexOf("/");
   return index === -1 ? "." : dir.slice(0, index) || ".";
-}
-
-function matchesLayerPath(filePath: string, pattern: string): boolean {
-  const normalizedFile = normalizePath(filePath);
-  const normalizedPattern = normalizePath(pattern);
-  if (normalizedPattern.endsWith("/**")) {
-    const prefix = normalizedPattern.slice(0, -3);
-    return normalizedFile === prefix || normalizedFile.startsWith(`${prefix}/`);
-  }
-  return (
-    normalizedFile === normalizedPattern ||
-    normalizedFile.startsWith(`${normalizedPattern}/`)
-  );
-}
-
-function couplingFromDependencies(
-  names: string[],
-  dependencies: ArchitectureDependency[],
-): CouplingMetric[] {
-  return names.sort().map((name) => {
-    const incoming = new Set(
-      dependencies
-        .filter((dep) => dep.target === name)
-        .map((dep) => dep.source),
-    );
-    const outgoing = new Set(
-      dependencies
-        .filter((dep) => dep.source === name)
-        .map((dep) => dep.target),
-    );
-    const Ca = incoming.size;
-    const Ce = outgoing.size;
-    return { name, Ca, Ce, instability: Ca + Ce === 0 ? 0 : Ce / (Ca + Ce) };
-  });
 }
 
 /**
@@ -1957,6 +1975,7 @@ export class SolidKG {
   ): Promise<SnapshotMetadata> {
     this.assertWritable("createSnapshot");
     const graph = this.captureSnapshotGraph();
+    const analysis = this.captureArchitectureHealth(input.architecture);
     const metadata: SnapshotMetadata = {
       label,
       description: input.description,
@@ -1967,7 +1986,9 @@ export class SolidKG {
       hyperedgeCount: graph.hyperedges.length,
       hyperedgeMemberCount: graph.hyperedgeMembers.length,
     };
-    this.queries.saveSnapshot(metadata, graph);
+    this.queries.saveSnapshot(metadata, graph, [
+      this.createSnapshotArchitectureHealthAnalysis(label, analysis),
+    ]);
     return metadata;
   }
 
@@ -1983,20 +2004,55 @@ export class SolidKG {
   async diffSnapshot(label: string): Promise<SnapshotDiff> {
     const snapshot = this.queries.getSnapshot(label);
     if (!snapshot) throw new Error(`Snapshot "${label}" not found`);
-    const current = this.captureSnapshotGraph();
+    return this.diffSnapshotGraph(snapshot.graph, this.captureSnapshotGraph());
+  }
+
+  async getSnapshotHealthDrift(label: string): Promise<SnapshotHealthDrift> {
+    const snapshot = this.queries.getSnapshot(label);
+    if (!snapshot) throw new Error(`Snapshot "${label}" not found`);
+    const storedAnalysis = this.queries
+      .getSnapshotAnalyses(label)
+      .find((analysis) => analysis.analysisKind === "architecture_health");
+    const baseline = storedAnalysis
+      ? (JSON.parse(storedAnalysis.payloadJson) as SnapshotArchitectureHealthBundle)
+          .health
+      : null;
+    const current = this.captureArchitectureHealth(baseline?.options).health;
+    const graphDiff = this.diffSnapshotGraph(
+      snapshot.graph,
+      this.captureSnapshotGraph(),
+    );
+    return compareSnapshotHealthDrift({
+      baselineLabel: label,
+      baseline,
+      current,
+      graphDiffCounts: snapshotDiffCounts(graphDiff),
+    });
+  }
+
+  getArchitectureHealth(
+    options: AnalyzeArchitectureOptions = {},
+  ): ArchitectureHealthReport {
+    return this.captureArchitectureHealth(options).health;
+  }
+
+  private diffSnapshotGraph(
+    snapshot: SnapshotGraph,
+    current: SnapshotGraph,
+  ): SnapshotDiff {
     const nodes = diffRecords(
-      snapshot.graph.nodes,
+      snapshot.nodes,
       current.nodes,
       (node) => node.id,
     );
-    const edges = diffRecords(snapshot.graph.edges, current.edges, edgeKey);
+    const edges = diffRecords(snapshot.edges, current.edges, edgeKey);
     const hyperedges = diffRecords(
-      snapshot.graph.hyperedges,
+      snapshot.hyperedges,
       current.hyperedges,
       (hyperedge) => hyperedge.id,
     );
     const members = diffRecords(
-      snapshot.graph.hyperedgeMembers,
+      snapshot.hyperedgeMembers,
       current.hyperedgeMembers,
       memberKey,
     );
@@ -2020,75 +2076,92 @@ export class SolidKG {
     options: AnalyzeArchitectureOptions = {},
   ): ArchitectureReport {
     this.assertWritable("analyzeArchitecture");
-    const files = this.queries
-      .getAllFiles()
-      .filter((file) => !file.path.endsWith("/package.json"));
-    const nodes = this.queries.getAllNodes();
-    const nodesById = new Map(nodes.map((node) => [node.id, node]));
-    const assignments = new Map<string, ArchitectureFileAssignment>();
-
-    for (const file of files) {
-      assignments.set(
-        file.path,
-        this.assignArchitectureFile(file.path, options.layers ?? []),
-      );
-    }
-
-    const packageDependencies = new Map<string, Set<EdgeKind>>();
-    const layerDependencies = new Map<string, Set<EdgeKind>>();
-    for (const edge of this.allEdges(nodes)) {
-      if (!ARCHITECTURE_EDGE_KINDS.has(edge.kind)) continue;
-      const sourceNode = nodesById.get(edge.source);
-      const targetNode = nodesById.get(edge.target);
-      if (!sourceNode || !targetNode) continue;
-      const source = assignments.get(sourceNode.filePath);
-      const target = assignments.get(targetNode.filePath);
-      if (!source || !target) continue;
-
-      if (source.packageName !== target.packageName) {
-        this.addDependencyKind(
-          packageDependencies,
-          source.packageName,
-          target.packageName,
-          edge.kind,
-        );
-      }
-      if (source.layerName !== target.layerName) {
-        this.addDependencyKind(
-          layerDependencies,
-          source.layerName,
-          target.layerName,
-          edge.kind,
-        );
-      }
-    }
-
-    const fileAssignments = [...assignments.values()].sort((a, b) =>
-      a.filePath.localeCompare(b.filePath),
-    );
-    const packages = this.buildPackages(fileAssignments);
-    const layers = this.buildLayers(fileAssignments, options.layers ?? []);
-    const packageDependencyList = this.dependencyMapToList(packageDependencies);
-    const layerDependencyList = this.dependencyMapToList(layerDependencies);
-    const report: ArchitectureReport = {
-      packages,
-      layers,
-      fileAssignments,
-      packageDependencies: packageDependencyList,
-      layerDependencies: layerDependencyList,
-      coupling: {
-        packages: couplingFromDependencies(
-          packages.map((pkg) => pkg.name),
-          packageDependencyList,
-        ),
-        layers: couplingFromDependencies(
-          layers.map((layer) => layer.name),
-          layerDependencyList,
-        ),
-      },
-    };
+    const report = this.projectArchitecture(options);
     this.queries.saveArchitectureReport(report);
     return report;
+  }
+
+  private projectArchitecture(
+    options: AnalyzeArchitectureOptions = {},
+  ): ArchitectureReport {
+    const files = this.queries.getAllFiles();
+    const nodes = this.queries.getAllNodes();
+    return this.projectArchitectureFromFacts(files, nodes, this.allEdges(nodes), options);
+  }
+
+  private projectArchitectureFromFacts(
+    files: readonly FileRecord[],
+    nodes: readonly Node[],
+    edges: readonly Edge[],
+    options: AnalyzeArchitectureOptions,
+  ): ArchitectureReport {
+    return buildArchitectureReport({
+      rootPackageName: path.basename(this.projectRoot),
+      files,
+      nodes,
+      edges,
+      manifests: this.collectArchitectureManifestPackages(files),
+      layerRules: options.layers ?? [],
+    });
+  }
+
+  private captureArchitectureHealth(
+    options: AnalyzeArchitectureOptions = {},
+  ): {
+    architecture: ArchitectureReport;
+    health: ArchitectureHealthReport;
+    options: NormalizedArchitectureHealthOptions;
+  } {
+    const normalizedOptions = normalizeArchitectureHealthOptions(options);
+    const files = this.queries.getAllFiles();
+    const nodes = this.queries.getAllNodes();
+    const edges = this.allEdges(nodes);
+    const architecture = this.projectArchitectureFromFacts(
+      files,
+      nodes,
+      edges,
+      normalizedOptions,
+    );
+    return {
+      architecture,
+      health: deriveArchitectureHealth({
+        architecture,
+        options: normalizedOptions,
+        producer: {
+          solidkgVersion: SOLIDKG_VERSION,
+          schemaVersion: this.db.getSchemaVersion()?.version ?? 0,
+          graphFactPolicy: "all_indexed_architecture_edges_v1",
+        },
+        files,
+        nodes,
+        edges,
+        unresolvedReferences: this.queries.getUnresolvedReferences(),
+        scip: this.queries.getScipStats(),
+      }),
+      options: normalizedOptions,
+    };
+  }
+
+  private createSnapshotArchitectureHealthAnalysis(
+    snapshotLabel: string,
+    analysis: {
+      architecture: ArchitectureReport;
+      health: ArchitectureHealthReport;
+      options: NormalizedArchitectureHealthOptions;
+    },
+  ): StoredSnapshotAnalysisRow {
+    const payload: SnapshotArchitectureHealthBundle = {
+      options: analysis.options,
+      architecture: analysis.architecture,
+      health: analysis.health,
+    };
+    return {
+      snapshotLabel,
+      analysisKind: "architecture_health",
+      analysisVersion: 1,
+      optionsJson: canonicalJson(analysis.options),
+      payloadJson: canonicalJson(payload),
+    };
   }
 
   getArchitecture(): ArchitectureReport {
@@ -2197,50 +2270,30 @@ export class SolidKG {
     return [...edges.values()];
   }
 
-  private assignArchitectureFile(
-    filePath: string,
-    layerRules: ArchitectureLayerRule[],
-  ): ArchitectureFileAssignment {
-    const packageInfo = this.findPackageForFile(filePath);
-    const layerRule = layerRules.find((rule) =>
-      rule.paths.some((pattern) => matchesLayerPath(filePath, pattern)),
-    );
-    return {
-      filePath,
-      packageName: packageInfo.name,
-      packageRoot: packageInfo.root,
-      packageProvenance: packageInfo.provenance,
-      layerName: layerRule?.name ?? "unassigned",
-      layerProvenance: layerRule ? "config_layer" : "unassigned",
-    };
-  }
-
-  private findPackageForFile(filePath: string): {
-    name: string;
-    root: string;
-    provenance: "manifest" | "root";
-  } {
-    let dir: string | null = directoryOf(filePath);
-    while (dir !== null) {
-      const manifestPath = path.join(
-        this.projectRoot,
-        dir === "." ? "" : dir,
-        "package.json",
-      );
-      if (existsSync(manifestPath)) {
-        return {
-          name: this.packageNameFromManifest(manifestPath, dir),
-          root: dir,
-          provenance: "manifest",
-        };
+  private collectArchitectureManifestPackages(
+    files: readonly { path: string }[],
+  ): ArchitectureManifestPackage[] {
+    const manifests = new Map<string, ArchitectureManifestPackage>();
+    for (const file of files) {
+      let directory: string | null = directoryOf(file.path);
+      while (directory !== null) {
+        if (!manifests.has(directory)) {
+          const manifestPath = path.join(
+            this.projectRoot,
+            directory === "." ? "" : directory,
+            "package.json",
+          );
+          if (existsSync(manifestPath)) {
+            manifests.set(directory, {
+              root: directory,
+              name: this.packageNameFromManifest(manifestPath, directory),
+            });
+          }
+        }
+        directory = parentDir(directory);
       }
-      dir = parentDir(dir);
     }
-    return {
-      name: path.basename(this.projectRoot),
-      root: ".",
-      provenance: "root",
-    };
+    return [...manifests.values()];
   }
 
   private packageNameFromManifest(manifestPath: string, root: string): string {
@@ -2258,83 +2311,6 @@ export class SolidKG {
     return fallback;
   }
 
-  private addDependencyKind(
-    map: Map<string, Set<EdgeKind>>,
-    source: string,
-    target: string,
-    kind: EdgeKind,
-  ): void {
-    const key = `${source}\0${target}`;
-    const kinds = map.get(key) ?? new Set<EdgeKind>();
-    kinds.add(kind);
-    map.set(key, kinds);
-  }
-
-  private dependencyMapToList(
-    map: Map<string, Set<EdgeKind>>,
-  ): ArchitectureDependency[] {
-    return [...map.entries()]
-      .map(([key, kinds]) => {
-        const [source, target] = key.split("\0");
-        return {
-          source: source!,
-          target: target!,
-          edgeKinds: [...kinds].sort(),
-        };
-      })
-      .sort(
-        (a, b) =>
-          a.source.localeCompare(b.source) || a.target.localeCompare(b.target),
-      );
-  }
-
-  private buildPackages(
-    assignments: ArchitectureFileAssignment[],
-  ): ArchitecturePackage[] {
-    const byName = new Map<string, ArchitecturePackage>();
-    for (const assignment of assignments) {
-      const existing = byName.get(assignment.packageName);
-      if (existing) existing.fileCount += 1;
-      else {
-        byName.set(assignment.packageName, {
-          name: assignment.packageName,
-          root: assignment.packageRoot,
-          provenance:
-            assignment.packageProvenance === "manifest" ? "manifest" : "root",
-          fileCount: 1,
-        });
-      }
-    }
-    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }
-
-  private buildLayers(
-    assignments: ArchitectureFileAssignment[],
-    rules: ArchitectureLayerRule[],
-  ): ArchitectureLayer[] {
-    const byName = new Map<string, ArchitectureLayer>();
-    for (const rule of rules) {
-      byName.set(rule.name, {
-        name: rule.name,
-        provenance: "config_layer",
-        fileCount: 0,
-      });
-    }
-    for (const assignment of assignments) {
-      const existing = byName.get(assignment.layerName);
-      if (existing) existing.fileCount += 1;
-      else {
-        byName.set(assignment.layerName, {
-          name: assignment.layerName,
-          provenance: assignment.layerProvenance,
-          fileCount: 1,
-        });
-      }
-    }
-    return [...byName.values()]
-      .filter((layer) => layer.fileCount > 0 || layer.name !== "unassigned")
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
 
   // ===========================================================================
   // Graph Query Methods

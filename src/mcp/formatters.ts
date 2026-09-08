@@ -1,4 +1,5 @@
 import type SolidKG from '../index';
+export { parseLayerRules } from '../analysis';
 
 export interface FileListEntry {
   readonly path: string;
@@ -6,19 +7,6 @@ export interface FileListEntry {
   readonly nodeCount: number;
 }
 
-export interface LayerRule {
-  readonly name: string;
-  readonly paths: string[];
-}
-
-function isLayerRule(value: unknown): value is LayerRule {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
-  return 'name' in value
-    && 'paths' in value
-    && typeof value.name === 'string'
-    && Array.isArray(value.paths)
-    && value.paths.every((path): path is string => typeof path === 'string');
-}
 
 export function formatArchitecturePackageLookup(lookup: ReturnType<SolidKG['getPackageLookup']>): string {
   if (!lookup.package) {
@@ -55,25 +43,6 @@ export function formatArchitectureLayerSuggestion(pathPrefix: string): string {
   return JSON.stringify([{ name: normalized || 'path-scope', paths: [pathPattern] }]);
 }
 
-export function parseLayerRules(value: unknown): LayerRule[] | string | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string') return 'layersJson must be a JSON string';
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) return 'layersJson must be a JSON array';
-    const rules: LayerRule[] = [];
-    for (const entry of parsed) {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return 'each layer rule must be an object';
-      if (!isLayerRule(entry)) {
-        return 'each layer rule must have a string name and string[] paths';
-      }
-      rules.push({ name: entry.name, paths: entry.paths });
-    }
-    return rules;
-  } catch (err) {
-    return `layersJson is invalid JSON: ${err instanceof Error ? err.message : String(err)}`;
-  }
-}
 
 export function formatSnapshotList(snapshots: Awaited<ReturnType<SolidKG['listSnapshots']>>): string {
   if (snapshots.length === 0) return 'No graph snapshots saved.';

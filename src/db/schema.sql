@@ -1,5 +1,7 @@
 -- SolidKG SQLite Schema
--- Version 10
+-- Version 11
+
+PRAGMA user_version = 11;
 
 -- Schema version tracking
 CREATE TABLE IF NOT EXISTS schema_versions (
@@ -381,6 +383,16 @@ CREATE TABLE IF NOT EXISTS graph_snapshot_hyperedge_members (
     FOREIGN KEY (snapshot_label) REFERENCES graph_snapshots(label) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS graph_snapshot_analyses (
+    snapshot_label TEXT NOT NULL,
+    analysis_kind TEXT NOT NULL,
+    analysis_version INTEGER NOT NULL,
+    options_json TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    PRIMARY KEY (snapshot_label, analysis_kind, analysis_version),
+    FOREIGN KEY (snapshot_label) REFERENCES graph_snapshots(label) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS architecture_reports (
     id TEXT PRIMARY KEY,
     payload TEXT NOT NULL,
@@ -477,6 +489,7 @@ CREATE INDEX IF NOT EXISTS idx_graph_snapshot_nodes_label ON graph_snapshot_node
 CREATE INDEX IF NOT EXISTS idx_graph_snapshot_edges_label ON graph_snapshot_edges(snapshot_label);
 CREATE INDEX IF NOT EXISTS idx_graph_snapshot_hyperedges_label ON graph_snapshot_hyperedges(snapshot_label);
 CREATE INDEX IF NOT EXISTS idx_graph_snapshot_members_label ON graph_snapshot_hyperedge_members(snapshot_label);
+CREATE INDEX IF NOT EXISTS idx_graph_snapshot_analyses_label ON graph_snapshot_analyses(snapshot_label);
 CREATE INDEX IF NOT EXISTS idx_arch_file_packages_package ON arch_file_packages(package_name);
 CREATE INDEX IF NOT EXISTS idx_arch_file_layers_layer ON arch_file_layers(layer_name);
 CREATE INDEX IF NOT EXISTS idx_capability_assertions_subject ON capability_assertions(subject_node_id);

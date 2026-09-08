@@ -69,7 +69,9 @@ export function matchByExactName(
   ref: UnresolvedRef,
   context: ResolutionContext
 ): ResolvedRef | null {
-  const candidates = context.getNodesByName(ref.referenceName);
+  const candidates = context
+    .getNodesByName(ref.referenceName)
+    .filter((candidate) => isEligibleTerminalCallableTarget(ref, candidate, context));
 
   if (candidates.length === 0) {
     return null;
@@ -101,6 +103,63 @@ export function matchByExactName(
   }
 
   return null;
+}
+
+const CALLABLE_TARGET_KINDS = new Set<Node['kind']>([
+  'function',
+  'method',
+  'class',
+  'struct',
+]);
+
+function isEligibleTerminalCallableTarget(
+  ref: UnresolvedRef,
+  candidate: Node,
+  context: ResolutionContext,
+): boolean {
+  if (ref.referenceKind !== 'calls') return true;
+  if (!CALLABLE_TARGET_KINDS.has(candidate.kind)) return false;
+  if (isTopLevelCandidate(candidate)) return true;
+
+  const caller = findCallerNode(ref, context);
+  if (!caller) return false;
+  if (candidate.id === caller.id) return true;
+  if (candidate.filePath !== caller.filePath) return false;
+
+  if (candidate.qualifiedName === `${caller.qualifiedName}::${candidate.name}`) {
+    return true;
+  }
+
+  const callerParent = lexicalParent(caller.qualifiedName);
+  const candidateParent = lexicalParent(candidate.qualifiedName);
+  return callerParent !== null && callerParent === candidateParent;
+}
+
+function findCallerNode(ref: UnresolvedRef, context: ResolutionContext): Node | undefined {
+  const callerInReferenceFile = context
+    .getNodesInFile(ref.filePath)
+    .find((node) => node.id === ref.fromNodeId);
+  if (callerInReferenceFile) return callerInReferenceFile;
+
+  for (const filePath of context.getAllFiles()) {
+    if (filePath === ref.filePath) continue;
+    const caller = context
+      .getNodesInFile(filePath)
+      .find((node) => node.id === ref.fromNodeId);
+    if (caller) return caller;
+  }
+
+  return undefined;
+}
+
+function lexicalParent(qualifiedName: string): string | null {
+  const separatorIndex = qualifiedName.lastIndexOf('::');
+  return separatorIndex >= 0 ? qualifiedName.slice(0, separatorIndex) : null;
+}
+
+function isTopLevelCandidate(candidate: Node): boolean {
+  const parent = lexicalParent(candidate.qualifiedName);
+  return parent === null || parent === candidate.filePath;
 }
 
 /**
@@ -408,9 +467,11 @@ export function matchFuzzy(
   // Use pre-built lowercase index for O(1) lookup instead of scanning all nodes
   const candidates = context.getNodesByLowerName(lowerName);
 
-  // Filter to callable kinds only (function, method, class)
-  const callableKinds = new Set(['function', 'method', 'class']);
-  const callableCandidates = candidates.filter((n) => callableKinds.has(n.kind));
+  const callableCandidates = candidates.filter(
+    (candidate) =>
+      CALLABLE_TARGET_KINDS.has(candidate.kind) &&
+      isEligibleTerminalCallableTarget(ref, candidate, context),
+  );
 
   // Prefer same-language matches
   const sameLanguageCandidates = callableCandidates.filter(n => n.language === ref.language);
@@ -439,6 +500,11 @@ export function matchReference(
   // Try strategies in order of confidence
   let result: ResolvedRef | null;
 
+  if (ref.memberCall) {
+    if (!ref.memberCall.ownerName) return null;
+    return matchEvidencedMemberCall(ref, context);
+  }
+
   // 0. File path match (e.g., "snippets/drawer-menu.liquid" → file node)
   result = matchByFilePath(ref, context);
   if (result) return result;
@@ -460,4 +526,72 @@ export function matchReference(
   if (result) return result;
 
   return null;
+}
+
+export function resolveBoundLocalMemberCall(
+  ref: UnresolvedRef,
+  context: ResolutionContext
+): ResolvedRef | null {
+  const memberCall = ref.memberCall;
+  const binding = memberCall?.binding;
+  if (!memberCall || !binding || binding.kind !== 'local') return null;
+
+  const owners = context.getNodesInFile(binding.ownerFilePath).filter((node) =>
+    node.language === ref.language &&
+    ['class', 'struct', 'interface'].includes(node.kind) &&
+    node.startLine === binding.ownerStartLine &&
+    node.startColumn === binding.ownerStartColumn
+  );
+  if (owners.length !== 1) return null;
+
+  const owner = owners[0]!;
+  const methods = context.getNodesInFile(owner.filePath).filter((node) =>
+    node.kind === 'method' &&
+    node.name === memberCall.member &&
+    node.language === ref.language &&
+    node.qualifiedName === `${owner.qualifiedName}::${node.name}` &&
+    Boolean(node.isStatic) === (binding.access === 'static')
+  );
+  if (methods.length !== 1) return null;
+
+  return {
+    original: ref,
+    targetNodeId: methods[0]!.id,
+    confidence: 0.95,
+    resolvedBy: 'instance-method',
+  };
+}
+
+function matchEvidencedMemberCall(
+  ref: UnresolvedRef,
+  context: ResolutionContext
+): ResolvedRef | null {
+  const memberCall = ref.memberCall;
+  if (!memberCall?.ownerName) return null;
+
+  const owners = context.getNodesByName(memberCall.ownerName).filter((owner) =>
+    owner.name === memberCall.ownerName &&
+    owner.language === ref.language &&
+    ['class', 'struct', 'interface'].includes(owner.kind) &&
+    (memberCall.ownerStartLine === undefined || owner.startLine === memberCall.ownerStartLine) &&
+    (memberCall.ownerStartColumn === undefined || owner.startColumn === memberCall.ownerStartColumn)
+  );
+  if (owners.length !== 1) return null;
+
+  const owner = owners[0]!;
+  const methods = context.getNodesInFile(owner.filePath).filter((node) =>
+    node.kind === 'method' &&
+    node.name === memberCall.member &&
+    node.language === ref.language &&
+    node.qualifiedName === `${owner.qualifiedName}::${node.name}` &&
+    (memberCall.ownerIsStatic === undefined || Boolean(node.isStatic) === memberCall.ownerIsStatic)
+  );
+  if (methods.length !== 1) return null;
+
+  return {
+    original: ref,
+    targetNodeId: methods[0]!.id,
+    confidence: 0.9,
+    resolvedBy: 'instance-method',
+  };
 }

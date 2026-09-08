@@ -107,12 +107,12 @@ files → ExtractionOrchestrator (tree-sitter) → DB (nodes/edges/hyperedges/fi
        ContextBuilder (markdown/JSON for AI consumption)
 ```
 
-The public API surface is `src/index.ts` — the `SolidKG` class wires all the layers and re-exports types, including explicit graph snapshots/diffs and package/layer architecture rollups. Library users only touch this file; the MCP server and CLI also drive it.
+The public API surface is `src/index.ts` — the `SolidKG` class wires all the layers and re-exports types, including explicit graph snapshots/diffs, architecture health, snapshot health drift, and package/layer architecture rollups. Library users only touch this file; the MCP server and CLI also drive it. `getArchitectureHealth()` and `getSnapshotHealthDrift(label)` are read-only analysis views. Health provides deterministic findings, metrics, evidence anchors, and per-signal coverage, not a score, grade, severity, runtime verdict, or dead-code proof. Static unreferenced results are candidates, and coverage can be partial or not run.
 
 ### Module layout
 
 - `src/index.ts` — `SolidKG` class: `init`/`open`/`close`, `indexAll`, `sync`, `searchNodes`, `getCallers`/`getCallees`, `getImpactRadius`, `getHyperedgesByNode`, `findHyperedgesBetweenNodes`, `buildContext`, `watch`/`unwatch`.
-- `src/db/` — `DatabaseConnection`, `QueryBuilder` (prepared statements), `schema.sql`, migrations, and `sqlite-adapter.ts`. Stores files, graph facts, semantic hyperedges, explicit graph snapshots, architecture rollup reports, and SCIP facts. The active backend is Node's built-in `node:sqlite` via a better-sqlite3-shaped adapter; released bundles carry the Node runtime, so there is no native build or wasm fallback in current builds. `solidkg status` surfaces backend and journal mode.
+- `src/db/` — `DatabaseConnection`, `QueryBuilder` (prepared statements), `schema.sql`, migrations, and `sqlite-adapter.ts`. Stores files, graph facts, semantic hyperedges, explicit graph snapshots with architecture-health analyses, architecture rollup reports, and SCIP facts. The active backend is Node's built-in `node:sqlite` via a better-sqlite3-shaped adapter; released bundles carry the Node runtime, so there is no native build or wasm fallback in current builds. `solidkg status` surfaces backend and journal mode.
 - `src/extraction/` — `ExtractionOrchestrator`, tree-sitter wrappers, per-language extractors under `languages/` (one file per language), plus standalone extractors for non-tree-sitter formats (`svelte-extractor.ts`, `vue-extractor.ts`, `liquid-extractor.ts`, `dfm-extractor.ts` for Delphi). `parse-worker.ts` runs heavy parsing off the main thread.
 - `src/resolution/` — `ReferenceResolver` orchestrates `import-resolver.ts` (with `path-aliases.ts` for tsconfig path aliases + cargo workspace member globs), `name-matcher.ts`, `callback-synthesizer.ts`, and `frameworks/` (Express, Laravel, Rails, FastAPI, Django, Flask, Spring, Gin, Axum, ASP.NET, Vapor, React Router, SvelteKit, Vue/Nuxt, Cargo workspaces). Frameworks emit `route` nodes, `references` edges, and relation hints for semantic hyperedge synthesis.
 - `src/hypergraph/` — deterministic semantic hyperedge IDs and synthesis from resolved framework/dynamic-dispatch metadata. Hyperedges preserve ordered multi-symbol relationships that pairwise edges flatten.
@@ -124,7 +124,7 @@ The public API surface is `src/index.ts` — the `SolidKG` class wires all the l
 - `src/mcp/` — MCP server (`MCPServer`, `tools.ts`, `transport.ts`) plus shared daemon plumbing (`daemon.ts`, `daemon-paths.ts`, `engine.ts`). `server-instructions.ts` is what the server returns in the MCP `initialize` response — keep it in sync with the user-facing tool guidance.
 - SCIP support is additive: generated or imported `.scip` indexes provide compiler-grade definitions/references/implementation/type-definition facts on top of the normal AST graph. Keep `solidkg_precise_refs`, status SCIP import/link/generation state, and primary-tool SCIP hints documented together when changing this surface.
 - `src/installer/` — see below.
-- `src/bin/solidkg.ts` — CLI (commander). Subcommands include `install`, `uninstall`, `init`, `uninit`, `index`, `sync`, `status`, `query`, `files`, `overview`, `context`, `snapshot`, `architecture`, `callers`, `callees`, `impact`, `affected`, `scip generate`, `scip import`, and `serve --mcp`.
+- `src/bin/solidkg.ts` — CLI (commander). Subcommands include `install`, `uninstall`, `init`, `uninit`, `index`, `sync`, `status`, `query`, `files`, `overview`, `context`, `snapshot`, `architecture`, `callers`, `callees`, `impact`, `affected`, `scip generate`, `scip import`, and `serve --mcp`. `architecture health` and `snapshot drift <label>` are read-only; `snapshot create <label> --layers <json-array>` saves the baseline analysis.
 - `src/ui/` — terminal UI (shimmer progress, worker).
 
 ### NodeKind / EdgeKind / HyperedgeKind
@@ -141,7 +141,7 @@ Defined in `src/types.ts`. Both extractors and resolvers must use these exact st
 
 - `targets/registry.ts` lists every supported agent.
 - `targets/types.ts` defines the `AgentTarget` interface — adding another agent (Continue, Zed, Windsurf…) is **one new file in `targets/` + one entry in `registry.ts`**. Each target owns its config-file location, MCP-server JSON/TOML/JSONC writing, and instructions-file path.
-- Current targets: `claude.ts`, `cursor.ts`, `codex.ts`, `opencode.ts`, `hermes.ts`.
+- Current targets: `claude.ts`, `cursor.ts`, `codex.ts`, `opencode.ts`, `hermes.ts`, `antigravity.ts`, `omp.ts`, `kimi.ts`.
 - `targets/toml.ts` is a hand-rolled TOML serializer scoped to `[mcp_servers.solidkg]` (used by Codex). Sibling tables and `[[array_of_tables]]` are preserved verbatim. No new dependency.
 - opencode reads `opencode.jsonc` by default; the installer prefers existing `.jsonc`, falls back to `.json`, and creates `.jsonc` for greenfield installs. Edits are surgical via `jsonc-parser` so user comments and formatting survive install/re-install/uninstall round-trips.
 - `instructions-template.ts` is the agent-agnostic instructions file written to each target (e.g. `CLAUDE.md`, `.cursor/rules/solidkg.mdc`, `~/.codex/AGENTS.md`, `~/.config/opencode/AGENTS.md`). It explicitly says "Prefer SolidKG over broad grep/read loops." and "Fall back to targeted Read only when SolidKG reports stale, truncated, omitted, unreadable, ambiguous, or heuristic-only results." — earlier versions prescribed Claude-specific "spawn an Explore agent" and confused other agents.
@@ -153,6 +153,7 @@ Defined in `src/types.ts`. Both extractors and resolvers must use these exact st
 - Installed guidance should define capability footprints as may-behavior evidence, not runtime proof. Coverage states (`complete`, `partial`, `unsupported`, `failed`, `not_run`, `stale`) describe capability-producer coverage for returned files, and empty assertions do not prove no capability exists.
 - Installed guidance should never force follow-up solely because candidate coverage is omitted, truncated, or partial. Follow up only when the answer packet is insufficient because required anchors/source are missing, stale, unreadable, ambiguous, or disconnected.
 - Installed guidance should state external dense/vector embeddings, vector databases, rerankers, and hybrid retrieval providers are not enabled by default; optional hybrid extension seams remain disabled unless a future build explicitly supports and configures them.
+- Installed guidance must describe architecture health and snapshot drift as explicit `solidkg_explore` questions in the compact profile. The optional advanced profile uses `solidkg_architecture action="health"` and `solidkg_snapshot action="drift"`. Keep the compatibility labels `comparable`, `partially_compatible`, `incompatible_analysis`, and `baseline_analysis_unavailable` synchronized. Explain that health/drift are read-only and require schema 11. Human/MCP categories cap at 20 items and report the remainder. CLI `--json` and API values remain complete. After a schema-upgrade failure, require `solidkg sync <project>` with write access before the user retries the read.
 - `claude-md-template.ts` is the legacy Claude-only template, retained for compatibility paths.
 - All installer changes need matching coverage in `__tests__/installer-targets.test.ts` — the parameterized contract tests cover install idempotency, sibling preservation, uninstall reverses install, byte-equal re-runs returning `unchanged`, and partial-state recovery for agent-specific formats.
 
@@ -162,7 +163,7 @@ Cursor launches MCP subprocesses with the wrong cwd and doesn't pass `rootUri` i
 
 ### MCP server instructions
 
-`src/mcp/server-instructions.ts` is sent back to the agent in the MCP `initialize` response. This is the *first* thing every agent sees about how to use the exposed profile, so treat it as authoritative provider-neutral guidance and keep it in sync with `instructions-template.ts`, `.cursor/rules/solidkg.mdc`, the README, and public MCP docs. The compact instructions must mention only `solidkg_explore`; the full instructions may describe every advanced tool. Tool-name guidance should preserve raw server names as documented `solidkg_*` names and describe host-added display/permission prefixes as client-specific wrappers, not names to copy into calls. Keep Claude-specific behavior only in Claude target files.
+`src/mcp/server-instructions.ts` is sent back to the agent in the MCP `initialize` response. This is the *first* thing every agent sees about how to use the exposed profile, so treat it as authoritative provider-neutral guidance and keep it in sync with `instructions-template.ts`, `.cursor/rules/solidkg.mdc`, the README, and public MCP docs. The compact instructions must mention only `solidkg_explore`; the full instructions may describe every advanced tool. Exact-label architecture health drift must be framed as an explore question in compact guidance, not as a new tool. Tool-name guidance should preserve raw server names as documented `solidkg_*` names and describe host-added display/permission prefixes as client-specific wrappers, not names to copy into calls. Keep Claude-specific behavior only in Claude target files.
 
 ## Retrieval performance & dynamic-dispatch coverage (do not regress)
 
@@ -283,7 +284,7 @@ For any Windows-specific PR, bug, or implementation, validate it on the real Win
 
 ## Releases
 
-Released to npm and mirrored as [GitHub Releases](https://solidkg.local/repository/releases). Release notes are generated by GitHub during the Release workflow; this repository does not maintain a root changelog.
+Released to npm and mirrored as [GitHub Releases](https://github.com/Valid-Systems/SolidKG/releases). Release notes are generated by GitHub during the Release workflow; this repository does not maintain a root changelog.
 
 ### Release flow (the user runs these)
 

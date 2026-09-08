@@ -15,8 +15,8 @@ import {
   FrameworkResolver,
   ImportMapping,
 } from './types';
-import { matchReference } from './name-matcher';
-import { resolveViaImport, resolveImportPath, extractImportMappings, extractReExports } from './import-resolver';
+import { matchReference, resolveBoundLocalMemberCall } from './name-matcher';
+import { resolveBoundImportMemberCall, resolveViaImport, resolveImportPath, extractImportMappings, extractReExports } from './import-resolver';
 import { detectFrameworks } from './frameworks';
 import { synthesizeCallbackEdges } from './callback-synthesizer';
 import { synthesizeSemanticHyperedges } from '../hypergraph/synthesizer';
@@ -449,8 +449,11 @@ export class ReferenceResolver {
       line: ref.line,
       column: ref.column,
       filePath: ref.filePath || this.getFilePathFromNodeId(ref.fromNodeId),
-      language: ref.language || this.getLanguageFromNodeId(ref.fromNodeId),
+      language: ref.language && ref.language !== 'unknown'
+        ? ref.language
+        : this.getLanguageFromNodeId(ref.fromNodeId),
       candidates: ref.candidates,
+      memberCall: ref.memberCall,
       relationHint: ref.relationHint,
     }));
 
@@ -542,7 +545,10 @@ export class ReferenceResolver {
     for (const imp of imports) {
       if (
         imp.localName === ref.referenceName ||
-        ref.referenceName.startsWith(imp.localName + '.')
+        ref.referenceName.startsWith(imp.localName + '.') ||
+        ref.memberCall?.ownerName === imp.localName ||
+        ref.memberCall?.receiver === imp.localName ||
+        ref.memberCall?.receiver.startsWith(imp.localName + '.')
       ) {
         return true;
       }
@@ -554,6 +560,14 @@ export class ReferenceResolver {
    * Resolve a single reference
    */
   resolveOne(ref: UnresolvedRef): ResolvedRef | null {
+    const binding = ref.memberCall?.binding;
+    if (binding) {
+      if (binding.kind === 'unknown') return null;
+      if (binding.kind === 'local') return resolveBoundLocalMemberCall(ref, this.context);
+      if (binding.kind === 'import') return resolveBoundImportMemberCall(ref, this.context);
+      return this.frameworks.find((framework) => framework.name === 'expo-modules')?.resolve(ref, this.context) ?? null;
+    }
+
     // Skip built-in/external references
     if (this.isBuiltInOrExternal(ref)) {
       return null;
@@ -599,11 +613,27 @@ export class ReferenceResolver {
       }
     }
 
+    if (ref.memberCall && !ref.memberCall.ownerName && !this.matchesAnyImport(ref)) {
+      return candidates.length > 0
+        ? candidates.reduce((best, current) => current.confidence > best.confidence ? current : best)
+        : null;
+    }
+
     // Strategy 2: Try import-based resolution
     const importResult = resolveViaImport(ref, this.context);
     if (importResult) {
       if (importResult.confidence >= 0.9) return importResult;
       candidates.push(importResult);
+    }
+
+    if (
+      ref.memberCall &&
+      ref.memberCall.ownerStartLine === undefined &&
+      this.matchesAnyImport(ref)
+    ) {
+      return candidates.length > 0
+        ? candidates.reduce((best, current) => current.confidence > best.confidence ? current : best)
+        : null;
     }
 
     // Strategy 3: Try name matching

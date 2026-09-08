@@ -317,12 +317,12 @@ export const tools: ToolDefinition[] = [
         action: {
           type: 'string',
           description: 'Snapshot action to run',
-          enum: ['create', 'list', 'delete', 'diff'],
+          enum: ['create', 'list', 'delete', 'diff', 'drift'],
           default: 'list',
         },
         label: {
           type: 'string',
-          description: 'Snapshot label for create/delete/diff',
+          description: 'Snapshot label for create/delete/diff/drift',
         },
         description: {
           type: 'string',
@@ -331,6 +331,10 @@ export const tools: ToolDefinition[] = [
         metadataJson: {
           type: 'string',
           description: 'Optional JSON object metadata for create',
+        },
+        layersJson: {
+          type: 'string',
+          description: 'Optional JSON array of layer rules for action=create, e.g. [{"name":"api","paths":["src/api/**"]}]',
         },
         projectPath: projectPathProperty,
       },
@@ -345,7 +349,7 @@ export const tools: ToolDefinition[] = [
         action: {
           type: 'string',
           description: 'Architecture action to run',
-          enum: ['analyze', 'get', 'coupling', 'package'],
+          enum: ['analyze', 'get', 'coupling', 'package', 'health'],
           default: 'get',
         },
         package: {
@@ -354,7 +358,7 @@ export const tools: ToolDefinition[] = [
         },
         layersJson: {
           type: 'string',
-          description: 'Optional JSON array of layer rules for analyze, e.g. [{"name":"api","paths":["src/api/**"]}]',
+          description: 'Optional JSON array of layer rules for analyze/health, e.g. [{"name":"api","paths":["src/api/**"]}]',
         },
         projectPath: projectPathProperty,
       },

@@ -240,9 +240,21 @@ describe('solidkg_explore output respects the adaptive budget', () => {
     const result = await handler.execute('solidkg_explore', { query: 'Session method helper' });
     const text = result.content?.[0]?.text ?? '';
     const smallBudget = getExploreOutputBudget(100);
-    // Allow a small overshoot for the trailing markers — the cap is enforced
-    // per-file rather than as an absolute output ceiling.
-    expect(text.length).toBeLessThan(smallBudget.maxOutputChars + 500);
+    expect(text.length).toBeLessThanOrEqual(smallBudget.maxOutputChars);
+  });
+
+  it('reserves the truncation marker and fence closure inside the output cap', () => {
+    const maxChars = 180;
+    const source = `\`\`\`ts\n${'const value = "x";\n'.repeat(40)}`;
+    const output = String(Reflect.apply(
+      Reflect.get(handler, 'truncateExploreOutputAtBoundary'),
+      handler,
+      [source, maxChars],
+    ));
+
+    expect(output).toContain(outputTruncatedMarker);
+    expect(output.length).toBeLessThanOrEqual(maxChars);
+    expect(countMarkdownCodeFences(output) % 2).toBe(0);
   });
 
   it('omits the meta-text gated off for small projects', async () => {
@@ -952,6 +964,7 @@ describe('solidkg_explore markdown truncation boundaries', () => {
 
   it('boundary keeps markdown code fences balanced when explore output is truncated', () => {
     expect(boundaryOutput).toContain(outputTruncatedMarker);
+    expect(boundaryOutput.length).toBeLessThanOrEqual(getExploreOutputBudget(500).maxOutputChars);
 
     const beforeMarker = textBeforeOutputTruncationMarker(boundaryOutput);
     expect(countMarkdownCodeFences(beforeMarker) % 2).toBe(0);
@@ -1116,6 +1129,7 @@ describe('solidkg_explore completeness metadata', () => {
     const text = result.content?.[0]?.text ?? '';
 
     expect(text).toContain(outputTruncatedMarker);
+    expect(text.length).toBeLessThanOrEqual(getExploreOutputBudget(500).maxOutputChars);
     expect(text).toMatch(/\[(partial|truncated)\]/i);
     expect.soft(text).not.toMatch(/source above is complete/i);
     expect.soft(text).not.toContain('Complete source for');

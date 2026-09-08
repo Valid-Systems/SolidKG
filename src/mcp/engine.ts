@@ -11,6 +11,7 @@
  */
 
 import SolidKG, { findNearestSolidKGRoot } from '../index';
+import { SchemaUpgradeRequiredError } from '../errors';
 import { watchDisabledReason } from '../sync';
 import { ToolHandler } from './tools';
 
@@ -132,18 +133,24 @@ export class MCPEngine {
     this.toolHandler.setDefaultProjectHint(searchFrom);
     const resolvedRoot = findNearestSolidKGRoot(searchFrom, { dataDir: this.opts.dataDir });
     if (!resolvedRoot) return;
+    this.projectPath = resolvedRoot;
     try {
       // Close any previously failed instance to avoid leaking resources.
       if (this.cg) {
         try { this.cg.close(); } catch { /* ignore */ }
         this.cg = null;
       }
+      this.preflightProjectSchema(resolvedRoot);
       this.cg = SolidKG.openSync(resolvedRoot, { dataDir: this.opts.dataDir });
       this.projectPath = resolvedRoot;
+      this.toolHandler.setSchemaUpgradeError(null);
       this.toolHandler.setDefaultSolidKG(this.cg);
       this.startWatching();
       this.catchUpSync();
-    } catch {
+    } catch (error) {
+      if (error instanceof SchemaUpgradeRequiredError) {
+        this.toolHandler.setSchemaUpgradeError(error);
+      }
       // Still failing — caller will try again on the next tool call.
     }
   }
@@ -190,14 +197,25 @@ export class MCPEngine {
 
     this.projectPath = resolvedRoot;
     try {
+      this.preflightProjectSchema(resolvedRoot);
       this.cg = await SolidKG.open(resolvedRoot, { dataDir: this.opts.dataDir });
+      this.toolHandler.setSchemaUpgradeError(null);
       this.toolHandler.setDefaultSolidKG(this.cg);
       this.startWatching();
       this.catchUpSync();
     } catch (err) {
+      if (err instanceof SchemaUpgradeRequiredError) {
+        this.toolHandler.setSchemaUpgradeError(err);
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       process.stderr.write(`[SolidKG MCP] Failed to open project at ${resolvedRoot}: ${msg}\n`);
     }
+  }
+
+  private preflightProjectSchema(resolvedRoot: string): void {
+    const preflight = SolidKG.openSync(resolvedRoot, { dataDir: this.opts.dataDir, readOnly: true });
+    preflight.close();
   }
 
   /**

@@ -39,13 +39,16 @@ import { mergeTraversalResults, relationCountsForEdges } from '../graph/traversa
 import { IndexLifecycleDiagnostics } from '../index-lifecycle-diagnostics';
 import type SolidKG from '../index';
 import type { IndexProgress } from '../extraction';
-import { logWarn } from '../errors';
+import { SchemaUpgradeRequiredError, logWarn } from '../errors';
+import { parseLayerRules } from '../analysis';
+import { formatArchitectureHealthReport, formatSnapshotHealthDrift } from '../mcp/architecture-health-formatters';
 
 import { buildNodeTooOldBanner, MIN_NODE_MAJOR } from './node-version-check';
 
 const STATUS_JSON_SCHEMA_VERSION = 'solidkg.status.v1';
 const OVERVIEW_EXPAND_PATH_LIMIT = 50;
 const productIdentity = getProductIdentity();
+const SCHEMA_UPGRADE_REMEDIATION = 'SolidKG schema 10 must be upgraded to 11 before architecture health or snapshot drift can be read. Run "solidkg sync <project>" once with write access, then retry.';
 
 function parseBoundedIntegerOption(value: string, optionName: string, min: number, max: number): number {
   if (!/^\d+$/.test(value)) {
@@ -1767,13 +1770,14 @@ program
 
 program
   .command('snapshot <action> [label]')
-  .description('Create, list, delete, or diff explicit graph snapshots')
+  .description('Create, list, delete, diff, or inspect health drift for explicit graph snapshots')
   .option('-p, --path <path>', 'Project path')
   .option('-d, --description <text>', 'Snapshot description for create')
   .option('-m, --metadata <json>', 'Snapshot metadata JSON object for create')
+  .option('-l, --layers <json>', 'Layer rules JSON array for create')
   .option('-j, --json', 'Output as JSON')
   .option('--data-dir <dir>', 'Directory for SolidKG data (defaults to <project>/.solidkg)')
-  .action(async (action: string, label: string | undefined, options: { path?: string; description?: string; metadata?: string; json?: boolean; dataDir?: string }) => {
+  .action(async (action: string, label: string | undefined, options: { path?: string; description?: string; metadata?: string; layers?: string; json?: boolean; dataDir?: string }) => {
     const dataDir = resolveDataDir(options.dataDir);
     const projectPath = resolveProjectPath(options.path, dataDir);
 
@@ -1783,6 +1787,12 @@ program
         info(formatDataDirHint(dataDir));
         process.exit(1);
       }
+
+      if (options.layers !== undefined && action !== 'create') {
+        throw new Error('--layers is only supported for snapshot create');
+      }
+      const layers = parseLayerRules(options.layers);
+      if (typeof layers === 'string') throw new Error(layers);
 
       const cg = action === 'create' || action === 'delete'
         ? await (await loadSolidKG()).default.open(projectPath, { dataDir })
@@ -1820,7 +1830,11 @@ program
           }
           metadata = parsed as Record<string, unknown>;
         }
-        const snapshot = await cg.createSnapshot(label, { description: options.description, metadata });
+        const snapshot = await cg.createSnapshot(label, {
+          description: options.description,
+          metadata,
+          ...(layers === undefined ? {} : { architecture: { layers } }),
+        });
         if (options.json) console.log(JSON.stringify(snapshot, null, 2));
         else success(`Saved snapshot "${snapshot.label}" (${snapshot.nodeCount} nodes, ${snapshot.edgeCount} edges)`);
       } else if (action === 'delete') {
@@ -1849,12 +1863,20 @@ program
           ];
           for (const [name, count] of rows) console.log(`${String(name).padEnd(26)} ${count}`);
         }
+      } else if (action === 'drift') {
+        const drift = await cg.getSnapshotHealthDrift(label);
+        if (options.json) console.log(JSON.stringify(drift, null, 2));
+        else console.log(formatSnapshotHealthDrift(drift));
       } else {
-        throw new Error(`Unknown snapshot action: ${action}`);
+        throw new Error(`Unknown snapshot action: ${action}. Expected create, list, delete, diff, or drift.`);
       }
 
       cg.destroy();
     } catch (err) {
+      if (err instanceof SchemaUpgradeRequiredError) {
+        console.error(SCHEMA_UPGRADE_REMEDIATION);
+        process.exit(1);
+      }
       error(`Snapshot command failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }
@@ -1862,9 +1884,9 @@ program
 
 program
   .command('architecture [action] [name]')
-  .description('Analyze or inspect package/layer architecture rollups')
+  .description('Analyze health or inspect package/layer architecture rollups')
   .option('-p, --path <path>', 'Project path')
-  .option('-l, --layers <json>', 'Layer rules JSON array for analyze')
+  .option('-l, --layers <json>', 'Layer rules JSON array for analyze or health')
   .option('-j, --json', 'Output as JSON')
   .option('--data-dir <dir>', 'Directory for SolidKG data (defaults to <project>/.solidkg)')
   .action(async (actionArg: string | undefined, name: string | undefined, options: { path?: string; layers?: string; json?: boolean; dataDir?: string }) => {
@@ -1879,26 +1901,20 @@ program
         process.exit(1);
       }
 
-      const { default: SolidKG } = await loadSolidKG();
-      const cg = await SolidKG.open(projectPath, { dataDir });
-      let layers: Array<{ name: string; paths: string[] }> | undefined;
-      if (options.layers) {
-        const parsed = JSON.parse(options.layers) as unknown;
-        if (!Array.isArray(parsed)) throw new Error('--layers must be a JSON array');
-        layers = parsed.map((entry) => {
-          if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('each layer rule must be an object');
-          const rule = entry as Record<string, unknown>;
-          if (typeof rule.name !== 'string' || !Array.isArray(rule.paths) || !rule.paths.every((p) => typeof p === 'string')) {
-            throw new Error('each layer rule must have a string name and string[] paths');
-          }
-          return { name: rule.name, paths: rule.paths as string[] };
-        });
-      }
+      const layers = parseLayerRules(options.layers);
+      if (typeof layers === 'string') throw new Error(layers);
+      const cg = action === 'health'
+        ? await openSolidKGReadOnly(projectPath, dataDir)
+        : await (await loadSolidKG()).default.open(projectPath, { dataDir });
 
       if (action === 'analyze') {
         const report = cg.analyzeArchitecture({ layers });
         if (options.json) console.log(JSON.stringify(report, null, 2));
         else printArchitectureReport(report);
+      } else if (action === 'health') {
+        const health = cg.getArchitectureHealth({ layers });
+        if (options.json) console.log(JSON.stringify(health, null, 2));
+        else console.log(formatArchitectureHealthReport(health));
       } else if (action === 'get') {
         const report = cg.getArchitecture();
         if (options.json) console.log(JSON.stringify(report, null, 2));
@@ -1913,11 +1929,15 @@ program
         else if (pkg) console.log(`${chalk.cyan(pkg.name)} ${chalk.dim(pkg.root)} (${pkg.fileCount} files, ${pkg.provenance})`);
         else warn(`Package "${name}" not found`);
       } else {
-        throw new Error(`Unknown architecture action: ${action}`);
+        throw new Error(`Unknown architecture action: ${action}. Expected analyze, get, coupling, package, or health.`);
       }
 
       cg.destroy();
     } catch (err) {
+      if (err instanceof SchemaUpgradeRequiredError) {
+        console.error(SCHEMA_UPGRADE_REMEDIATION);
+        process.exit(1);
+      }
       error(`Architecture command failed: ${err instanceof Error ? err.message : String(err)}`);
       process.exit(1);
     }

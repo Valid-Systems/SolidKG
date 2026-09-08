@@ -4,7 +4,7 @@
  * Types for the reference resolution system.
  */
 
-import { EdgeKind, FrameworkRelationHint, FrameworkRelationHintRef, Language, Node } from '../types';
+import { EdgeKind, FrameworkRelationHint, FrameworkRelationHintRef, Language, MemberCallEvidence, Node } from '../types';
 
 /**
  * An unresolved reference from extraction
@@ -27,6 +27,7 @@ export interface UnresolvedRef {
   language: Language;
   /** Possible qualified names it might resolve to */
   candidates?: string[];
+  memberCall?: MemberCallEvidence;
   /** Semantic relation member metadata to carry through reference resolution */
   relationHint?: FrameworkRelationHintRef;
 }

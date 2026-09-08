@@ -11,6 +11,7 @@ import { SchemaVersion } from '../types';
 import { runMigrations, getCurrentVersion, CURRENT_SCHEMA_VERSION } from './migrations';
 import { SolidKGDirectoryOptions, getSolidKGDir } from '../directory';
 import { SOLIDKG_VERSION, SOLIDKG_VERSION_METADATA_KEY } from '../version';
+import { SchemaUpgradeRequiredError } from '../errors';
 
 export { SqliteDatabase, SqliteBackend } from './sqlite-adapter';
 
@@ -99,7 +100,7 @@ export class DatabaseConnection {
       throw new Error(`Database not found: ${dbPath}`);
     }
 
-    const { db, backend } = createDatabase(dbPath);
+    const { db, backend } = createDatabase(dbPath, { readOnly: options.readOnly });
 
     try {
       configureConnection(db, options);
@@ -110,7 +111,11 @@ export class DatabaseConnection {
 
       if (currentVersion < CURRENT_SCHEMA_VERSION) {
         if (options.readOnly) {
-          throw new Error(`Database schema version ${currentVersion} is older than ${CURRENT_SCHEMA_VERSION}; read-only open cannot run migrations`);
+          throw new SchemaUpgradeRequiredError(
+            currentVersion,
+            CURRENT_SCHEMA_VERSION,
+            dbPath,
+          );
         }
         runMigrations(db, currentVersion);
       }
