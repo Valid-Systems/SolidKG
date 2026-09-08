@@ -19,6 +19,8 @@ import {
   HyperedgeRelation,
   FrameworkRelationHintRef,
   Language,
+  MemberCallBinding,
+  MemberCallEvidence,
   GraphStats,
   ScipDocumentRecord,
   ScipIndexRecord,
@@ -440,22 +442,77 @@ function rowToEdge(row: EdgeRow): Edge {
 }
 
 const RELATION_HINT_CANDIDATE_PREFIX = '__solidkg_relation_hint__:';
+const MEMBER_CALL_CANDIDATE_PREFIX = '__solidkg_member_call__:';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isMemberCallBinding(value: unknown): value is MemberCallBinding {
+  if (!isRecord(value)) return false;
+
+  switch (value.kind) {
+    case 'local':
+      return typeof value.ownerFilePath === 'string' &&
+        typeof value.ownerStartLine === 'number' &&
+        typeof value.ownerStartColumn === 'number' &&
+        (value.access === 'instance' || value.access === 'static');
+    case 'import':
+      return typeof value.localName === 'string' &&
+        Array.isArray(value.exportPath) &&
+        value.exportPath.every((segment) => typeof segment === 'string') &&
+        (value.access === 'instance' || value.access === 'static' || value.access === 'namespace');
+    case 'native':
+      return typeof value.moduleName === 'string';
+    case 'unknown':
+      return true;
+    default:
+      return false;
+  }
+}
+
+function isMemberCallEvidence(value: unknown): value is MemberCallEvidence {
+  return isRecord(value) &&
+    typeof value.receiver === 'string' &&
+    typeof value.member === 'string' &&
+    (value.ownerName === undefined || typeof value.ownerName === 'string') &&
+    (value.ownerIsStatic === undefined || typeof value.ownerIsStatic === 'boolean') &&
+    (value.ownerStartLine === undefined || typeof value.ownerStartLine === 'number') &&
+    (value.ownerStartColumn === undefined || typeof value.ownerStartColumn === 'number') &&
+    (value.binding === undefined || isMemberCallBinding(value.binding));
+}
+
+function unknownMemberCallEvidence(value: unknown): MemberCallEvidence {
+  if (!isRecord(value)) {
+    return { receiver: '', member: '', binding: { kind: 'unknown' } };
+  }
+
+  return {
+    receiver: typeof value.receiver === 'string' ? value.receiver : '',
+    member: typeof value.member === 'string' ? value.member : '',
+    binding: { kind: 'unknown' },
+  };
+}
 
 function encodeUnresolvedCandidates(ref: UnresolvedReference): string | null {
   const candidates = [...(ref.candidates ?? [])];
   if (ref.relationHint) {
     candidates.push(`${RELATION_HINT_CANDIDATE_PREFIX}${JSON.stringify(ref.relationHint)}`);
   }
+  if (ref.memberCall) {
+    candidates.push(`${MEMBER_CALL_CANDIDATE_PREFIX}${JSON.stringify(ref.memberCall)}`);
+  }
   return candidates.length > 0 ? JSON.stringify(candidates) : null;
 }
 
-function decodeUnresolvedCandidates(value: string | null): Pick<UnresolvedReference, 'candidates' | 'relationHint'> {
+function decodeUnresolvedCandidates(value: string | null): Pick<UnresolvedReference, 'candidates' | 'memberCall' | 'relationHint'> {
   if (!value) return {};
   const parsed = safeJsonParse<unknown[]>(value, []);
   if (!Array.isArray(parsed)) return {};
 
   const candidates: string[] = [];
   let relationHint: FrameworkRelationHintRef | undefined;
+  let memberCall: UnresolvedReference['memberCall'];
   for (const entry of parsed) {
     if (typeof entry !== 'string') continue;
     if (entry.startsWith(RELATION_HINT_CANDIDATE_PREFIX)) {
@@ -465,11 +522,19 @@ function decodeUnresolvedCandidates(value: string | null): Pick<UnresolvedRefere
       }
       continue;
     }
+    if (entry.startsWith(MEMBER_CALL_CANDIDATE_PREFIX)) {
+      const decoded = safeJsonParse<unknown>(entry.slice(MEMBER_CALL_CANDIDATE_PREFIX.length), undefined);
+      memberCall = isMemberCallEvidence(decoded)
+        ? decoded
+        : unknownMemberCallEvidence(decoded);
+      continue;
+    }
     candidates.push(entry);
   }
 
   return {
     candidates: candidates.length > 0 ? candidates : undefined,
+    memberCall,
     relationHint,
   };
 }
