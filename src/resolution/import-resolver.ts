@@ -590,6 +590,11 @@ export function resolveViaImport(
   ref: UnresolvedRef,
   context: ResolutionContext
 ): ResolvedRef | null {
+  const hasLexicalOwner = ref.memberCall?.ownerStartLine !== undefined;
+  if (hasLexicalOwner) {
+    return null;
+  }
+
   // Use cached import mappings (avoids re-reading and re-parsing per ref)
   const imports = context.getImportMappings(ref.filePath, ref.language);
   if (imports.length === 0 && !context.readFile(ref.filePath)) {
@@ -598,7 +603,13 @@ export function resolveViaImport(
 
   // Check if the reference name matches any import
   for (const imp of imports) {
-    if (imp.localName === ref.referenceName || ref.referenceName.startsWith(imp.localName + '.')) {
+    const memberCall = ref.memberCall;
+    const matchesImport = imp.localName === ref.referenceName ||
+      ref.referenceName.startsWith(imp.localName + '.') ||
+      memberCall?.ownerName === imp.localName ||
+      memberCall?.receiver === imp.localName ||
+      memberCall?.receiver.startsWith(imp.localName + '.');
+    if (matchesImport) {
       // Resolve the import path
       const resolvedPath = resolveImportPath(
         imp.source,
@@ -610,7 +621,7 @@ export function resolveViaImport(
       if (resolvedPath) {
         const exportedName = imp.isDefault ? 'default' : imp.exportedName;
         const memberName = imp.isNamespace
-          ? ref.referenceName.replace(imp.localName + '.', '')
+          ? memberCall?.member ?? ref.referenceName.replace(imp.localName + '.', '')
           : null;
 
         const targetNode = findExportedSymbol(
@@ -620,6 +631,33 @@ export function resolveViaImport(
           context,
           new Set()
         );
+
+        if (targetNode && memberCall) {
+          if (imp.isNamespace && targetNode.kind === 'function') {
+            return {
+              original: ref,
+              targetNodeId: targetNode.id,
+              confidence: 0.9,
+              resolvedBy: 'import',
+            };
+          }
+          const methodNode = findMethodOnOwner(
+            targetNode,
+            memberCall.member,
+            memberCall.ownerIsStatic,
+            [ref.language],
+            context
+          );
+          if (methodNode) {
+            return {
+              original: ref,
+              targetNodeId: methodNode.id,
+              confidence: 0.9,
+              resolvedBy: 'import',
+            };
+          }
+          continue;
+        }
 
         if (targetNode) {
           return {
@@ -634,6 +672,113 @@ export function resolveViaImport(
   }
 
   return null;
+}
+
+export function resolveBoundImportMemberCall(
+  ref: UnresolvedRef,
+  context: ResolutionContext
+): ResolvedRef | null {
+  const memberCall = ref.memberCall;
+  const binding = memberCall?.binding;
+  if (!memberCall || !binding || binding.kind !== 'import') return null;
+
+  const imports = context.getImportMappings(ref.filePath, ref.language).filter((imp) =>
+    imp.localName === binding.localName
+  );
+  if (imports.length !== 1) return null;
+  const [imp] = imports;
+  if (!imp) return null;
+
+  const namespaceExportName = imp.isNamespace
+    ? binding.access === 'namespace'
+      ? memberCall.member
+      : binding.exportPath[0] ?? null
+    : null;
+  const expectedExportPath = namespaceExportName
+    ? [namespaceExportName]
+    : [imp.isDefault ? 'default' : imp.exportedName];
+  if (
+    (imp.isNamespace && !namespaceExportName) ||
+    (!imp.isNamespace && binding.access === 'namespace') ||
+    binding.exportPath.length !== expectedExportPath.length ||
+    binding.exportPath.some((segment, index) => segment !== expectedExportPath[index])
+  ) {
+    return null;
+  }
+
+  let resolvedPath = resolveImportPath(imp.source, ref.filePath, ref.language, context);
+  if (!resolvedPath && isJavaScriptFamilyLanguage(ref.language)) {
+    for (const alternateLanguage of JAVASCRIPT_FAMILY_LANGUAGES) {
+      if (alternateLanguage === ref.language) continue;
+      resolvedPath = resolveImportPath(imp.source, ref.filePath, alternateLanguage, context);
+      if (resolvedPath) break;
+    }
+  }
+  if (!resolvedPath) return null;
+
+  const targetNode = findExportedSymbol(
+    resolvedPath,
+    {
+      isDefault: imp.isDefault,
+      isNamespace: imp.isNamespace,
+      exportedName: imp.isDefault ? 'default' : imp.exportedName,
+      memberName: namespaceExportName,
+    },
+    ref.language,
+    context,
+    new Set()
+  );
+  if (!targetNode) return null;
+
+  if (binding.access === 'namespace' && targetNode.kind === 'function') {
+    return {
+      original: ref,
+      targetNodeId: targetNode.id,
+      confidence: 0.95,
+      resolvedBy: 'import',
+    };
+  }
+
+  const method = findMethodOnOwner(
+    targetNode,
+    memberCall.member,
+    binding.access === 'static',
+    isJavaScriptFamilyLanguage(ref.language) ? JAVASCRIPT_FAMILY_LANGUAGES : [ref.language],
+    context
+  );
+  if (!method) return null;
+  return {
+    original: ref,
+    targetNodeId: method.id,
+    confidence: 0.95,
+    resolvedBy: 'import',
+  };
+}
+
+function findMethodOnOwner(
+  owner: Node,
+  memberName: string,
+  ownerIsStatic: boolean | undefined,
+  allowedLanguages: readonly Language[],
+  context: ResolutionContext
+): Node | undefined {
+  if (!allowedLanguages.includes(owner.language) || !['class', 'struct', 'interface'].includes(owner.kind)) {
+    return undefined;
+  }
+  const methods = context.getNodesInFile(owner.filePath).filter((node) =>
+    node.kind === 'method' &&
+    node.name === memberName &&
+    allowedLanguages.includes(node.language) &&
+    node.qualifiedName === `${owner.qualifiedName}::${node.name}` &&
+    (ownerIsStatic === undefined || Boolean(node.isStatic) === ownerIsStatic)
+  );
+  return methods.length === 1 ? methods[0] : undefined;
+}
+
+const JAVASCRIPT_FAMILY_LANGUAGES: readonly Language[] = ['javascript', 'jsx', 'typescript', 'tsx'];
+
+function isJavaScriptFamilyLanguage(language: Language): boolean {
+  return JAVASCRIPT_FAMILY_LANGUAGES.includes(language);
 }
 
 /** Recursive depth cap for re-export chain following. Real codebases
@@ -672,10 +817,13 @@ function findExportedSymbol(
 
   // 1. Direct hit: the symbol is declared in this file.
   if (want.isDefault) {
-    const direct = nodesInFile.find(
-      (n) => n.isExported && (n.kind === 'function' || n.kind === 'class')
-    );
-    if (direct) return direct;
+    const defaultName = getDefaultExportName(context.readFile(filePath));
+    if (defaultName) {
+      const direct = nodesInFile.filter((node) =>
+        node.name === defaultName && node.qualifiedName === defaultName
+      );
+      if (direct.length === 1) return direct[0];
+    }
   } else if (want.isNamespace && want.memberName) {
     const direct = nodesInFile.find(
       (n) => n.name === want.memberName && n.isExported
@@ -725,6 +873,29 @@ function findExportedSymbol(
       if (!next) continue;
       const chained = findExportedSymbol(next, want, language, context, visited, depth + 1);
       if (chained) return chained;
+    }
+  }
+
+  return undefined;
+}
+
+function getDefaultExportName(content: string | null): string | undefined {
+  if (!content) return undefined;
+  const cleaned = stripJsComments(content);
+  const declaration = cleaned.match(
+    /\bexport\s+default\s+(?:(?:abstract|async)\s+)*(?:class|function)\s+([A-Za-z_$][\w$]*)\b/
+  );
+  if (declaration?.[1]) return declaration[1];
+
+  const identifier = cleaned.match(/\bexport\s+default\s+([A-Za-z_$][\w$]*)\s*(?:;|(?=\r?\n|$))/);
+  if (identifier?.[1]) return identifier[1];
+
+  const named = /\bexport\s*\{([^}]+)\}(?!\s*from\b)/g;
+  let match: RegExpExecArray | null;
+  while ((match = named.exec(cleaned)) !== null) {
+    for (const entry of match[1]!.split(',')) {
+      const alias = entry.trim().match(/^([A-Za-z_$][\w$]*)\s+as\s+default$/);
+      if (alias?.[1]) return alias[1];
     }
   }
 

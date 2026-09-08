@@ -13,9 +13,9 @@
  * This framework extractor walks the file source for those declarative
  * literals and emits method nodes named `takePictureAsync` /
  * `notificationAsync` / `width` / etc., attributed to the Swift / Kotlin
- * file. The standard name-matcher then resolves JS `Foo.takePictureAsync(...)`
- * to them via the existing `obj.method` → method-name path — no separate
- * resolve() branch needed.
+ * file. JS callers resolve through an explicit `requireNativeModule(...)`
+ * binding, which preserves receiver-aware matching instead of falling back to
+ * a global method-name match.
  *
  * Real-world shape (expo-haptics):
  *
@@ -39,9 +39,12 @@
  *   Fabric (Phase 6) and is left to that phase.
  */
 import type { Node } from '../../types';
-import {
+import type {
   FrameworkExtractionResult,
   FrameworkResolver,
+  ResolvedRef,
+  ResolutionContext,
+  UnresolvedRef,
 } from '../types';
 
 /**
@@ -72,6 +75,45 @@ const EXPO_MODULE_NAME_RE = /\bName\s*\(\s*["']([A-Za-z_][A-Za-z0-9_]*)["']/;
  */
 const EXPO_CLASS_RE =
   /\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*Module\b/;
+
+function resolveExpoNativeModuleCall(
+  ref: UnresolvedRef,
+  context: ResolutionContext
+): ResolvedRef | null {
+  if (
+    ref.language !== 'javascript' &&
+    ref.language !== 'typescript' &&
+    ref.language !== 'jsx' &&
+    ref.language !== 'tsx'
+  ) {
+    return null;
+  }
+
+  const memberCall = ref.memberCall;
+  const binding = memberCall?.binding;
+  if (!memberCall || !binding || binding.kind !== 'native') return null;
+
+  const targets = context
+    .getNodesByName(memberCall.member)
+    .filter((node) =>
+      node.id.startsWith('expo-module:') &&
+      node.qualifiedName.endsWith(`::${binding.moduleName}.${memberCall.member}`)
+    );
+  const swiftTargets = targets.filter((node) => node.language === 'swift');
+  const platformTargets = swiftTargets.length > 0
+    ? swiftTargets
+    : targets.filter((node) => node.language === 'kotlin');
+  if (platformTargets.length !== 1) return null;
+  const [target] = platformTargets;
+  if (!target) return null;
+
+  return {
+    original: ref,
+    targetNodeId: target.id,
+    confidence: 0.95,
+    resolvedBy: 'framework',
+  };
+}
 
 /**
  * Detect whether a file is plausibly an Expo Module — looking for both
@@ -182,12 +224,11 @@ export const expoModulesResolver: FrameworkResolver = {
   },
 
   /**
-   * No bespoke resolution needed — the synthetic method nodes emitted by
-   * `extract()` get picked up by the standard name-matcher when a JS
-   * callsite like `Foo.takePictureAsync(args)` resolves. Returning null
-   * here is correct.
+   * Resolve only an explicit JS `const receiver = requireNativeModule("X")`
+   * binding to the synthetic `X.method` declaration. Ownerless member calls
+   * otherwise remain unresolved instead of matching a global method name.
    */
-  resolve() {
-    return null;
+  resolve(ref, context) {
+    return resolveExpoNativeModuleCall(ref, context);
   },
 };

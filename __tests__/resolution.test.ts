@@ -927,4 +927,124 @@ def bootstrap():
       expect(callers.some((c) => c.node.filePath === 'src/main.ts')).toBe(true);
     });
   });
+
+  describe('receiver-aware JavaScript and TypeScript member calls', () => {
+    it('resolves only member calls with a source-proven class owner', async () => {
+      fs.mkdirSync(path.join(tempDir, 'src'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempDir, 'src/service.ts'),
+        `export class Service { run(): void {} static build(): void {} }\nexport class Decoy { run(): void {} }\n`
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'src/main.ts'),
+        `import { Service as ImportedService } from './service';
+export function typed(client: ImportedService): void { client.run(); }
+export function constructed(): void { const client = new ImportedService(); client.run(); ImportedService.build(); }
+export function unknown(): void { const client = getClient(); client.run(); new Map().run(); getClient().run(); }
+function getClient(): unknown { return {}; }
+`
+      );
+
+      cg = await SolidKG.init(tempDir, { index: true });
+      cg.resolveReferences();
+
+      const service = cg.getNodesByKind('class').find((node) => node.name === 'Service');
+      const run = cg.getNodesByKind('method').find((node) => node.name === 'run' && node.qualifiedName.includes('Service'));
+      const build = cg.getNodesByKind('method').find((node) => node.name === 'build' && node.qualifiedName.includes('Service'));
+      expect(service).toBeDefined();
+      expect(run).toBeDefined();
+      expect(build).toBeDefined();
+      if (!service || !run || !build) throw new Error('Expected Service and its methods to be indexed');
+
+      const runCallers = cg.getCallers(run.id).map((caller) => caller.node.name);
+      expect(runCallers).toEqual(expect.arrayContaining(['typed', 'constructed']));
+      expect(runCallers).not.toContain('unknown');
+      expect(cg.getCallers(build.id).map((caller) => caller.node.name)).toContain('constructed');
+    });
+
+    it('keeps owner evidence exact across shadowing, imports, defaults, namespaces, and static methods', async () => {
+      fs.mkdirSync(path.join(tempDir, 'src'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempDir, 'src', 'service.ts'),
+        `export class Service {
+  instanceShared(): void {}
+  static staticShared(): void {}
+  static same(): void {}
+  same(): void {}
+}
+export function Decoy(): void {}
+export default class DefaultService { run(): void {} }
+export function namespaceTarget(): void {}
+`
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'src', 'unrelated.ts'),
+        `export class ImportedService { missing(): void {} }
+export class LRUCache { get(): void {} }
+`
+      );
+      fs.writeFileSync(
+        path.join(tempDir, 'src', 'main.ts'),
+        `import DefaultService, { Service as ImportedService } from './service';
+import * as api from './service';
+
+ class LRUCache { get(): void {} }
+ class Cache { get(): void {} }
+
+export function importedInstance(client: ImportedService): void { client.instanceShared(); }
+export function importedStatic(): void { ImportedService.staticShared(); }
+export function missingImported(client: ImportedService): void { client.missing(); }
+export function defaultImport(): void { const service = new DefaultService(); service.run(); }
+export function namespaceImport(): void { api.namespaceTarget(); }
+export function outerCache(): void { const cache = new Cache(); cache.get(); }
+export function nestedCache(): void {
+  class Cache { get(): void {} }
+  const cache = new Cache();
+  cache.get();
+}
+export function shadowImportedClass(): void {
+  class ImportedService { instanceShared(): void {} }
+  const localService = new ImportedService();
+  localService.instanceShared();
+}
+export function afterShadow(client: ImportedService): void { client.instanceShared(); }
+export function instanceSame(): void { const service = new ImportedService(); service.same(); }
+export function staticSame(): void { ImportedService.same(); }
+`
+      );
+
+      cg = await SolidKG.init(tempDir, { index: true });
+      cg.resolveReferences();
+
+      const methods = cg.getNodesByKind('method');
+      const callersOf = (method: Node | undefined): string[] =>
+        method ? cg.getCallers(method.id).map((caller) => caller.node.name) : [];
+      const serviceMethod = (name: string, isStatic: boolean): Node | undefined =>
+        methods.find((node) => node.name === name && node.qualifiedName === `Service::${name}` && node.isStatic === isStatic);
+      const defaultRun = methods.find((node) => node.name === 'run' && node.qualifiedName === 'DefaultService::run');
+      const namespaceTarget = cg.getNodesByKind('function').find((node) => node.name === 'namespaceTarget');
+      const missing = methods.find((node) => node.name === 'missing' && node.qualifiedName === 'ImportedService::missing');
+      const cacheClasses = cg.getNodesByKind('class').filter((node) => node.name === 'Cache').sort((left, right) => left.startLine - right.startLine);
+      const cacheMethod = (owner: Node | undefined): Node | undefined =>
+        owner ? methods.find((node) => node.name === 'get' && node.qualifiedName === `${owner.qualifiedName}::get`) : undefined;
+
+      expect(callersOf(serviceMethod('instanceShared', false))).toContain('importedInstance');
+      expect(callersOf(serviceMethod('staticShared', true))).toContain('importedStatic');
+      expect(callersOf(defaultRun)).toContain('defaultImport');
+      expect(callersOf(namespaceTarget)).toContain('namespaceImport');
+      expect(callersOf(missing)).not.toContain('missingImported');
+      expect(cacheClasses).toHaveLength(2);
+      expect(callersOf(cacheMethod(cacheClasses[0]))).toContain('outerCache');
+      expect(callersOf(cacheMethod(cacheClasses[1]))).toContain('nestedCache');
+      expect(callersOf(serviceMethod('instanceShared', false))).toContain('afterShadow');
+      expect(callersOf(serviceMethod('instanceShared', false))).not.toContain('shadowImportedClass');
+      expect(methods.some((method) =>
+        method.qualifiedName !== 'Service::instanceShared'
+        && method.name === 'instanceShared'
+        && callersOf(method).includes('shadowImportedClass')
+      )).toBe(true);
+      expect(callersOf(serviceMethod('same', false))).toContain('instanceSame');
+      expect(callersOf(serviceMethod('same', true))).toContain('staticSame');
+    });
+  });
 });

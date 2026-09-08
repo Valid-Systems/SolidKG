@@ -122,33 +122,59 @@ export async function impactAsync() {
 }
 `
     );
+    fs.writeFileSync(
+      path.join(dir, 'src', 'wrong-module.ts'),
+      `
+import { requireNativeModule } from 'expo-modules-core';
+const Haptics = requireNativeModule('ExpoOther');
+export async function impactAsync() {
+  return await Haptics.uniqueExpoHapticCall();
+}
+`
+    );
 
-    const cg = await SolidKG.init(dir, { silent: true });
-    await cg.indexAll();
-    const db = (cg as any).db.db;
+    const cg = await SolidKG.init(dir);
+    try {
+      await cg.indexAll();
+      const db = (cg as any).db.db;
 
-    // The native method node should exist.
-    const native = db
-      .prepare(
-        "SELECT * FROM nodes WHERE kind='method' AND name='uniqueExpoHapticCall' AND id LIKE 'expo-module:%'"
-      )
-      .all();
-    expect(native).toHaveLength(1);
+      // The native method node should exist.
+      const native = db
+        .prepare(
+          "SELECT * FROM nodes WHERE kind='method' AND name='uniqueExpoHapticCall' AND id LIKE 'expo-module:%'"
+        )
+        .all();
+      expect(native).toHaveLength(1);
 
-    // And the JS callsite should produce a call edge targeting it.
-    const callEdge = db
-      .prepare(
-        `SELECT t.name target, t.id target_id
-         FROM edges e
-         JOIN nodes s ON s.id = e.source
-         JOIN nodes t ON t.id = e.target
-         WHERE e.kind = 'calls'
-           AND s.file_path LIKE '%index.ts'
-           AND t.name = 'uniqueExpoHapticCall'`
-      )
-      .all();
-    cg.close?.();
-    expect(callEdge.length).toBeGreaterThanOrEqual(1);
-    expect(callEdge[0].target_id.startsWith('expo-module:')).toBe(true);
+      // And the JS callsite should produce a call edge targeting it.
+      const callEdge = db
+        .prepare(
+          `SELECT t.name target, t.id target_id
+           FROM edges e
+           JOIN nodes s ON s.id = e.source
+           JOIN nodes t ON t.id = e.target
+           WHERE e.kind = 'calls'
+             AND s.file_path LIKE '%index.ts'
+             AND t.name = 'uniqueExpoHapticCall'`
+        )
+        .all();
+      expect(callEdge.length).toBeGreaterThanOrEqual(1);
+      expect(callEdge[0].target_id.startsWith('expo-module:')).toBe(true);
+
+      const wrongModuleCallEdge = db
+        .prepare(
+          `SELECT t.id target_id
+           FROM edges e
+           JOIN nodes s ON s.id = e.source
+           JOIN nodes t ON t.id = e.target
+           WHERE e.kind = 'calls'
+             AND s.file_path LIKE '%wrong-module.ts'
+             AND t.name = 'uniqueExpoHapticCall'`
+        )
+        .all();
+      expect(wrongModuleCallEdge).toHaveLength(0);
+    } finally {
+      cg.close?.();
+    }
   });
 });

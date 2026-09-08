@@ -14,8 +14,10 @@ import {
   ExtractionResult,
   ExtractionError,
   UnresolvedReference,
+  MemberCallEvidence,
   FrameworkRelationHint,
 } from '../types';
+import type { MemberCallBinding } from '../types';
 import { getParser, detectLanguage, isLanguageSupported } from './grammars';
 import { generateNodeId, getNodeText, getChildByField, getPrecedingDocstring } from './tree-sitter-helpers';
 import type { LanguageExtractor, ExtractorContext } from './tree-sitter-types';
@@ -34,6 +36,29 @@ import {
 
 // Re-export for backward compatibility
 export { generateNodeId } from './tree-sitter-helpers';
+
+type MemberCallOwner = Pick<
+  MemberCallEvidence,
+  'ownerName' | 'ownerIsStatic' | 'ownerStartLine' | 'ownerStartColumn'
+>;
+
+interface ReceiverResolution {
+  readonly binding: MemberCallBinding;
+  readonly owner: Partial<MemberCallOwner>;
+}
+
+interface LexicalBinding {
+  readonly node: SyntaxNode;
+  readonly scope: SyntaxNode;
+  readonly isVisible: boolean;
+}
+
+interface ImportBinding {
+  readonly localName: string;
+  readonly exportPath: readonly string[];
+  readonly source: string;
+  readonly isNamespace: boolean;
+}
 
 function referencesWithRelationHints(
   references: UnresolvedReference[],
@@ -1516,6 +1541,7 @@ export class TreeSitterExtractor {
 
     // Get the function/method being called
     let calleeName = '';
+    let memberCall: MemberCallEvidence | undefined;
 
     // Java/Kotlin method_invocation has 'object' + 'name' fields instead of 'function'
     // PHP member_call_expression has 'object' + 'name', scoped_call_expression has 'scope' + 'name'
@@ -1597,6 +1623,9 @@ export class TreeSitterExtractor {
             // (e.g., Python's console.print() vs builtin print())
             // Skip self/this/cls as they don't aid resolution
             const receiver = getChildByField(func, 'object') || getChildByField(func, 'operand') || func.namedChild(0);
+            if (this.isJavaScriptOrTypeScript() && receiver) {
+              memberCall = this.getMemberCallEvidence(node, receiver, methodName);
+            }
             const SKIP_RECEIVERS = new Set(['self', 'this', 'cls', 'super']);
             if (receiver && (receiver.type === 'identifier' || receiver.type === 'simple_identifier')) {
               const receiverName = getNodeText(receiver, this.source);
@@ -1625,8 +1654,658 @@ export class TreeSitterExtractor {
         referenceKind: 'calls',
         line: node.startPosition.row + 1,
         column: node.startPosition.column,
+        memberCall,
       });
     }
+  }
+
+  private isJavaScriptOrTypeScript(): boolean {
+    return this.language === 'javascript' || this.language === 'jsx' ||
+      this.language === 'typescript' || this.language === 'tsx';
+  }
+
+  private getMemberCallEvidence(
+    callNode: SyntaxNode,
+    receiverNode: SyntaxNode,
+    member: string
+  ): MemberCallEvidence {
+    const receiver = getNodeText(receiverNode, this.source).trim();
+    const resolution = this.resolveReceiverBinding(callNode, receiverNode, member);
+    return {
+      receiver,
+      member,
+      ...resolution.owner,
+      binding: resolution.binding,
+    };
+  }
+
+  private resolveReceiverBinding(
+    callNode: SyntaxNode,
+    receiverNode: SyntaxNode,
+    member: string,
+    isNamespaceSegment = false
+  ): ReceiverResolution {
+    const receiver = getNodeText(receiverNode, this.source).trim();
+    if (receiver === 'this') return this.resolveThisBinding(callNode);
+
+    if (receiverNode.type === 'member_expression') {
+      const object = getChildByField(receiverNode, 'object') ?? receiverNode.namedChild(0);
+      const property = getChildByField(receiverNode, 'property') ?? receiverNode.namedChild(1);
+      if (object && property) {
+        const namespace = this.resolveReceiverBinding(callNode, object, member, true);
+        if (namespace.binding.kind === 'import' && namespace.binding.access === 'namespace') {
+          return {
+            binding: {
+              ...namespace.binding,
+              exportPath: [...namespace.binding.exportPath, getNodeText(property, this.source)],
+              access: 'static',
+            },
+            owner: {
+              ownerName: getNodeText(property, this.source),
+              ownerIsStatic: true,
+            },
+          };
+        }
+      }
+      return this.resolveThisFieldBinding(callNode, receiverNode);
+    }
+
+    if (receiverNode.type === 'new_expression') {
+      const constructor = getChildByField(receiverNode, 'constructor') ?? receiverNode.namedChild(0);
+      return constructor ? this.resolveOwnerNode(callNode, constructor, 'instance') : this.unknownReceiver();
+    }
+
+    if (receiverNode.type === 'identifier' || receiverNode.type === 'simple_identifier') {
+      const binding = this.findLexicalBinding(callNode, receiver);
+      if (binding) {
+        return binding.isVisible
+          ? this.resolveLexicalBinding(binding, callNode, receiver)
+          : this.unknownReceiver();
+      }
+
+      const classBinding = this.findLexicalClassBinding(callNode, receiver);
+      if (classBinding.isBound) {
+        return classBinding.node
+          ? this.localReceiver(classBinding.node, 'static')
+          : this.unknownReceiver();
+      }
+
+      const importBinding = this.findImportBinding(callNode, receiver);
+      if (!importBinding) return this.unknownReceiver();
+      const importResolution = this.importReceiver(
+        importBinding,
+        importBinding.isNamespace ? 'namespace' : 'static'
+      );
+      return importBinding.isNamespace
+        ? {
+          binding: {
+            kind: 'import',
+            localName: importBinding.localName,
+            exportPath: isNamespaceSegment ? [] : [member],
+            access: 'namespace',
+          },
+          owner: importResolution.owner,
+        }
+        : importResolution;
+    }
+
+    return this.unknownReceiver();
+  }
+
+  private findLexicalBinding(
+    callNode: SyntaxNode,
+    name: string
+  ): LexicalBinding | undefined {
+    let current: SyntaxNode | null = callNode.parent;
+    while (current) {
+      if (this.isLexicalScope(current)) {
+        const declaration = this.findBindingInScope(current, name, callNode.startIndex);
+        if (declaration) return declaration;
+      }
+      if (this.isFunctionScope(current)) {
+        const parameter = this.findParameterBinding(current, name);
+        if (parameter) {
+          return { node: parameter, scope: current, isVisible: parameter.endIndex <= callNode.startIndex };
+        }
+      }
+      current = current.parent;
+    }
+    return undefined;
+  }
+
+  private findBindingInScope(
+    scope: SyntaxNode,
+    name: string,
+    callStartIndex: number
+  ): LexicalBinding | undefined {
+    const declarations = this.collectScopeNodes(scope, (node) => node.type === 'variable_declarator')
+      .filter((node) => this.declaresName(node, name))
+      .sort((left, right) => left.startIndex - right.startIndex);
+    if (declarations.length === 0) return undefined;
+
+    const visible = declarations.filter((node) => node.endIndex <= callStartIndex).at(-1);
+    return { node: visible ?? declarations[0]!, scope, isVisible: Boolean(visible) };
+  }
+
+  private findParameterBinding(functionNode: SyntaxNode, name: string): SyntaxNode | undefined {
+    const parameters = getChildByField(functionNode, 'parameters') ??
+      functionNode.namedChildren.find((node) => node.type === 'formal_parameters') ??
+      getChildByField(functionNode, 'parameter');
+    if (!parameters) return undefined;
+
+    const parameterNodes = parameters.type === 'identifier' || parameters.type === 'simple_identifier'
+      ? [parameters]
+      : parameters.namedChildren;
+    for (const parameter of parameterNodes) {
+      if (['required_parameter', 'optional_parameter', 'rest_pattern'].includes(parameter.type)) {
+        if (this.declaresName(parameter, name)) return parameter;
+        continue;
+      }
+      if (['identifier', 'simple_identifier'].includes(parameter.type)) {
+        if (getNodeText(parameter, this.source) === name) return parameter;
+        continue;
+      }
+      const binding = this.collectScopeNodes(parameter, (node) =>
+        ['identifier', 'simple_identifier', 'shorthand_property_identifier_pattern'].includes(node.type) &&
+        getNodeText(node, this.source) === name
+      )[0];
+      if (binding) return binding;
+    }
+    return undefined;
+  }
+
+  private declaresName(binding: SyntaxNode, name: string): boolean {
+    if (getNodeText(binding, this.source) === name) return true;
+    const pattern = getChildByField(binding, 'name') ?? getChildByField(binding, 'pattern');
+    if (!pattern) return false;
+    if (getNodeText(pattern, this.source) === name) return true;
+    return this.collectScopeNodes(pattern, (node) =>
+      [
+        'identifier',
+        'simple_identifier',
+        'shorthand_property_identifier_pattern',
+      ].includes(node.type) &&
+      getNodeText(node, this.source) === name
+    ).length > 0;
+  }
+
+  private resolveLexicalBinding(
+    binding: LexicalBinding,
+    callNode: SyntaxNode,
+    receiver: string,
+    visitedBindings = new Set<number>()
+  ): ReceiverResolution {
+    if (visitedBindings.has(binding.node.startIndex)) return this.unknownReceiver();
+    if (this.hasReassignmentBefore(binding.node, binding.scope, callNode, receiver)) {
+      return this.unknownReceiver();
+    }
+    const nextVisitedBindings = new Set(visitedBindings).add(binding.node.startIndex);
+
+    const nativeBinding = this.getNativeBinding(binding.node, callNode);
+    if (nativeBinding) return nativeBinding;
+
+    const typeAnnotation = this.findTypeAnnotation(binding.node);
+    if (typeAnnotation) {
+      const typeNode = typeAnnotation.namedChild(0);
+      if (!typeNode) return this.unknownReceiver();
+      return this.resolveTypeOwnerNode(callNode, typeNode, 'instance');
+    }
+
+    if (binding.node.type !== 'variable_declarator') return this.unknownReceiver();
+    const initializer = getChildByField(binding.node, 'value');
+    if (!initializer || initializer.type !== 'new_expression') return this.unknownReceiver();
+
+    const constructor = getChildByField(initializer, 'constructor') ?? initializer.namedChild(0);
+    return constructor
+      ? this.resolveOwnerNode(callNode, constructor, 'instance', nextVisitedBindings)
+      : this.unknownReceiver();
+  }
+
+  private findTypeAnnotation(node: SyntaxNode): SyntaxNode | undefined {
+    const direct = getChildByField(node, 'type');
+    if (direct?.type === 'type_annotation') return direct;
+    return node.namedChildren.find((child) => child.type === 'type_annotation');
+  }
+
+  private findLexicalClassBinding(
+    callNode: SyntaxNode,
+    name: string
+  ): { isBound: boolean; node?: SyntaxNode } {
+    let current: SyntaxNode | null = callNode.parent;
+    while (current) {
+      if (this.isLexicalScope(current)) {
+        const scope = current;
+        const declarations = this.collectScopeNodes(scope, (node) => node.type === 'class_declaration')
+          .filter((node) => this.getDirectIdentifier(node, 'name') === name)
+          .sort((left, right) => left.startIndex - right.startIndex);
+        if (declarations.length > 0) {
+          const visible = declarations.filter((node) =>
+            node.startIndex === scope.startIndex || node.endIndex <= callNode.startIndex
+          ).at(-1);
+          return visible ? { isBound: true, node: visible } : { isBound: true };
+        }
+      }
+      current = current.parent;
+    }
+    return { isBound: false };
+  }
+
+  private findLexicalNamespaceClass(
+    callNode: SyntaxNode,
+    namespaceName: string,
+    className: string
+  ): SyntaxNode | undefined {
+    let current: SyntaxNode | null = callNode.parent;
+    while (current) {
+      if (this.isLexicalScope(current)) {
+        const namespaces = this.collectScopeNodes(current, (node) =>
+          node.type === 'internal_module' && this.getDirectIdentifier(node, 'name') === namespaceName
+        ).sort((left, right) => left.startIndex - right.startIndex);
+        const namespace = namespaces.filter((node) => node.endIndex <= callNode.startIndex).at(-1);
+        if (namespace) {
+          const body = getChildByField(namespace, 'body');
+          if (!body) return undefined;
+          return this.collectScopeNodes(body, (node) => node.type === 'class_declaration')
+            .find((node) => this.getDirectIdentifier(node, 'name') === className);
+        }
+      }
+      current = current.parent;
+    }
+    return undefined;
+  }
+
+  private collectScopeNodes(scope: SyntaxNode, predicate: (node: SyntaxNode) => boolean): SyntaxNode[] {
+    const nodes: SyntaxNode[] = [];
+    const visit = (node: SyntaxNode, isScopeRoot: boolean): void => {
+      if (predicate(node)) nodes.push(node);
+      if (!isScopeRoot && this.isLexicalScope(node)) return;
+      for (const child of node.namedChildren) visit(child, false);
+    };
+    visit(scope, true);
+    return nodes;
+  }
+
+  private isLexicalScope(node: SyntaxNode): boolean {
+    return [
+      'program',
+      'statement_block',
+      'switch_body',
+      'for_statement',
+      'for_in_statement',
+      'for_of_statement',
+      'catch_clause',
+      'class_declaration',
+      'class',
+      'class_body',
+      'function_declaration',
+      'function_expression',
+      'generator_function',
+      'arrow_function',
+      'method_definition',
+    ].includes(node.type);
+  }
+
+  private isFunctionScope(node: SyntaxNode): boolean {
+    return [
+      'function_declaration',
+      'function_expression',
+      'generator_function',
+      'arrow_function',
+      'method_definition',
+    ].includes(node.type);
+  }
+
+  private getDirectIdentifier(node: SyntaxNode, field: string): string | undefined {
+    const identifier = getChildByField(node, field);
+    if (!identifier || ![
+      'identifier',
+      'simple_identifier',
+      'type_identifier',
+      'property_identifier',
+      'private_property_identifier',
+    ].includes(identifier.type)) return undefined;
+    return getNodeText(identifier, this.source);
+  }
+
+  private hasReassignmentBefore(
+    binding: SyntaxNode,
+    scope: SyntaxNode,
+    callNode: SyntaxNode,
+    receiver: string
+  ): boolean {
+    let reassigned = false;
+    const searchScope = this.isFunctionScope(scope)
+      ? getChildByField(scope, 'body') ?? scope
+      : scope;
+    const visit = (node: SyntaxNode, isSearchScope: boolean): void => {
+      if (!isSearchScope && this.isFunctionScope(node)) return;
+      if (!isSearchScope && this.isLexicalScope(node) &&
+        this.findBindingInScope(node, receiver, Number.MAX_SAFE_INTEGER)) return;
+      if (reassigned || node.startIndex <= binding.endIndex || node.endIndex > callNode.startIndex) {
+        for (const child of node.namedChildren) {
+          if (!reassigned) visit(child, false);
+        }
+        return;
+      }
+
+      if (['assignment_expression', 'augmented_assignment_expression'].includes(node.type)) {
+        const left = getChildByField(node, 'left') ?? getChildByField(node, 'left_hand_side') ?? node.namedChild(0);
+        if (left && getNodeText(left, this.source) === receiver) {
+          reassigned = true;
+          return;
+        }
+      }
+      if (node.type === 'update_expression') {
+        const argument = getChildByField(node, 'argument') ?? node.namedChild(0);
+        if (argument && getNodeText(argument, this.source) === receiver) {
+          reassigned = true;
+          return;
+        }
+      }
+      for (const child of node.namedChildren) {
+        if (!reassigned) visit(child, false);
+      }
+    };
+    visit(searchScope, true);
+    return reassigned;
+  }
+
+  private resolveThisBinding(callNode: SyntaxNode): ReceiverResolution {
+    const context = this.findThisClassContext(callNode);
+    return context
+      ? this.localReceiver(context.classNode, context.isStatic ? 'static' : 'instance')
+      : this.unknownReceiver();
+  }
+
+  private resolveThisFieldBinding(callNode: SyntaxNode, receiverNode: SyntaxNode): ReceiverResolution {
+    const object = getChildByField(receiverNode, 'object') ?? receiverNode.namedChild(0);
+    const property = getChildByField(receiverNode, 'property') ?? receiverNode.namedChild(1);
+    if (!object || !property || getNodeText(object, this.source) !== 'this') return this.unknownReceiver();
+
+    const context = this.findThisClassContext(callNode);
+    if (!context) return this.unknownReceiver();
+
+    const fieldName = getNodeText(property, this.source);
+    const classBody = getChildByField(context.classNode, 'body');
+    const field = classBody?.namedChildren.find((node) => {
+      if (!['field_definition', 'public_field_definition', 'property_definition'].includes(node.type)) {
+        return false;
+      }
+      return (this.getDirectIdentifier(node, 'name') ?? this.getDirectIdentifier(node, 'property')) === fieldName;
+    });
+    if (!field) return this.unknownReceiver();
+
+    const typeAnnotation = this.findTypeAnnotation(field);
+    const typeNode = typeAnnotation?.namedChild(0);
+    if (typeNode) {
+      return this.resolveTypeOwnerNode(callNode, typeNode, 'instance');
+    }
+    const initializer = getChildByField(field, 'value');
+    if (initializer?.type !== 'new_expression') return this.unknownReceiver();
+    const constructor = getChildByField(initializer, 'constructor') ?? initializer.namedChild(0);
+    return constructor
+      ? this.resolveOwnerNode(callNode, constructor, 'instance')
+      : this.unknownReceiver();
+  }
+
+  private findThisClassContext(callNode: SyntaxNode): { classNode: SyntaxNode; isStatic: boolean } | undefined {
+    let current: SyntaxNode | null = callNode.parent;
+    let member: SyntaxNode | undefined;
+    while (current) {
+      if (['function_declaration', 'function_expression', 'generator_function'].includes(current.type)) return undefined;
+      if (current.type === 'method_definition' && current.parent?.type !== 'class_body') return undefined;
+      if (!member && ['method_definition', 'public_field_definition', 'field_definition', 'property_definition'].includes(current.type)) {
+        member = current;
+      }
+      if (current.type === 'class_declaration' || current.type === 'class') {
+        return { classNode: current, isStatic: this.extractor?.isStatic?.(member ?? current) ?? false };
+      }
+      current = current.parent;
+    }
+    return undefined;
+  }
+
+  private localReceiver(classNode: SyntaxNode, access: 'instance' | 'static'): ReceiverResolution {
+    const name = this.getDirectIdentifier(classNode, 'name');
+    const ownerName = name ? this.normalizeOwnerName(name) : undefined;
+    if (!ownerName) return this.unknownReceiver();
+    const owner = {
+      ownerName,
+      ownerIsStatic: access === 'static',
+      ownerStartLine: classNode.startPosition.row + 1,
+      ownerStartColumn: classNode.startPosition.column,
+    } satisfies MemberCallOwner;
+    return {
+      binding: {
+        kind: 'local',
+        ownerFilePath: this.filePath,
+        ownerStartLine: classNode.startPosition.row + 1,
+        ownerStartColumn: classNode.startPosition.column,
+        access,
+      },
+      owner,
+    };
+  }
+
+  private importReceiver(
+    binding: ImportBinding,
+    access: 'instance' | 'static' | 'namespace'
+  ): ReceiverResolution {
+    const ownerName = binding.exportPath.at(-1) ?? binding.localName;
+    return {
+      binding: {
+        kind: 'import',
+        localName: binding.localName,
+        exportPath: [...binding.exportPath],
+        access,
+      },
+      owner: { ownerName, ownerIsStatic: access === 'static' },
+    };
+  }
+
+  private resolveOwnerNode(
+    callNode: SyntaxNode,
+    node: SyntaxNode,
+    access: 'instance' | 'static',
+    visitedBindings = new Set<number>()
+  ): ReceiverResolution {
+    const namespace = getChildByField(node, 'module') ?? getChildByField(node, 'object');
+    const exported = getChildByField(node, 'name') ?? getChildByField(node, 'property');
+    if (namespace && exported) {
+      const namespaceResolution = this.resolveReceiverBinding(callNode, namespace, '', true);
+      if (namespaceResolution.binding.kind === 'import' && namespaceResolution.binding.access === 'namespace') {
+        return this.importReceiver({
+          localName: namespaceResolution.binding.localName,
+          exportPath: [...namespaceResolution.binding.exportPath, getNodeText(exported, this.source)],
+          source: '',
+          isNamespace: false,
+        }, access);
+      }
+      const localClass = this.findLexicalNamespaceClass(
+        callNode,
+        getNodeText(namespace, this.source),
+        getNodeText(exported, this.source)
+      );
+      if (localClass) return this.localReceiver(localClass, access);
+      return this.unknownReceiver();
+    }
+
+    const ownerName = this.normalizeOwnerName(getNodeText(node, this.source));
+    if (!ownerName) return this.unknownReceiver();
+
+    const lexicalBinding = this.findLexicalBinding(callNode, ownerName);
+    if (lexicalBinding) {
+      return lexicalBinding.isVisible
+        ? this.resolveLexicalBinding(lexicalBinding, callNode, ownerName, visitedBindings)
+        : this.unknownReceiver();
+    }
+
+    const localClass = this.findLexicalClassBinding(callNode, ownerName);
+    if (localClass.isBound) {
+      return localClass.node ? this.localReceiver(localClass.node, access) : this.unknownReceiver();
+    }
+
+    const importBinding = this.findImportBinding(callNode, ownerName);
+    return importBinding
+      ? this.importReceiver(importBinding, access)
+      : this.unknownReceiver();
+  }
+
+  private resolveTypeOwnerNode(
+    callNode: SyntaxNode,
+    node: SyntaxNode,
+    access: 'instance' | 'static'
+  ): ReceiverResolution {
+    const namespace = getChildByField(node, 'module') ?? getChildByField(node, 'object');
+    const exported = getChildByField(node, 'name') ?? getChildByField(node, 'property');
+    if (namespace && exported) {
+      const namespaceName = getNodeText(namespace, this.source);
+      const namespaceImport = this.findImportBinding(callNode, namespaceName);
+      if (namespaceImport?.isNamespace) {
+        return this.importReceiver({
+          localName: namespaceImport.localName,
+          exportPath: [getNodeText(exported, this.source)],
+          source: namespaceImport.source,
+          isNamespace: false,
+        }, access);
+      }
+      const localClass = this.findLexicalNamespaceClass(
+        callNode,
+        namespaceName,
+        getNodeText(exported, this.source)
+      );
+      return localClass ? this.localReceiver(localClass, access) : this.unknownReceiver();
+    }
+
+    const ownerName = this.normalizeOwnerName(getNodeText(node, this.source));
+    if (!ownerName || this.hasTypeParameterBinding(callNode, ownerName)) {
+      return this.unknownReceiver();
+    }
+
+    const localClass = this.findLexicalClassBinding(callNode, ownerName);
+    if (localClass.isBound) {
+      return localClass.node ? this.localReceiver(localClass.node, access) : this.unknownReceiver();
+    }
+
+    const importBinding = this.findImportBinding(callNode, ownerName);
+    return importBinding
+      ? this.importReceiver(importBinding, access)
+      : this.unknownReceiver();
+  }
+
+  private hasTypeParameterBinding(callNode: SyntaxNode, name: string): boolean {
+    let current: SyntaxNode | null = callNode.parent;
+    while (current) {
+      const parameters = getChildByField(current, 'type_parameters') ??
+        current.namedChildren.find((child) => child.type === 'type_parameters');
+      if (parameters?.namedChildren.some((parameter) => {
+        if (parameter.type !== 'type_parameter') return false;
+        if (this.getDirectIdentifier(parameter, 'name') === name) return true;
+        const typeName = parameter.namedChildren.find((child) =>
+          child.type === 'type_identifier' || child.type === 'identifier'
+        );
+        return typeName ? getNodeText(typeName, this.source) === name : false;
+      })) return true;
+      current = current.parent;
+    }
+    return false;
+  }
+
+  private findImportBinding(_callNode: SyntaxNode, localName: string): ImportBinding | undefined {
+    const root = this.getRootNode(_callNode);
+    const imports = this.collectScopeNodes(root, (node) => node.type === 'import_statement');
+
+    for (const importNode of imports) {
+      const namespace = this.collectScopeNodes(importNode, (node) => node.type === 'namespace_import')
+        .find((node) => this.getLastIdentifier(node) === localName);
+      if (namespace) {
+        return { localName, exportPath: [], source: this.getImportSource(importNode), isNamespace: true };
+      }
+
+      for (const specifier of this.collectScopeNodes(importNode, (node) => node.type === 'import_specifier')) {
+        const identifiers = this.getDirectIdentifiers(specifier);
+        const importedName = this.getDirectIdentifier(specifier, 'name') ?? identifiers[0];
+        const alias = this.getDirectIdentifier(specifier, 'alias') ?? identifiers.at(-1);
+        if (importedName && alias === localName) {
+          return {
+            localName,
+            exportPath: [importedName],
+            source: this.getImportSource(importNode),
+            isNamespace: false,
+          };
+        }
+      }
+
+      const clause = importNode.namedChildren.find((node) => node.type === 'import_clause');
+      const defaultImport = clause?.namedChildren.find((node) =>
+        (node.type === 'identifier' || node.type === 'type_identifier') && getNodeText(node, this.source) === localName
+      );
+      if (defaultImport) {
+        return {
+          localName,
+          exportPath: ['default'],
+          source: this.getImportSource(importNode),
+          isNamespace: false,
+        };
+      }
+    }
+
+    return undefined;
+  }
+
+  private getNativeBinding(binding: SyntaxNode, callNode: SyntaxNode): ReceiverResolution | undefined {
+    if (binding.type !== 'variable_declarator') return undefined;
+    const initializer = getChildByField(binding, 'value');
+    if (!initializer || initializer.type !== 'call_expression') return undefined;
+
+    const functionNode = getChildByField(initializer, 'function') ?? initializer.namedChild(0);
+    if (!functionNode) return undefined;
+    const factoryName = getNodeText(functionNode, this.source);
+    if (this.findLexicalBinding(callNode, factoryName)) return undefined;
+    const factory = this.findImportBinding(callNode, factoryName);
+    if (
+      !factory ||
+      factory.isNamespace ||
+      factory.source !== 'expo-modules-core' ||
+      factory.exportPath.length !== 1 ||
+      factory.exportPath[0] !== 'requireNativeModule'
+    ) return undefined;
+
+    const argumentsNode = getChildByField(initializer, 'arguments');
+    const moduleNameNode = argumentsNode?.namedChild(0);
+    if (!moduleNameNode || moduleNameNode.type !== 'string') return undefined;
+    const moduleName = getNodeText(moduleNameNode, this.source).slice(1, -1);
+    return moduleName ? { binding: { kind: 'native', moduleName }, owner: {} } : undefined;
+  }
+
+  private getRootNode(node: SyntaxNode): SyntaxNode {
+    let current = node;
+    while (current.parent) current = current.parent;
+    return current;
+  }
+
+  private getDirectIdentifiers(node: SyntaxNode): string[] {
+    return node.namedChildren
+      .filter((child) => ['identifier', 'type_identifier', 'simple_identifier'].includes(child.type))
+      .map((child) => getNodeText(child, this.source));
+  }
+
+  private getLastIdentifier(node: SyntaxNode): string | undefined {
+    return this.getDirectIdentifiers(node).at(-1);
+  }
+
+  private unknownReceiver(): ReceiverResolution {
+    return { binding: { kind: 'unknown' }, owner: {} };
+  }
+
+  private getImportSource(importNode: SyntaxNode): string {
+    const source = getChildByField(importNode, 'source') ?? importNode.namedChildren.at(-1);
+    return source ? getNodeText(source, this.source).slice(1, -1) : '';
+  }
+
+  private normalizeOwnerName(typeName: string): string | undefined {
+    const owner = typeName.replace(/\s/g, '').replace(/<.*$/, '').split(/[.:]/).at(-1);
+    return owner || undefined;
   }
 
   /**
