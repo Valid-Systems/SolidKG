@@ -20,12 +20,38 @@ solidkg callers <symbol>        # Find what calls a function/method (--limit, --
 solidkg callees <symbol>        # Find what a function/method calls (--limit, --json)
 solidkg impact <symbol>         # Analyze what code is affected by changing a symbol (--depth, --json)
 solidkg affected [files...]     # Find test files affected by changes
+solidkg snapshot <action>       # Create, list, diff, drift, or delete a snapshot
+solidkg architecture <action>   # Analyze, health, get, coupling, or package
 solidkg scip generate [path]    # Generate .scip files without importing them
 solidkg scip import [files...]  # Import existing .scip files as optional precise refs
 solidkg serve --mcp             # Start MCP server
 ```
 
 There is no supported `visualize` command, Studio command, or browser-opening graph UI workflow. The CLI is the supported non-GUI surface for graph queries and exports. Use `query`, `files`, `context`, `status --json`, `context --format json`, `snapshot`, `architecture`, `callers`, `callees`, `impact`, and `scip` commands when scripts or custom agents need graph data.
+
+## Architecture health and snapshot drift
+
+Health and drift require schema 11 and use read-only handles. If an existing index needs an upgrade, run `solidkg sync <project>` once with write access. Then retry the read.
+
+Before a change, save a baseline with its layer rules:
+
+```bash
+solidkg snapshot create before-refactor --layers '[{"name":"api","paths":["src/api/**"]}]' --path .
+solidkg architecture health --layers '[{"name":"api","paths":["src/api/**"]}]' --json --path .
+```
+
+After the change, update the index and compare it with the baseline:
+
+```bash
+solidkg sync .
+solidkg snapshot drift before-refactor --json --path .
+```
+
+Snapshot creation writes the baseline. Drift reuses its saved layer options and requires an exact saved label. `--layers` applies to snapshot creation, not drift.
+
+Health provides findings, metrics, evidence anchors, and per-signal coverage, not a score, grade, severity, or runtime verdict. Static unreferenced results are candidates, not dead-code proof. Drift always includes graph-diff counts. Its comparison status is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`. Incompatible or unavailable analysis does not produce a guessed finding comparison.
+
+Without `--json`, each finding or delta category shows at most 20 items and reports the remainder. CLI `--json` and API results remain complete.
 
 ## Initialization and SCIP modes
 

@@ -47,6 +47,9 @@ cg.close();
 | `getCallers(id)` / `getCallees(id)` | Walk the call graph |
 | `getImpactRadius(id, depth)` | Transitive impact of a change |
 | `buildContext(task, opts)` | Markdown / JSON context for AI |
+| `getArchitectureHealth(opts)` | Read-only structural findings, metrics, evidence anchors, and per-signal coverage |
+| `createSnapshot(label, opts)` | Save graph facts and architecture-health analysis |
+| `getSnapshotHealthDrift(label)` | Compare a saved baseline with the current indexed graph |
 | `watch()` / `unwatch()` | Start / stop the file watcher |
 | `close()` | Close the database connection |
 
@@ -55,6 +58,16 @@ cg.close();
 The API mirrors the public CLI controls. `SolidKG.init(project, { dataDir })` and `SolidKG.open(project, { dataDir })` open an external data directory while keeping `project` as the source root. `indexAll()` accepts source-selection options such as `extraRoots`, `includePatterns`, `excludePatterns`, `includeVendored`, `includeSubmodules`, `maxFileSizeBytes`, and SCIP mode options. `IndexResult.skippedFiles` reports files skipped by scope or size rules.
 
 Routine API indexing defaults to AST extraction without starting external SCIP generators. Use the SCIP options when a caller wants best-effort or required precision generation.
+
+## Architecture health and snapshot drift
+
+Health and drift require an existing schema 11 index. If an index needs an upgrade, run `solidkg sync <project>` once with write access. Then reopen it with `SolidKG.open(project, { readOnly: true })` for read-only access.
+
+Before a change, use a writable handle to save `createSnapshot('before-refactor', { architecture: { layers: [{ name: 'api', paths: ['src/api/**'] }] } })`. After the change, sync the index before the comparison. `getSnapshotHealthDrift('before-refactor')` reuses the saved layer options. A missing snapshot label raises an error.
+
+`getArchitectureHealth({ layers })` returns deterministic findings, metrics, evidence anchors, and per-signal coverage. It does not assign a score, grade, severity, or runtime verdict. Static unreferenced findings are candidates, not proof that code is dead.
+
+Drift always includes graph-diff counts. Its comparison status is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`. Incompatible or unavailable analysis does not produce a guessed finding comparison. API results remain complete, unlike the bounded human/MCP categories.
 
 ## Public exports
 
