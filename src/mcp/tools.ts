@@ -4,7 +4,7 @@
  * Defines the tools exposed by the SolidKG MCP server.
  */
 
-import SolidKG, { findNearestSolidKGRoot } from '../index';
+import SolidKG, { findNearestSolidKGRoot, SchemaUpgradeRequiredError } from '../index';
 import {
   detectWorktreeIndexMismatch,
   worktreeMismatchWarning,
@@ -29,6 +29,7 @@ import type {
   UncertaintyLabel,
   RankingReason,
   SearchRankingReason,
+  EvidencePacketEntry,
 } from '../types';
 import { buildFailureAnswerPacket, buildNodeAnswerPacket, formatAnswerPacketMarkdown } from '../evidence/packets';
 import { buildGraphTraversalPacket, formatGraphTraversalPacketMarkdown, type GraphTraversalDirection, type GraphTraversalLimit, type GraphTraversalResult } from '../graph';
@@ -64,6 +65,10 @@ import {
   globToRegex,
   parseLayerRules,
 } from './formatters';
+import {
+  formatArchitectureHealthReport,
+  formatSnapshotHealthDrift,
+} from './architecture-health-formatters';
 import { formatNodeCapabilityFootprint, formatTraceCapabilityFootprint } from './capability-footprint';
 import { findAllSymbols, findSymbol, normalizeLookupPath } from './symbol-resolution';
 
@@ -90,6 +95,24 @@ const MAX_INPUT_LENGTH = 10_000;
 const MAX_PATH_LENGTH = 4_096;
 const MAX_OVERVIEW_EXPAND_PATHS = 50;
 const DEFAULT_MCP_TOOLS = new Set(['explore']);
+
+interface ReadOnlyProjectContext {
+  root: string;
+  startPath: string;
+  pendingFiles: readonly PendingFile[];
+}
+
+const SCHEMA_UPGRADE_REMEDIATION = 'SolidKG schema 10 must be upgraded to 11 before architecture health or snapshot drift can be read. Run "solidkg sync <project>" once with write access, then retry.';
+const EXPLORE_ARCHITECTURE_SECTION_MAX_CHARS = 6_000;
+
+type ExploreArchitectureIntent = 'health' | 'drift';
+
+interface ExploreArchitectureDecoration {
+  text: string;
+  evidence: EvidencePacketEntry[];
+  uncertaintyLabels: UncertaintyLabel[];
+  canAnswerFromReturnedContext: boolean;
+}
 
 /**
  * Node kinds that contain other symbols. For these, `solidkg_node` with
@@ -394,6 +417,7 @@ function parseStrictBoundedNumber(
 export class ToolHandler {
   // Cache of opened SolidKG instances for cross-project queries
   private projectCache: Map<string, SolidKG> = new Map();
+  private schemaUpgradeError: SchemaUpgradeRequiredError | null = null;
   // The directory the server last searched for a default project. Surfaced in
   // the "not initialized" error so users can see why detection missed.
   private defaultProjectHint: string | null = null;
@@ -412,6 +436,11 @@ export class ToolHandler {
    */
   setDefaultSolidKG(cg: SolidKG): void {
     this.cg = cg;
+    this.schemaUpgradeError = null;
+  }
+
+  setSchemaUpgradeError(error: SchemaUpgradeRequiredError | null): void {
+    this.schemaUpgradeError = error;
   }
 
   /**
@@ -501,6 +530,7 @@ export class ToolHandler {
     const dataDir = dataDirArg ? resolvePath(dataDirArg) : this.defaultDataDir;
     if (!projectPath) {
       if (!this.cg) {
+        if (this.schemaUpgradeError) throw this.schemaUpgradeError;
         const searched = this.defaultProjectHint ?? process.cwd();
         throw new Error(
           'No SolidKG project is loaded for this session.\n' +
@@ -568,6 +598,64 @@ export class ToolHandler {
       this.projectCache.set(cacheKey, cg);
     }
     return cg;
+  }
+
+  private resolveReadOnlyProject(
+    projectPath?: string,
+    dataDirArg?: string,
+  ): { root: string; dataDir?: string; startPath: string; pendingFiles: readonly PendingFile[] } {
+    const dataDir = dataDirArg ? resolvePath(dataDirArg) : this.defaultDataDir;
+    const startPath = projectPath ?? this.cg?.getProjectRoot() ?? this.defaultProjectHint ?? process.cwd();
+    if (projectPath && existsSync(projectPath)) {
+      const pathError = validateProjectPath(projectPath);
+      if (pathError) throw new Error(pathError);
+    }
+    const root = findNearestSolidKGRoot(startPath, { dataDir });
+    if (!root) throw new Error(`SolidKG not initialized in ${startPath}. Run 'solidkg init' in that project first.`);
+    let pendingFiles: readonly PendingFile[] = [];
+    if (this.cg && resolvePath(this.cg.getProjectRoot()) === resolvePath(root)) {
+      try {
+        pendingFiles = this.cg.getPendingFiles?.() ?? [];
+      } catch {
+        pendingFiles = [];
+      }
+    }
+    return { root, dataDir, startPath, pendingFiles };
+  }
+
+  private async withReadOnlyProject<T>(
+    projectPath: string | undefined,
+    dataDirArg: string | undefined,
+    callback: (cg: SolidKG, context: ReadOnlyProjectContext) => Promise<T> | T,
+  ): Promise<T> {
+    const resolved = this.resolveReadOnlyProject(projectPath, dataDirArg);
+    const cg = await SolidKG.open(resolved.root, { dataDir: resolved.dataDir, readOnly: true });
+    try {
+      return await callback(cg, resolved);
+    } finally {
+      cg.close();
+    }
+  }
+
+  private withReadOnlyNotices(result: ToolResult, context: ReadOnlyProjectContext): ToolResult {
+    if (result.isError) return result;
+    const first = result.content[0];
+    if (!first || first.type !== 'text') return result;
+    let text = first.text;
+    try {
+      const mismatch = detectWorktreeIndexMismatch(context.startPath, context.root);
+      if (mismatch) text = `${worktreeMismatchNotice(mismatch)}\n\n${text}`;
+    } catch {
+      text = first.text;
+    }
+    const inResponse = context.pendingFiles.filter((pending) => text.includes(pending.path));
+    const elsewhere = context.pendingFiles.filter((pending) => !text.includes(pending.path));
+    const banner = inResponse.length > 0 ? formatStaleBanner(inResponse) : '';
+    const footer = elsewhere.length > 0 ? formatStaleFooter(elsewhere) : '';
+    return {
+      ...result,
+      content: [{ type: 'text', text: [banner, text, footer].filter(Boolean).join('\n\n') }, ...result.content.slice(1)],
+    };
   }
 
   /**
@@ -839,11 +927,20 @@ export class ToolHandler {
           return this.errorResult(`Unknown tool: ${toolName}`);
       }
       result = this.redactToolResult(result);
+      if (this.isReadOnlyHealthOrDrift(toolName, args)) return result;
       const withWorktree = this.withWorktreeNotice(result, args.projectPath as string | undefined);
       return this.withStalenessNotice(withWorktree, args.projectPath as string | undefined);
     } catch (err) {
       return this.errorResult(`Tool execution failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  private isReadOnlyHealthOrDrift(toolName: string, args: Record<string, unknown>): boolean {
+    return (toolName === 'solidkg_architecture' && args.action === 'health')
+      || (toolName === 'solidkg_snapshot' && args.action === 'drift')
+      || (toolName === 'solidkg_explore'
+        && typeof args.query === 'string'
+        && this.exploreArchitectureIntent(args.query) !== null);
   }
 
   /**
@@ -1891,7 +1988,128 @@ export class ToolHandler {
     const query = this.validateString(args.query, 'query');
     if (typeof query !== 'string') return query;
 
-    const cg = this.getSolidKG(args.projectPath as string | undefined, args.dataDir as string | undefined);
+    const intent = this.exploreArchitectureIntent(query);
+    if (!intent) {
+      const cg = this.getSolidKG(args.projectPath as string | undefined, args.dataDir as string | undefined);
+      return this.handleExploreWithGraph(args, query, cg);
+    }
+
+    try {
+      return await this.withReadOnlyProject(
+        args.projectPath as string | undefined,
+        args.dataDir as string | undefined,
+        async (cg, context) => this.withReadOnlyNotices(
+          await this.handleExploreWithGraph(args, query, cg, await this.exploreArchitectureDecoration(intent, query, cg)),
+          context,
+        ),
+      );
+    } catch (error) {
+      return error instanceof SchemaUpgradeRequiredError
+        ? this.schemaUpgradeRemediationResult()
+        : this.errorResult(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  private exploreArchitectureIntent(query: string): ExploreArchitectureIntent | null {
+    if (/\b(?:architecture\s+health|architecture|health)\s+drift(?:ed|ing)?\b/i.test(query)) return 'drift';
+    if (/\b(?:repository|codebase|architecture)\s+health\b|\bhealth\s+(?:report|findings|analysis)\b/i.test(query)) return 'health';
+    return null;
+  }
+
+  private snapshotLabelOccursOnce(query: string, label: string): boolean {
+    let matches = 0;
+    let offset = 0;
+    while (offset < query.length) {
+      const index = query.indexOf(label, offset);
+      if (index === -1) break;
+      const before = query[index - 1] ?? '';
+      const after = query[index + label.length] ?? '';
+      const startsWithWord = /[A-Za-z0-9_]/.test(label[0] ?? '');
+      const endsWithWord = /[A-Za-z0-9_]/.test(label[label.length - 1] ?? '');
+      if ((!startsWithWord || !/[A-Za-z0-9_]/.test(before)) && (!endsWithWord || !/[A-Za-z0-9_]/.test(after))) {
+        matches++;
+      }
+      offset = index + label.length;
+    }
+    return matches === 1;
+  }
+
+  private exploreArchitectureEvidence(
+    findings: Array<{ id: string; evidence: Array<{ path: string | null; line: number | null; symbol: string | null }> }>,
+    prefix: string,
+  ): EvidencePacketEntry[] {
+    return findings
+      .flatMap((finding) => finding.evidence.map((anchor, index) => ({ finding, anchor, index })))
+      .slice(0, 20)
+      .map(({ finding, anchor, index }) => ({
+        evidenceId: `ev_${createHash('sha256').update(`${prefix}:${finding.id}:${index}:${anchor.path ?? ''}:${anchor.line ?? ''}`).digest('hex').slice(0, 16)}`,
+        kind: 'relationship' as const,
+        label: `${prefix}: ${finding.id}${anchor.symbol ? ` (${anchor.symbol})` : ''}`,
+        sourceAnchor: {
+          filePath: anchor.path ?? '<architecture analysis>',
+          startLine: anchor.line ?? 0,
+          endLine: anchor.line ?? 0,
+        },
+      }));
+  }
+
+  private boundedExploreArchitectureSection(text: string): string {
+    if (text.length <= EXPLORE_ARCHITECTURE_SECTION_MAX_CHARS) return text;
+    const prefix = text.slice(0, EXPLORE_ARCHITECTURE_SECTION_MAX_CHARS);
+    const cut = prefix.lastIndexOf('\n');
+    return `${prefix.slice(0, cut > 0 ? cut : EXPLORE_ARCHITECTURE_SECTION_MAX_CHARS).trimEnd()}\n\n> Architecture analysis truncated to the explore budget.`;
+  }
+
+  private async exploreArchitectureDecoration(
+    intent: ExploreArchitectureIntent,
+    query: string,
+    cg: SolidKG,
+  ): Promise<ExploreArchitectureDecoration> {
+    if (intent === 'health') {
+      const report = cg.getArchitectureHealth();
+      const partial = report.signals.some((signal) => signal.coverage.status !== 'complete');
+      return {
+        text: this.boundedExploreArchitectureSection(formatArchitectureHealthReport(report)),
+        evidence: this.exploreArchitectureEvidence(report.signals.flatMap((signal) => signal.findings), 'Architecture health'),
+        uncertaintyLabels: partial ? ['architecture_health_partial'] : [],
+        canAnswerFromReturnedContext: !partial,
+      };
+    }
+
+    const labels = (await cg.listSnapshots()).map((snapshot) => snapshot.label);
+    const matches = labels.filter((label) => this.snapshotLabelOccursOnce(query, label));
+    if (matches.length !== 1) {
+      const candidateLabels = labels.slice(0, 10);
+      const summary = candidateLabels.length === 0
+        ? 'No saved snapshot labels are available.'
+        : `Saved snapshot labels: ${candidateLabels.map((label) => `\`${label}\``).join(', ')}${labels.length > candidateLabels.length ? `, +${labels.length - candidateLabels.length} more` : ''}.`;
+      const ambiguous = matches.length > 1;
+      return {
+        text: `## Snapshot Health Drift\n\n${ambiguous ? 'Multiple saved snapshot labels matched the query.' : 'Name exactly one saved snapshot label in the query.'}\n\n${summary}`,
+        evidence: [],
+        uncertaintyLabels: [ambiguous ? 'ambiguous_snapshot_label' : 'snapshot_label_required'],
+        canAnswerFromReturnedContext: false,
+      };
+    }
+
+    const drift = await cg.getSnapshotHealthDrift(matches[0]!);
+    const uncertaintyLabels: UncertaintyLabel[] = [];
+    if (drift.comparisonStatus === 'baseline_analysis_unavailable') uncertaintyLabels.push('snapshot_health_drift_unavailable');
+    if (drift.comparisonStatus === 'incompatible_analysis') uncertaintyLabels.push('snapshot_health_drift_incompatible');
+    return {
+      text: this.boundedExploreArchitectureSection(formatSnapshotHealthDrift(drift)),
+      evidence: this.exploreArchitectureEvidence([...drift.introduced, ...drift.resolved, ...drift.persisting], 'Snapshot health drift'),
+      uncertaintyLabels,
+      canAnswerFromReturnedContext: drift.comparisonStatus === 'comparable',
+    };
+  }
+
+  private async handleExploreWithGraph(
+    args: Record<string, unknown>,
+    query: string,
+    cg: SolidKG,
+    architectureDecoration?: ExploreArchitectureDecoration,
+  ): Promise<ToolResult> {
 
     // Resolve adaptive output budget from project size. Falls back to the
     // largest-tier defaults if stats aren't available, which preserves
@@ -1957,6 +2175,22 @@ export class ToolHandler {
     }
 
     if (subgraph.nodes.size === 0) {
+      if (architectureDecoration) {
+        const packet = formatAnswerPacketMarkdown(buildNodeAnswerPacket({
+          query,
+          tool: 'solidkg_explore',
+          nodes: [],
+          additionalEvidence: architectureDecoration.evidence,
+          canAnswerFromReturnedContext: architectureDecoration.canAnswerFromReturnedContext,
+          uncertaintyLabels: architectureDecoration.uncertaintyLabels,
+          rankingReasons: [{ kind: 'graph_relationship', label: 'Architecture analysis returned through a scoped read-only graph handle', weight: 100 }],
+          suggestedNextTools: architectureDecoration.canAnswerFromReturnedContext ? [] : ['solidkg_explore'],
+        }));
+        return this.textResult(this.truncateExploreOutputAtBoundary(
+          `${architectureDecoration.text}\n\nNo additional source symbols matched "${query}".\n\n${packet}`,
+          budget.maxOutputChars,
+        ));
+      }
       return this.textResult(this.withAnswerPacket(
         `No relevant code found for "${query}"`,
         buildFailureAnswerPacket({
@@ -2376,6 +2610,7 @@ export class ToolHandler {
       `Found ${subgraph.nodes.size} symbols across ${fileGroups.size} files.`,
       `Source completeness: ${EXPLORE_SOURCE_COMPLETENESS_PLACEHOLDER}`,
       EXPLORE_ANSWER_PACKET_PLACEHOLDER,
+      architectureDecoration?.text ?? '',
       sourceBodyEvidenceNodeIds.size > 0 ? `Source body evidence: ${sourceBodyEvidenceNodeIds.size} chunk-seeded symbol(s) boosted file/source ranking.` : '',
       graphRankedFileScores.size > 0 ? 'Graph-ranked file allocation: personalized file-graph ranking was used after exact file/symbol tiers.' : '',
       '',
@@ -2959,7 +3194,10 @@ export class ToolHandler {
       const statusLabel = this.formatExploreSourceCompletenessLabel(status, summary);
       const shownNodes = [...subgraph.nodes.values()].filter((node) => shownFilePaths.has(node.filePath));
       const flowOutput = exactFileTokens.size > 0 || excludedQueryTerms.size > 0 ? '' : this.buildFlowFromNamedSymbols(cg, query);
-      const uncertaintyLabels: UncertaintyLabel[] = status === 'complete' ? [] : ['source_partial'];
+      const uncertaintyLabels: UncertaintyLabel[] = [
+        ...(status === 'complete' ? [] : ['source_partial'] as const),
+        ...(architectureDecoration?.uncertaintyLabels ?? []),
+      ];
       if (flowOutput.startsWith('Ambiguous symbol ')) uncertaintyLabels.push('ambiguous_symbol');
       if (subgraph.edges.some((edge) => edge.provenance === 'heuristic')) uncertaintyLabels.push('heuristic_edge');
       const shownEvidenceTokens = new Set(tokenizeCodeForSearch(shownEvidenceParts?.join('\n') ?? '').map((term) => term.toLowerCase()));
@@ -2967,15 +3205,18 @@ export class ToolHandler {
         ? []
         : queryTerms.filter((term) => !isRetrievalConceptCovered(term, shownEvidenceTokens));
       if (uncoveredQueryTerms.length > 0) uncertaintyLabels.push('missing_query_concept');
-      const canAnswer = shownNodes.length > 0
+      const sourceCanAnswer = shownNodes.length > 0
         && summary.included + summary.partial > 0
         && !uncertaintyLabels.includes('ambiguous_symbol')
         && !uncertaintyLabels.includes('missing_query_concept');
+      const canAnswer = sourceCanAnswer
+        && (architectureDecoration?.canAnswerFromReturnedContext ?? true);
       const note = this.formatExploreSourceCompletenessNote(status, summary, canAnswer);
       const packet = formatAnswerPacketMarkdown(buildNodeAnswerPacket({
         query,
         tool: 'solidkg_explore',
         nodes: shownNodes,
+        additionalEvidence: architectureDecoration?.evidence,
         canAnswerFromReturnedContext: canAnswer,
         uncertaintyLabels,
         rankingReasons: [
@@ -3513,8 +3754,28 @@ export class ToolHandler {
   }
 
   private async handleSnapshot(args: Record<string, unknown>): Promise<ToolResult> {
-    const cg = this.getSolidKG(args.projectPath as string | undefined, args.dataDir as string | undefined);
     const action = typeof args.action === 'string' ? args.action : 'list';
+
+    if (action === 'drift') {
+      const label = this.validateString(args.label, 'label');
+      if (typeof label !== 'string') return label;
+      try {
+        return await this.withReadOnlyProject(
+          args.projectPath as string | undefined,
+          args.dataDir as string | undefined,
+          async (cg, context) => this.withReadOnlyNotices(
+            this.textResult(this.truncateOutput(formatSnapshotHealthDrift(await cg.getSnapshotHealthDrift(label)))),
+            context,
+          ),
+        );
+      } catch (error) {
+        return error instanceof SchemaUpgradeRequiredError
+          ? this.schemaUpgradeRemediationResult()
+          : this.errorResult(error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    const cg = this.getSolidKG(args.projectPath as string | undefined, args.dataDir as string | undefined);
 
     if (action === 'list') {
       const snapshots = await cg.listSnapshots();
@@ -3537,9 +3798,12 @@ export class ToolHandler {
           return this.errorResult(`metadataJson is invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
+      const layers = parseLayerRules(args.layersJson);
+      if (typeof layers === 'string') return this.errorResult(layers);
       const snapshot = await cg.createSnapshot(label, {
         description: typeof args.description === 'string' ? args.description : undefined,
         metadata,
+        architecture: layers ? { layers } : undefined,
       });
       return this.textResult(JSON.stringify(snapshot, null, 2));
     }
@@ -3558,10 +3822,28 @@ export class ToolHandler {
   }
 
   private async handleArchitecture(args: Record<string, unknown>): Promise<ToolResult> {
-    const cg = this.getSolidKG(args.projectPath as string | undefined, args.dataDir as string | undefined);
     const action = typeof args.action === 'string' ? args.action : 'get';
     const layers = parseLayerRules(args.layersJson);
     if (typeof layers === 'string') return this.errorResult(layers);
+
+    if (action === 'health') {
+      try {
+        return await this.withReadOnlyProject(
+          args.projectPath as string | undefined,
+          args.dataDir as string | undefined,
+          (cg, context) => this.withReadOnlyNotices(
+            this.textResult(this.truncateOutput(formatArchitectureHealthReport(cg.getArchitectureHealth({ layers })))),
+            context,
+          ),
+        );
+      } catch (error) {
+        return error instanceof SchemaUpgradeRequiredError
+          ? this.schemaUpgradeRemediationResult()
+          : this.errorResult(error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    const cg = this.getSolidKG(args.projectPath as string | undefined, args.dataDir as string | undefined);
 
     if (action === 'analyze') {
       const report = cg.analyzeArchitecture({ layers });
@@ -3920,6 +4202,13 @@ export class ToolHandler {
   private textResult(text: string): ToolResult {
     return {
       content: [{ type: 'text', text }],
+    };
+  }
+
+  private schemaUpgradeRemediationResult(): ToolResult {
+    return {
+      content: [{ type: 'text', text: SCHEMA_UPGRADE_REMEDIATION }],
+      isError: true,
     };
   }
 

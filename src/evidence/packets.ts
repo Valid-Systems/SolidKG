@@ -170,6 +170,7 @@ export function buildNodeAnswerPacket(args: {
   query: string;
   tool: string;
   nodes: Node[];
+  additionalEvidence?: EvidencePacketEntry[];
   canAnswerFromReturnedContext?: boolean;
   uncertaintyLabels?: UncertaintyLabel[];
   rankingReasons?: RankingReason[];
@@ -178,7 +179,7 @@ export function buildNodeAnswerPacket(args: {
   actionabilityInput?: ReturnedEvidenceActionabilityInput;
   includeReturnedEvidenceActionability?: boolean;
 }): AnswerPacket {
-  const evidence = args.nodes.map((node) => entryFromNode(node));
+  const evidence = [...args.nodes.map((node) => entryFromNode(node)), ...(args.additionalEvidence ?? [])];
   const canAnswer = args.canAnswerFromReturnedContext ?? evidence.length > 0;
   const uncertaintyLabels = args.uncertaintyLabels ?? [];
   const hasHeuristicEvidence = uncertaintyLabels.includes('heuristic_edge');
