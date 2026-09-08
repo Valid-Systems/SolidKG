@@ -40,6 +40,16 @@ Set `SOLIDKG_MCP_TOOLS=all` on the MCP server to expose every advanced graph too
 
 Capability footprints in `solidkg_trace` and `solidkg_node` are may-behavior evidence, not runtime proof. Coverage states (`complete`, `partial`, `unsupported`, `failed`, `not_run`, `stale`) describe producer coverage; empty assertions do not prove no capability exists.
 
+### Architecture health and snapshot drift
+
+Ask `solidkg_explore` explicit questions such as "Show repository architecture health" or "What architecture health drifted since snapshot baseline?". A drift label in an explore question must match one saved snapshot label exactly, including case.
+
+With `SOLIDKG_MCP_TOOLS=all`, use `solidkg_architecture` with `action="health"` for deterministic structural findings, metrics, evidence anchors, and per-signal coverage. It is not a score, grade, severity, runtime verdict, or dead-code proof. Static unreferenced results are candidates, and coverage can be partial or not run.
+
+Use `solidkg_snapshot` with `action="drift"` and an exact snapshot label to compare health with a saved snapshot. Drift always includes graph-diff counts. Its semantic comparison is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`; incompatible or unavailable analysis does not produce a guessed finding comparison.
+
+Health and drift reads are read-only and require schema 11. If an existing index needs a schema upgrade, run `solidkg sync <project>` once with write access. Then retry the read. Human and MCP output caps each finding or delta category at 20 items and reports the remainder. CLI `--json` and API values remain complete.
+
 ### Retrieval extensions
 
 - Source-body chunk retrieval is local and deterministic: persisted source-body/code-token chunks can seed or boost results with visible `source_body_chunk` ranking evidence. Exact symbols, paths, flow evidence, semantic relations, and SCIP facts remain higher-salience.

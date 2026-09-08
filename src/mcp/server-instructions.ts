@@ -38,6 +38,10 @@ Explicit exclusions such as "not tests" or "excluding generated metadata" are
 retrieval constraints, not positive search terms. A \`missing_query_concept\`
 uncertainty label means the returned source did not cover every explicit
 counterfactual concept, so the packet is intentionally partial.
+Ask \`solidkg_explore\` explicit questions such as "Show repository architecture
+health" or "What architecture health drifted since snapshot baseline?". A drift
+label in an explore question must match one saved snapshot label exactly,
+including case.
 Do not follow up solely because candidate coverage is partial, omitted, or
 truncated. Prefer SolidKG over broad grep/read loops. Fall back to targeted Read
 only when the answer packet is insufficient because required source is stale,
@@ -88,8 +92,8 @@ or permission strings; do not add another \`solidkg_\` prefix when calling tools
 - **"Show exact definitions/references for X."** → \`solidkg_precise_refs\` when SCIP data is present (accepts a node ID from search/node output or a symbol name)
 - **"What's in directory X? / what lives where?"** → \`solidkg_files\` (use \`format: "overview"\` for a progressive repository map with language, symbol-kind, conservative anchor, and architecture hints)
 - **"Is the index ready / what's its size?"** → \`solidkg_status\` (includes semantic relation counts plus SCIP import/link/generation state)
-- **"Save/diff the graph before a refactor."** → \`solidkg_snapshot\`
-- **"Show package/layer coupling."** → \`solidkg_architecture\`
+- **"Save/diff the graph or compare saved health."** → \`solidkg_snapshot\`; use \`action="drift"\` and an exact snapshot label for health drift
+- **"Show package/layer coupling or architecture health."** → \`solidkg_architecture\`; use \`action="health"\` for health
 
 ## Common chains
 
@@ -107,6 +111,9 @@ or permission strings; do not add another \`solidkg_\` prefix when calling tools
 - **Refactor planning**: \`solidkg_search\` → \`solidkg_callers\` → \`solidkg_impact\`. The blast-radius answer comes from impact, not from walking callers manually.
 - **Refactor verification**: \`solidkg_snapshot\` action=create before the change, then action=diff after indexing/syncing to see added/removed/changed nodes, edges, hyperedges, and hyperedge members.
 - **Architecture rollup**: \`solidkg_architecture\` action=analyze with explicit layer rules when you need layers; action=get/coupling/package reuses the last analyzed report.
+- **Architecture health**: \`solidkg_architecture\` action=health returns deterministic structural findings, metrics, evidence anchors, and per-signal coverage. It is not a score, grade, severity, runtime verdict, or dead-code proof. Static unreferenced results are candidates, and coverage can be partial or not run.
+- **Snapshot health drift**: \`solidkg_snapshot\` action=drift always returns graph-diff counts and compares saved/current findings only when the analysis is compatible. Its comparison is \`comparable\`, \`partially_compatible\`, \`incompatible_analysis\`, or \`baseline_analysis_unavailable\`; incompatible or unavailable analysis does not produce a guessed finding comparison.
+- **Read-only health and drift**: health and drift reads use read-only handles and require schema 11. If an existing index needs a schema upgrade, run \`solidkg sync <project>\` once with write access. Then retry the read. Human and MCP output caps each finding or delta category at 20 items and reports the remainder. CLI \`--json\` and API values remain complete.
 - **Debugging a regression**: \`solidkg_callers\` of the suspected symbol; widen with \`solidkg_impact\` if an unexpected call appears.
 
 ## Retrieval extensions
@@ -143,4 +150,3 @@ export function getServerInstructions(): string {
     ? SERVER_INSTRUCTIONS
     : FULL_SERVER_INSTRUCTIONS;
 }
-

@@ -37,8 +37,8 @@ Set `SOLIDKG_MCP_TOOLS=all` to expose every tool below. Explicit comma-separated
 | `solidkg_precise_refs` | Return SCIP definitions/references/implementation/type-definition facts when SCIP data has been generated or imported |
 | `solidkg_files` | Get the indexed file structure, or `format="overview"` for a progressive repository map with language, symbol-kind, conservative anchor, and architecture hints |
 | `solidkg_status` | Check index health, statistics, semantic relation counts, and optional SCIP import/link/generation state |
-| `solidkg_snapshot` | Create, list, delete, or diff explicit graph snapshots for refactor verification |
-| `solidkg_architecture` | Analyze or retrieve package/layer architecture rollups with Ca/Ce/instability metrics |
+| `solidkg_snapshot` | Create, list, delete, or diff explicit graph snapshots. Use `action="drift"` with an exact snapshot label for health drift |
+| `solidkg_architecture` | Analyze or retrieve package/layer architecture rollups with Ca/Ce/instability metrics. Use `action="health"` for architecture health |
 
 ## Semantic relations
 
@@ -88,6 +88,14 @@ External dense/vector embeddings, vector databases, rerankers, and hybrid retrie
 
 MCP tool calls are bounded by a server-side timeout so a slow context build returns a tool-level error instead of hanging the session. Override the default with `SOLIDKG_MCP_TOOL_TIMEOUT_MS` only when a host or repository needs a different bound.
 
-For refactor verification, use `solidkg_snapshot` with `action=create` before the change and `action=diff` after indexing/syncing. For package and layer questions, use `solidkg_architecture` with `action=analyze`; pass `layersJson` when explicit layer rules are needed, then reuse `get`, `coupling`, or `package` actions for follow-up views.
+For refactor verification, use `solidkg_snapshot` with `action=create` before the change and `action=diff` after indexing/syncing. Pass `layersJson` when saved health analysis needs explicit layer rules. For package and layer questions, use `solidkg_architecture` with `action=analyze`; pass `layersJson` when explicit layer rules are needed, then reuse `get`, `coupling`, or `package` actions for follow-up views.
+
+`solidkg_architecture` with `action="health"` returns deterministic structural findings, metrics, evidence anchors, and per-signal coverage. It is not a score, grade, severity, runtime verdict, or dead-code proof. Static unreferenced results remain candidates, and coverage can be partial or not run.
+
+`solidkg_snapshot` with `action="drift"` always includes graph-diff counts. Its semantic comparison is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`; incompatible or unavailable analysis does not produce a guessed finding comparison.
+
+Health and drift reads use read-only handles and require schema 11. If an existing index needs a schema upgrade, run `solidkg sync <project>` once with write access. Then retry the read. MCP text output caps each finding or delta category at 20 items and reports the remainder. For complete results, use CLI `--json` or the TypeScript API. These MCP actions return text, not complete report JSON.
+
+The compact profile remains explore-only. Ask `solidkg_explore` explicit questions such as "Show repository architecture health" or "What architecture health drifted since snapshot baseline?". A drift label in an explore question must match one saved snapshot label exactly, including case.
 
 The installer writes this guidance into each agent's instructions file automatically.

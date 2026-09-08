@@ -21,7 +21,7 @@ Tested error-free on 112 of the largest and most impactful OSS codebases, SolidK
 
 - **Follow real flows.** Trace callers, routes, callbacks, UI render chains, framework conventions, and cross-language bridges.
 - **Return evidence, not summaries.** Results include verbatim source, graph relationships, provenance, and explicit uncertainty when static analysis cannot prove a path.
-- **Understand change risk.** Query callers, callees, impact radius, affected tests, snapshots, package boundaries, and layer coupling.
+- **Understand change risk.** Query callers, callees, impact radius, affected tests, snapshots, package boundaries, layer coupling, deterministic architecture health, and snapshot health drift.
 - **Stay local.** SQLite, tree-sitter, and optional SCIP run on your machine. No source uploads, embeddings, vector database, API keys, or telemetry are required.
 
 ## Quick start
@@ -141,16 +141,41 @@ console.log(matches.length, impact.nodes.size, overview);
 graph.close();
 ```
 
+Architecture health is a read-only deterministic report of structural findings, metrics, evidence anchors, and per-signal coverage. It does not assign a score, grade, severity, or runtime verdict. Static unreferenced results are candidates, not proof that code is dead.
+
+Before this example, save the `before-refactor` snapshot with the command below. The example opens an existing index with a new read-only handle.
+
+```typescript
+import SolidKG from "solidkg";
+
+const graph = await SolidKG.open("/path/to/project", { readOnly: true });
+try {
+  const health = graph.getArchitectureHealth({
+    layers: [{ name: "api", paths: ["src/api/**"] }],
+  });
+  const drift = await graph.getSnapshotHealthDrift("before-refactor");
+  console.log(health, drift);
+} finally {
+  graph.close();
+}
+```
+
+Health drift always includes graph-diff counts. Its semantic comparison is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`; incompatible or unavailable analysis never produces a guessed finding comparison.
+
 ## Advanced workflows
 
 ```bash
 solidkg overview . --max-depth 2
-solidkg snapshot create before-refactor --path .
+solidkg snapshot create before-refactor --layers '[{"name":"api","paths":["src/api/**"]}]' --path .
+solidkg architecture health --layers '[{"name":"api","paths":["src/api/**"]}]' --json --path .
+solidkg snapshot drift before-refactor --json --path .
 solidkg architecture analyze --path .
 solidkg scip generate --path .
 ```
 
-Set `SOLIDKG_MCP_TOOLS=all` on the MCP server to expose the advanced trace, precise-reference, snapshot, architecture, and status tools. Run `solidkg <command> --help` for the complete CLI.
+Health and drift reads are read-only and require schema 11. If an existing index needs a schema upgrade, run `solidkg sync <project>` once with write access. Then retry the read. Human and MCP output caps each finding or delta category at 20 items and reports the remainder. CLI `--json` and TypeScript API results remain complete.
+
+The compact MCP profile still exposes only `solidkg_explore`. Ask it explicit questions such as "Show repository architecture health" or "What architecture health drifted since snapshot before-refactor?". A drift label in an explore query must match one saved snapshot label exactly, including case. Set `SOLIDKG_MCP_TOOLS=all` to expose the advanced `solidkg_architecture` tool with `action="health"` and `solidkg_snapshot` with `action="drift"`. Run `solidkg <command> --help` for the complete CLI.
 
 ## Install from source
 

@@ -217,6 +217,19 @@ describe('MCP initialize instructions', () => {
     expect(FULL_SERVER_INSTRUCTIONS).toContain('Treat it as already read');
   });
 
+  it('keeps health intent in compact guidance and health actions in the full profile', () => {
+    expect(SERVER_INSTRUCTIONS).toMatch(/Show repository architecture\s+health/);
+    expect(SERVER_INSTRUCTIONS).toContain('match one saved snapshot label exactly');
+    expect(SERVER_INSTRUCTIONS).not.toContain('solidkg_architecture');
+    expect(SERVER_INSTRUCTIONS).not.toContain('solidkg_snapshot');
+
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('solidkg_architecture');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('action=health');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('solidkg_snapshot');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('action=drift');
+    expect(FULL_SERVER_INSTRUCTIONS).toContain('baseline_analysis_unavailable');
+  });
+
   it('documents source chunk evidence and disabled hybrid defaults', () => {
     expect(FULL_SERVER_INSTRUCTIONS).toContain('source_body_chunk');
     expect(FULL_SERVER_INSTRUCTIONS).toContain('persisted source-body/code-token chunks');
