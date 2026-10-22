@@ -994,13 +994,18 @@ export class ExtractionOrchestrator {
     let nextId = 0;
     let workerParseCount = 0;
     const pendingParses = new Map<number, {
+      worker: import('worker_threads').Worker;
       resolve: (result: ExtractionResult) => void;
       reject: (err: Error) => void;
       timer: ReturnType<typeof setTimeout>;
     }>();
 
-    function rejectAllPending(reason: string): void {
+    // Only reject parses owned by `w`. A recycled or timed-out worker exits
+    // (code 1 from terminate()) after its replacement has taken new requests;
+    // those requests must not be failed by the old worker's exit.
+    function rejectAllPending(w: import('worker_threads').Worker | null, reason: string): void {
       for (const [id, pending] of pendingParses) {
+        if (w && pending.worker !== w) continue;
         clearTimeout(pending.timer);
         pendingParses.delete(id);
         pending.reject(new Error(reason));
@@ -1021,13 +1026,13 @@ export class ExtractionOrchestrator {
 
       w.on('error', (err) => {
         logWarn('Parse worker error', { error: err.message });
-        rejectAllPending(`Worker error: ${err.message}`);
+        rejectAllPending(w, `Worker error: ${err.message}`);
       });
 
       w.on('exit', (code) => {
-        if (code !== 0 && pendingParses.size > 0) {
+        if (code !== 0 && [...pendingParses.values()].some((pending) => pending.worker === w)) {
           logWarn('Parse worker exited unexpectedly', { code });
-          rejectAllPending(`Worker exited with code ${code}`);
+          rejectAllPending(w, `Worker exited with code ${code}`);
         }
         // Clear reference so we know to respawn, reset count so
         // the fresh worker gets a full cycle before recycling.
@@ -1108,14 +1113,17 @@ export class ExtractionOrchestrator {
           pendingParses.delete(id);
           log(`TIMEOUT: ${filePath} exceeded ${timeoutMs}ms — killing worker`);
           // Reject first because terminating a stuck worker can take time.
-          parseWorker = null;
-          workerParseCount = 0;
+          if (parseWorker === worker) {
+            parseWorker = null;
+            workerParseCount = 0;
+          }
           reject(new Error(`Parse timed out after ${timeoutMs}ms`));
           // Fire-and-forget: kill the stuck worker in the background
           worker.terminate().catch(() => {});
         }, timeoutMs);
 
         pendingParses.set(id, {
+          worker,
           resolve: (result) => {
             if (recycleAfterParse) recycleWorker();
             resolve(result);
@@ -1421,7 +1429,7 @@ export class ExtractionOrchestrator {
     }
 
     // Shut down parse worker and clear any pending timers
-    rejectAllPending('Indexing complete');
+    rejectAllPending(null, 'Indexing complete');
     if (parseWorker) {
       (parseWorker as import('worker_threads').Worker).terminate().catch(() => {});
     }

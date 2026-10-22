@@ -14,6 +14,29 @@ class SourceDocument {
   readonly text: string;
   private readonly lineStarts: readonly number[];
   private readonly byteColumnsByLine = new Map<number, ReadonlyMap<number, number> | null>();
+  private readonly childIndexesByParent = new Map<string, ReadonlyMap<string, number>>();
+
+  /**
+   * Index of each child within `parent` (first match wins, like a linear
+   * scan). The native binding has no sibling navigation, so without this
+   * every sibling lookup rescans the parent's children.
+   */
+  childIndexes(parent: NativeNode, named: boolean): ReadonlyMap<string, number> {
+    const key = `${named ? 'n' : 'a'}:${nativeNodeKey(parent)}`;
+    let indexes = this.childIndexesByParent.get(key);
+    if (indexes) return indexes;
+    const built = new Map<string, number>();
+    const count = named ? parent.namedChildCount() : parent.childCount();
+    for (let index = 0; index < count; index++) {
+      const child = named ? parent.namedChild(index) : parent.child(index);
+      if (child === null) continue;
+      const childKey = nativeNodeKey(child);
+      if (!built.has(childKey)) built.set(childKey, index);
+    }
+    indexes = built;
+    this.childIndexesByParent.set(key, indexes);
+    return indexes;
+  }
 
   constructor(text: string) {
     this.text = text;
@@ -73,6 +96,11 @@ function sameNativeNode(left: NativeNode, right: NativeNode): boolean {
     && left.startByte() === right.startByte()
     && left.endByte() === right.endByte()
     && left.isNamed() === right.isNamed();
+}
+
+/** Identity key matching sameNativeNode. */
+function nativeNodeKey(node: NativeNode): string {
+  return `${node.kindId()}:${node.startByte()}:${node.endByte()}:${node.isNamed() ? 1 : 0}`;
 }
 
 export class SyntaxNode {
@@ -211,15 +239,26 @@ export class SyntaxNode {
     const parent = this.nativeNode.parent();
     if (parent === null) return null;
     const count = named ? parent.namedChildCount() : parent.childCount();
+    const cachedIndex = this.document.childIndexes(parent, named).get(nativeNodeKey(this.nativeNode));
+    if (cachedIndex !== undefined) {
+      // Two distinct parents can share a key; verify before trusting the cache.
+      const candidate = named ? parent.namedChild(cachedIndex) : parent.child(cachedIndex);
+      if (candidate !== null && sameNativeNode(candidate, this.nativeNode)) {
+        return this.siblingAt(parent, cachedIndex + offset, count, named);
+      }
+    }
     for (let index = 0; index < count; index++) {
       const candidate = named ? parent.namedChild(index) : parent.child(index);
       if (candidate !== null && sameNativeNode(candidate, this.nativeNode)) {
-        const siblingIndex = index + offset;
-        if (siblingIndex < 0 || siblingIndex >= count) return null;
-        return this.wrap(named ? parent.namedChild(siblingIndex) : parent.child(siblingIndex));
+        return this.siblingAt(parent, index + offset, count, named);
       }
     }
     return null;
+  }
+
+  private siblingAt(parent: NativeNode, siblingIndex: number, count: number, named: boolean): SyntaxNode | null {
+    if (siblingIndex < 0 || siblingIndex >= count) return null;
+    return this.wrap(named ? parent.namedChild(siblingIndex) : parent.child(siblingIndex));
   }
 
   private fieldNameAt(index: number, named: boolean): string | null {

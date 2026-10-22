@@ -60,6 +60,13 @@ interface ImportBinding {
   readonly isNamespace: boolean;
 }
 
+interface ReassignmentCandidate {
+  readonly startIndex: number;
+  readonly endIndex: number;
+  /** Nested lexical scopes between the search scope and the assignment. */
+  readonly shadowScopes: readonly SyntaxNode[];
+}
+
 function referencesWithRelationHints(
   references: UnresolvedReference[],
   relationHints: FrameworkRelationHint[] | undefined
@@ -218,6 +225,14 @@ export class TreeSitterExtractor {
   private extractor: LanguageExtractor | null = null;
   private nodeStack: string[] = []; // Stack of parent node IDs
   private methodIndex: Map<string, string> | null = null; // lookup key → node ID for Pascal defProc lookup
+  // Receiver-binding lookups run once per member call. Memoize the per-scope
+  // scans so large scopes (e.g. minified bundles) are walked once, not per call.
+  private scopeNodesCache = new Map<string, SyntaxNode[]>();
+  private scopeDeclarationsCache = new Map<string, Map<string, SyntaxNode[]>>();
+  private scopeClassesCache = new Map<string, Map<string, SyntaxNode[]>>();
+  private reassignmentCache = new Map<string, Map<string, ReassignmentCandidate[]>>();
+  private importBindings: Map<string, ImportBinding> | null = null;
+  private namedChildIndexesCache = new Map<string, Map<number, number>>();
 
   constructor(filePath: string, source: string, language?: Language) {
     this.filePath = filePath;
@@ -308,6 +323,12 @@ export class TreeSitterExtractor {
         this.tree.delete();
         this.tree = null;
       }
+      this.scopeNodesCache.clear();
+      this.scopeDeclarationsCache.clear();
+      this.scopeClassesCache.clear();
+      this.reassignmentCache.clear();
+      this.importBindings = null;
+      this.namedChildIndexesCache.clear();
       // Release source string to reduce GC pressure
       this.source = '';
     }
@@ -1778,10 +1799,8 @@ export class TreeSitterExtractor {
     name: string,
     callStartIndex: number
   ): LexicalBinding | undefined {
-    const declarations = this.collectScopeNodes(scope, (node) => node.type === 'variable_declarator')
-      .filter((node) => this.declaresName(node, name))
-      .sort((left, right) => left.startIndex - right.startIndex);
-    if (declarations.length === 0) return undefined;
+    const declarations = this.getScopeDeclarations(scope).get(name);
+    if (!declarations) return undefined;
 
     const visible = declarations.filter((node) => node.endIndex <= callStartIndex).at(-1);
     return { node: visible ?? declarations[0]!, scope, isVisible: Boolean(visible) };
@@ -1812,6 +1831,37 @@ export class TreeSitterExtractor {
       if (binding) return binding;
     }
     return undefined;
+  }
+
+  /** Variable declarators directly in `scope`, indexed by every name they declare. */
+  private getScopeDeclarations(scope: SyntaxNode): Map<string, SyntaxNode[]> {
+    const key = this.scopeKey(scope);
+    let byName = this.scopeDeclarationsCache.get(key);
+    if (byName) return byName;
+    byName = new Map();
+    for (const declarator of this.getScopeNodesOfType(scope, 'variable_declarator')) {
+      for (const name of this.declaredNames(declarator)) {
+        const declarations = byName.get(name);
+        if (!declarations) byName.set(name, [declarator]);
+        else if (declarations.at(-1) !== declarator) declarations.push(declarator);
+      }
+    }
+    this.scopeDeclarationsCache.set(key, byName);
+    return byName;
+  }
+
+  /** Every name for which declaresName(binding, name) is true. */
+  private declaredNames(binding: SyntaxNode): string[] {
+    const names = [getNodeText(binding, this.source)];
+    const pattern = getChildByField(binding, 'name') ?? getChildByField(binding, 'pattern');
+    if (!pattern) return names;
+    names.push(getNodeText(pattern, this.source));
+    for (const identifier of this.collectScopeNodes(pattern, (node) =>
+      ['identifier', 'simple_identifier', 'shorthand_property_identifier_pattern'].includes(node.type)
+    )) {
+      names.push(getNodeText(identifier, this.source));
+    }
+    return names;
   }
 
   private declaresName(binding: SyntaxNode, name: string): boolean {
@@ -1875,10 +1925,8 @@ export class TreeSitterExtractor {
     while (current) {
       if (this.isLexicalScope(current)) {
         const scope = current;
-        const declarations = this.collectScopeNodes(scope, (node) => node.type === 'class_declaration')
-          .filter((node) => this.getDirectIdentifier(node, 'name') === name)
-          .sort((left, right) => left.startIndex - right.startIndex);
-        if (declarations.length > 0) {
+        const declarations = this.getScopeClasses(scope).get(name);
+        if (declarations) {
           const visible = declarations.filter((node) =>
             node.startIndex === scope.startIndex || node.endIndex <= callNode.startIndex
           ).at(-1);
@@ -1898,15 +1946,13 @@ export class TreeSitterExtractor {
     let current: SyntaxNode | null = callNode.parent;
     while (current) {
       if (this.isLexicalScope(current)) {
-        const namespaces = this.collectScopeNodes(current, (node) =>
-          node.type === 'internal_module' && this.getDirectIdentifier(node, 'name') === namespaceName
-        ).sort((left, right) => left.startIndex - right.startIndex);
+        const namespaces = this.getScopeNodesOfType(current, 'internal_module')
+          .filter((node) => this.getDirectIdentifier(node, 'name') === namespaceName);
         const namespace = namespaces.filter((node) => node.endIndex <= callNode.startIndex).at(-1);
         if (namespace) {
           const body = getChildByField(namespace, 'body');
           if (!body) return undefined;
-          return this.collectScopeNodes(body, (node) => node.type === 'class_declaration')
-            .find((node) => this.getDirectIdentifier(node, 'name') === className);
+          return this.getScopeClasses(body).get(className)?.[0];
         }
       }
       current = current.parent;
@@ -1923,6 +1969,38 @@ export class TreeSitterExtractor {
     };
     visit(scope, true);
     return nodes;
+  }
+
+  private scopeKey(node: SyntaxNode): string {
+    return `${node.type}:${node.startIndex}:${node.endIndex}`;
+  }
+
+  /** Cached collectScopeNodes(scope, node => node.type === type), in source order. */
+  private getScopeNodesOfType(scope: SyntaxNode, type: string): SyntaxNode[] {
+    const key = `${type}@${this.scopeKey(scope)}`;
+    let nodes = this.scopeNodesCache.get(key);
+    if (!nodes) {
+      nodes = this.collectScopeNodes(scope, (node) => node.type === type);
+      this.scopeNodesCache.set(key, nodes);
+    }
+    return nodes;
+  }
+
+  /** Class declarations directly in `scope`, indexed by name, in source order. */
+  private getScopeClasses(scope: SyntaxNode): Map<string, SyntaxNode[]> {
+    const key = this.scopeKey(scope);
+    let byName = this.scopeClassesCache.get(key);
+    if (byName) return byName;
+    byName = new Map();
+    for (const declaration of this.getScopeNodesOfType(scope, 'class_declaration')) {
+      const name = this.getDirectIdentifier(declaration, 'name');
+      if (name === undefined) continue;
+      const declarations = byName.get(name);
+      if (declarations) declarations.push(declaration);
+      else byName.set(name, [declaration]);
+    }
+    this.scopeClassesCache.set(key, byName);
+    return byName;
   }
 
   private isLexicalScope(node: SyntaxNode): boolean {
@@ -1973,41 +2051,53 @@ export class TreeSitterExtractor {
     callNode: SyntaxNode,
     receiver: string
   ): boolean {
-    let reassigned = false;
     const searchScope = this.isFunctionScope(scope)
       ? getChildByField(scope, 'body') ?? scope
       : scope;
-    const visit = (node: SyntaxNode, isSearchScope: boolean): void => {
-      if (!isSearchScope && this.isFunctionScope(node)) return;
-      if (!isSearchScope && this.isLexicalScope(node) &&
-        this.findBindingInScope(node, receiver, Number.MAX_SAFE_INTEGER)) return;
-      if (reassigned || node.startIndex <= binding.endIndex || node.endIndex > callNode.startIndex) {
-        for (const child of node.namedChildren) {
-          if (!reassigned) visit(child, false);
-        }
-        return;
-      }
+    const candidates = this.getReassignmentCandidates(searchScope).get(receiver);
+    if (!candidates) return false;
+    // A nested scope that redeclares the receiver shadows assignments inside it.
+    return candidates.some((candidate) =>
+      candidate.startIndex > binding.endIndex &&
+      candidate.endIndex <= callNode.startIndex &&
+      !candidate.shadowScopes.some((shadow) =>
+        this.getScopeDeclarations(shadow).has(receiver)
+      )
+    );
+  }
 
+  /**
+   * Assignment and update expressions reachable from `searchScope` without
+   * entering a nested function, indexed by the assigned name.
+   */
+  private getReassignmentCandidates(searchScope: SyntaxNode): Map<string, ReassignmentCandidate[]> {
+    const key = this.scopeKey(searchScope);
+    let byName = this.reassignmentCache.get(key);
+    if (byName) return byName;
+    const candidates = new Map<string, ReassignmentCandidate[]>();
+    const add = (target: SyntaxNode | null, node: SyntaxNode, shadowScopes: readonly SyntaxNode[]): void => {
+      if (!target) return;
+      const name = getNodeText(target, this.source);
+      const candidate = { startIndex: node.startIndex, endIndex: node.endIndex, shadowScopes };
+      const existing = candidates.get(name);
+      if (existing) existing.push(candidate);
+      else candidates.set(name, [candidate]);
+    };
+    const visit = (node: SyntaxNode, isSearchScope: boolean, shadowScopes: readonly SyntaxNode[]): void => {
+      if (!isSearchScope && this.isFunctionScope(node)) return;
+      const scopes = !isSearchScope && this.isLexicalScope(node) ? [...shadowScopes, node] : shadowScopes;
       if (['assignment_expression', 'augmented_assignment_expression'].includes(node.type)) {
-        const left = getChildByField(node, 'left') ?? getChildByField(node, 'left_hand_side') ?? node.namedChild(0);
-        if (left && getNodeText(left, this.source) === receiver) {
-          reassigned = true;
-          return;
-        }
+        add(getChildByField(node, 'left') ?? getChildByField(node, 'left_hand_side') ?? node.namedChild(0), node, scopes);
       }
       if (node.type === 'update_expression') {
-        const argument = getChildByField(node, 'argument') ?? node.namedChild(0);
-        if (argument && getNodeText(argument, this.source) === receiver) {
-          reassigned = true;
-          return;
-        }
+        add(getChildByField(node, 'argument') ?? node.namedChild(0), node, scopes);
       }
-      for (const child of node.namedChildren) {
-        if (!reassigned) visit(child, false);
-      }
+      for (const child of node.namedChildren) visit(child, false, scopes);
     };
-    visit(searchScope, true);
-    return reassigned;
+    visit(searchScope, true, []);
+    byName = candidates;
+    this.reassignmentCache.set(key, byName);
+    return byName;
   }
 
   private resolveThisBinding(callNode: SyntaxNode): ReceiverResolution {
@@ -2211,46 +2301,50 @@ export class TreeSitterExtractor {
     return false;
   }
 
-  private findImportBinding(_callNode: SyntaxNode, localName: string): ImportBinding | undefined {
-    const root = this.getRootNode(_callNode);
-    const imports = this.collectScopeNodes(root, (node) => node.type === 'import_statement');
+  private findImportBinding(callNode: SyntaxNode, localName: string): ImportBinding | undefined {
+    // Imports live at the file root, so the answer depends only on the name.
+    this.importBindings ??= this.indexImportBindings(this.getRootNode(callNode));
+    return this.importBindings.get(localName);
+  }
 
-    for (const importNode of imports) {
-      const namespace = this.collectScopeNodes(importNode, (node) => node.type === 'namespace_import')
-        .find((node) => this.getLastIdentifier(node) === localName);
-      if (namespace) {
-        return { localName, exportPath: [], source: this.getImportSource(importNode), isNamespace: true };
+  /**
+   * Index every import binding by local name. The first import statement that
+   * binds a name wins; within a statement a namespace import wins over a named
+   * specifier, which wins over a default import.
+   */
+  private indexImportBindings(root: SyntaxNode): Map<string, ImportBinding> {
+    const bindings = new Map<string, ImportBinding>();
+    const add = (binding: ImportBinding): void => {
+      if (!bindings.has(binding.localName)) bindings.set(binding.localName, binding);
+    };
+
+    for (const importNode of this.getScopeNodesOfType(root, 'import_statement')) {
+      const source = this.getImportSource(importNode);
+      const namespaceNames: string[] = [];
+      for (const namespace of this.collectScopeNodes(importNode, (node) => node.type === 'namespace_import')) {
+        const localName = this.getLastIdentifier(namespace);
+        if (localName !== undefined) namespaceNames.push(localName);
       }
-
+      const specifiers: ImportBinding[] = [];
       for (const specifier of this.collectScopeNodes(importNode, (node) => node.type === 'import_specifier')) {
         const identifiers = this.getDirectIdentifiers(specifier);
         const importedName = this.getDirectIdentifier(specifier, 'name') ?? identifiers[0];
         const alias = this.getDirectIdentifier(specifier, 'alias') ?? identifiers.at(-1);
-        if (importedName && alias === localName) {
-          return {
-            localName,
-            exportPath: [importedName],
-            source: this.getImportSource(importNode),
-            isNamespace: false,
-          };
+        if (importedName && alias !== undefined) {
+          specifiers.push({ localName: alias, exportPath: [importedName], source, isNamespace: false });
         }
       }
-
       const clause = importNode.namedChildren.find((node) => node.type === 'import_clause');
-      const defaultImport = clause?.namedChildren.find((node) =>
-        (node.type === 'identifier' || node.type === 'type_identifier') && getNodeText(node, this.source) === localName
-      );
-      if (defaultImport) {
-        return {
-          localName,
-          exportPath: ['default'],
-          source: this.getImportSource(importNode),
-          isNamespace: false,
-        };
-      }
+      const defaultNames = (clause?.namedChildren ?? [])
+        .filter((node) => node.type === 'identifier' || node.type === 'type_identifier')
+        .map((node) => getNodeText(node, this.source));
+
+      for (const localName of namespaceNames) add({ localName, exportPath: [], source, isNamespace: true });
+      for (const binding of specifiers) add(binding);
+      for (const localName of defaultNames) add({ localName, exportPath: ['default'], source, isNamespace: false });
     }
 
-    return undefined;
+    return bindings;
   }
 
   private getNativeBinding(binding: SyntaxNode, callNode: SyntaxNode): ReceiverResolution | undefined {
@@ -2443,15 +2537,7 @@ export class TreeSitterExtractor {
     //    the matching instead.
     const parent = declNode.parent;
     if (parent) {
-      const declStart = declNode.startIndex;
-      let declIdx = -1;
-      for (let i = 0; i < parent.namedChildCount; i++) {
-        const sibling = parent.namedChild(i);
-        if (sibling && sibling.startIndex === declStart) {
-          declIdx = i;
-          break;
-        }
-      }
+      const declIdx = this.getNamedChildIndexesByStart(parent).get(declNode.startIndex) ?? -1;
       if (declIdx > 0) {
         for (let j = declIdx - 1; j >= 0; j--) {
           const sibling = parent.namedChild(j);
@@ -2463,6 +2549,20 @@ export class TreeSitterExtractor {
         }
       }
     }
+  }
+
+  /** Index of the first named child of `parent` starting at each offset. */
+  private getNamedChildIndexesByStart(parent: SyntaxNode): Map<number, number> {
+    const key = this.scopeKey(parent);
+    let indexes = this.namedChildIndexesCache.get(key);
+    if (indexes) return indexes;
+    indexes = new Map();
+    for (let i = 0; i < parent.namedChildCount; i++) {
+      const child = parent.namedChild(i);
+      if (child && !indexes.has(child.startIndex)) indexes.set(child.startIndex, i);
+    }
+    this.namedChildIndexesCache.set(key, indexes);
+    return indexes;
   }
 
   /**
