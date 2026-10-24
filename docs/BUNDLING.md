@@ -66,7 +66,7 @@ rejected by `build-bundle.sh`.
 [`.github/workflows/release.yml`](.github/workflows/release.yml) — manually
 triggered. Reads the version from `package.json`, builds each platform bundle on
 its matching matrix runner, creates the GitHub Release, and publishes
-the npm shim + per-platform packages. Requires the `NPM_TOKEN` repo secret.
+the npm shim + per-platform packages. Publishes through npm trusted publishing (GitHub OIDC); no `NPM_TOKEN` secret is used. Each package (`solidkg` and `solidkg-<platform>-<arch>`) must trust `Valid-Systems/SolidKG` workflow `release.yml`.
 
 Still TODO:
 - **Code signing** — the main gap for "download & run": macOS Gatekeeper needs a

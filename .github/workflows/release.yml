@@ -108,6 +108,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -162,9 +163,7 @@ jobs:
           tmp=$(mktemp -d)
           npm install --omit=optional --ignore-scripts --no-audit --no-fund --prefix "$tmp" "/tmp/$tgz"
           node -e "const fs=require('fs'); const path=require('path'); const dir='$tmp/node_modules/solidkg'; const pkg=require(path.join(dir,'package.json')); if (pkg.version !== '${{ needs.prepare.outputs.version }}') throw new Error('wrong package version'); if (pkg.license !== 'MIT') throw new Error('wrong package license'); if (!fs.existsSync(path.join(dir,'LICENSE'))) throw new Error('missing LICENSE'); if (!pkg.bin || !pkg.bin.solidkg) throw new Error('missing bin'); if (!pkg.optionalDependencies || Object.keys(pkg.optionalDependencies).length !== 6) throw new Error('wrong platform dependency count');"
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish to npm (trusted publishing via OIDC)
         run: |
           set -euo pipefail
           version="${{ needs.prepare.outputs.version }}"
