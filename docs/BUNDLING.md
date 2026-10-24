@@ -49,7 +49,7 @@ rejected by `build-bundle.sh`.
 2. **npm** ([`scripts/npm-shim.js`](scripts/npm-shim.js)) — preserves
    `npm i -g solidkg`. The main package is a tiny shim; the
    bundles ship as per-platform `optionalDependencies`
-   (`solidkg-<target>` with `os`/`cpu`), so npm installs only the
+   (`@solidkg/<target>` with `os`/`cpu`), so npm installs only the
    matching one. The shim — run by the user's Node — execs the bundle, so the
    real work runs on the bundled Node 24.16.0. Works even on old Node. On Windows it
    invokes the bundled `node.exe` against the app entry directly (not the `.cmd`
@@ -66,7 +66,7 @@ rejected by `build-bundle.sh`.
 [`.github/workflows/release.yml`](.github/workflows/release.yml) — manually
 triggered. Reads the version from `package.json`, builds each platform bundle on
 its matching matrix runner, creates the GitHub Release, and publishes
-the npm shim + per-platform packages. Publishes through npm trusted publishing (GitHub OIDC); no `NPM_TOKEN` secret is used. Each package (`solidkg` and `solidkg-<platform>-<arch>`) must trust `Valid-Systems/SolidKG` workflow `release.yml`.
+the npm shim + per-platform packages. Publishes through npm trusted publishing (GitHub OIDC); no `NPM_TOKEN` secret is used. Each package (`solidkg` and `@solidkg/<platform>-<arch>`) must trust `Valid-Systems/SolidKG` workflow `release.yml`.
 
 Still TODO:
 - **Code signing** — the main gap for "download & run": macOS Gatekeeper needs a

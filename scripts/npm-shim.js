@@ -4,7 +4,7 @@
 // npm thin-installer launcher for SolidKG.
 //
 // The heavy artifact (a vendored Node runtime + the app) ships as a per-platform
-// optionalDependency: solidkg-<platform>-<arch>. npm installs
+// optionalDependency: @solidkg/<platform>-<arch>. npm installs
 // only the one matching the host, via each package's `os`/`cpu` fields (the
 // esbuild pattern). This shim — run by the user's OWN Node — locates that bundle
 // and execs its launcher, so the real work always runs on the bundled Node 24.16.0
@@ -32,7 +32,7 @@ var os = require('os');
 var path = require('path');
 
 var target = process.platform + '-' + process.arch; // e.g. darwin-arm64, linux-x64
-var pkg = 'solidkg-' + target;
+var pkg = '@solidkg/' + target;
 var isWindows = process.platform === 'win32';
 
 main().catch(function (e) {

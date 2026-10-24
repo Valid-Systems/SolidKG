@@ -58,7 +58,7 @@ for archive in "${archives[@]}"; do
     node -e '
       const fs=require("fs");
       fs.writeFileSync(process.argv[1], JSON.stringify({
-        name: `solidkg-${process.env.TARGET}`,
+        name: `@solidkg/${process.env.TARGET}`,
         version: process.env.VERSION,
         description: `SolidKG self-contained bundle for ${process.env.TARGET}`,
         license: "MIT",
@@ -67,7 +67,7 @@ for archive in "${archives[@]}"; do
       }, null, 2) + "\n");
     ' "$pkgdir/package.json"
   targets+=("$target")
-  echo "[pack-npm] solidkg-${target}@${VERSION}"
+  echo "[pack-npm] @solidkg/${target}@${VERSION}"
 done
 
 # Main shim package.
@@ -79,7 +79,7 @@ VERSION="$VERSION" TARGETS="${targets[*]}" \
     const fs=require("fs");
     const opt={};
     for (const t of process.env.TARGETS.split(/\s+/).filter(Boolean))
-      opt[`solidkg-${t}`]=process.env.VERSION;
+      opt[`@solidkg/${t}`]=process.env.VERSION;
     fs.writeFileSync(process.argv[1], JSON.stringify({
       name: "solidkg",
       version: process.env.VERSION,

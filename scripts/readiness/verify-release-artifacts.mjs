@@ -133,7 +133,7 @@ function writeSyntheticPlatformPackage(pkgDir, target) {
 
   const [osName, cpu] = target.split('-');
   writeFileSync(join(bundleDir, 'package.json'), JSON.stringify({
-    name: `solidkg-${target}`,
+    name: `@solidkg/${target}`,
     version,
     description: `SolidKG self-contained bundle for ${target}`,
     license: 'MIT',
@@ -156,7 +156,7 @@ function verifyPackNpmWithSyntheticBundles() {
     cpSync(join(repoRoot, 'scripts', 'npm-shim.js'), join(mainDir, 'npm-shim.js'));
     cpSync(join(repoRoot, 'README.md'), join(mainDir, 'README.md'));
     cpSync(join(repoRoot, 'LICENSE'), join(mainDir, 'LICENSE'));
-    const optionalDependencies = Object.fromEntries(syntheticTargets.map((target) => [`solidkg-${target}`, version]));
+    const optionalDependencies = Object.fromEntries(syntheticTargets.map((target) => [`@solidkg/${target}`, version]));
     writeFileSync(join(mainDir, 'package.json'), JSON.stringify({
       name: 'solidkg',
       version,
@@ -172,7 +172,7 @@ function verifyPackNpmWithSyntheticBundles() {
     assert(mainPackage.license === 'MIT', 'main npm package declares the MIT license');
     assert(JSON.stringify(mainPackage.files) === JSON.stringify(['npm-shim.js', 'README.md', 'LICENSE']), 'main npm package file whitelist is npm-shim.js, README.md, and LICENSE');
     for (const target of syntheticTargets) {
-      assert(mainPackage.optionalDependencies?.[`solidkg-${target}`] === version, `main npm optionalDependencies maps solidkg-${target} to package version`);
+      assert(mainPackage.optionalDependencies?.[`@solidkg/${target}`] === version, `main npm optionalDependencies maps @solidkg/${target} to package version`);
     }
 
     const mainPackFiles = parsePackJson(run('npm', ['pack', '--dry-run', '--json', '--ignore-scripts', mainDir]));

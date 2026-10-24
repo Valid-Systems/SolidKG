@@ -315,7 +315,7 @@ Once `package.json` is at the target version on `main`, trigger
 1. Syncs `package-lock.json` to `package.json`'s version if they've drifted; commits + pushes that change.
 2. Builds every platform bundle on one runner, generates `SHA256SUMS`.
 3. Creates the GitHub Release with GitHub-generated notes.
-4. Publishes the npm shim + per-platform packages. Publishes through npm trusted publishing (GitHub OIDC); no `NPM_TOKEN` secret is used. Each package (`solidkg` and `solidkg-<platform>-<arch>`) must trust `Valid-Systems/SolidKG` workflow `release.yml`.
+4. Publishes the npm shim + per-platform packages. Publishes through npm trusted publishing (GitHub OIDC); no `NPM_TOKEN` secret is used. Each package (`solidkg` and `@solidkg/<platform>-<arch>`) must trust `Valid-Systems/SolidKG` workflow `release.yml`.
 
 **Do not run `npm publish`, `git push`, or `git tag` yourself** — these are
 publish actions on shared state. Write the files, hand the user the commands.

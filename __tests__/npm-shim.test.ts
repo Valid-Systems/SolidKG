@@ -77,10 +77,10 @@ function runShim(pkgDir: string, args: string[], env: Record<string, string>) {
 describe.skipIf(isWindows)('npm-shim launcher', () => {
   it('runs the installed optional-dependency bundle without any download', async () => {
     const pkg = makePkg();
-    const platformPkg = path.join(pkg, 'node_modules', `solidkg-${target}`);
+    const platformPkg = path.join(pkg, 'node_modules', '@solidkg', target);
     writeLauncher(path.join(platformPkg, 'bin'));
     fs.writeFileSync(path.join(platformPkg, 'package.json'),
-      JSON.stringify({ name: `solidkg-${target}`, version: '9.9.9-test' }) + '\n');
+      JSON.stringify({ name: `@solidkg/${target}`, version: '9.9.9-test' }) + '\n');
     const cache = mkTmp('cache');
     const r = await runShim(pkg, ['--probe-abc'], { SOLIDKG_INSTALL_DIR: cache });
 
@@ -118,7 +118,7 @@ describe.skipIf(isWindows)('npm-shim launcher', () => {
 
     expect(r.status).toBe(1);
     expect(r.stderr).toContain(`no prebuilt bundle for ${target}`);
-    expect(r.stderr).toContain(`solidkg-${target}`);
+    expect(r.stderr).toContain(`@solidkg/${target}`);
     expect(r.stderr).toContain('--registry=https://registry.npmjs.org');
     expect(r.stderr).toContain(`tar -xf ${asset}`);
     expect(r.stderr).toContain(path.join('bundles', `${target}-9.9.9-test`));
