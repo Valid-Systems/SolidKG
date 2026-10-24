@@ -52,8 +52,8 @@ jobs:
       - name: Verify source before release
         run: |
           pnpm exec tsc --noEmit
-          pnpm test
           pnpm run build
+          pnpm test
 
   bundle:
     needs: prepare
