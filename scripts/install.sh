@@ -3,10 +3,10 @@
 # SolidKG standalone installer.
 #
 # Downloads a self-contained bundle (a vendored Node runtime + the app) from
-# solidkg.local release artifacts. No Node.js, no build tools, no npm
+# GitHub Releases. No Node.js, no build tools, no npm
 # required - ideal for a fresh Linux VPS over SSH.
 #
-#   curl -fsSL https://solidkg.local/install/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Valid-Systems/SolidKG/main/scripts/install.sh | sh
 #
 # Upgrade:   re-run the same command.
 # Uninstall: curl -fsSL .../install.sh | sh -s -- --uninstall
@@ -19,8 +19,8 @@ set -eu
 
 INSTALL_DIR="${SOLIDKG_INSTALL_DIR:-$HOME/.solidkg}"
 BIN_DIR="${SOLIDKG_BIN_DIR:-$HOME/.local/bin}"
-LATEST_URL="${SOLIDKG_LATEST_URL:-https://solidkg.local/releases/latest}"
-DOWNLOAD_BASE="${SOLIDKG_DOWNLOAD_BASE:-https://solidkg.local/releases/download}"
+LATEST_URL="${SOLIDKG_LATEST_URL:-https://github.com/Valid-Systems/SolidKG/releases/latest}"
+DOWNLOAD_BASE="${SOLIDKG_DOWNLOAD_BASE:-https://github.com/Valid-Systems/SolidKG/releases/download}"
 
 if [ "${1:-}" = "--uninstall" ]; then
   rm -f "$BIN_DIR/solidkg"

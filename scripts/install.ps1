@@ -1,9 +1,9 @@
 # SolidKG standalone installer for Windows (PowerShell).
 #
 # Downloads a self-contained bundle (a vendored Node runtime + the app) from
-# solidkg.local release artifacts. No Node.js, no build tools required.
+# GitHub Releases. No Node.js, no build tools required.
 #
-#   irm https://solidkg.local/install/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/Valid-Systems/SolidKG/main/scripts/install.ps1 | iex
 #
 # Re-run to upgrade. To uninstall: remove $env:LOCALAPPDATA\solidkg and drop
 # its \current\bin entry from your user PATH.
@@ -14,8 +14,8 @@
 
 $ErrorActionPreference = 'Stop'
 $installDir = if ($env:SOLIDKG_INSTALL_DIR) { $env:SOLIDKG_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'solidkg' }
-$latestUrl = if ($env:SOLIDKG_LATEST_URL) { $env:SOLIDKG_LATEST_URL } else { 'https://solidkg.local/releases/latest' }
-$downloadBase = if ($env:SOLIDKG_DOWNLOAD_BASE) { $env:SOLIDKG_DOWNLOAD_BASE } else { 'https://solidkg.local/releases/download' }
+$latestUrl = if ($env:SOLIDKG_LATEST_URL) { $env:SOLIDKG_LATEST_URL } else { 'https://github.com/Valid-Systems/SolidKG/releases/latest' }
+$downloadBase = if ($env:SOLIDKG_DOWNLOAD_BASE) { $env:SOLIDKG_DOWNLOAD_BASE } else { 'https://github.com/Valid-Systems/SolidKG/releases/download' }
 
 # 1. Detect architecture -> target matching the release archives.
 $arch = if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'arm64' } else { 'x64' }

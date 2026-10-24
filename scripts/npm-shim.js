@@ -16,7 +16,7 @@
 // optionalDependencies. npm treats an unfetchable optional dep as success and
 // silently skips it, so the bundle goes missing and every command fails. When
 // the installed bundle can't be resolved, this shim falls back to downloading
-// the matching bundle from solidkg.local release artifacts - the very archive
+// the matching bundle from GitHub Releases - the very archive
 // install.sh uses - into a cache dir, then runs that. Knobs:
 //   SOLIDKG_NO_DOWNLOAD=1     disable the network fallback (print guidance)
 //   SOLIDKG_INSTALL_DIR=DIR   cache location (default: ~/.solidkg)
@@ -87,7 +87,7 @@ function launcherIn(dir) {
   return null;
 }
 
-// Download + cache the platform bundle from solidkg.local release artifacts. Returns
+// Download + cache the platform bundle from GitHub Releases. Returns
 // {command, args}; exits the process with guidance if it can't.
 async function selfHealBundle() {
   var version = readVersion();
@@ -113,12 +113,12 @@ async function selfHealBundle() {
     );
   }
 
-  var base = process.env.SOLIDKG_DOWNLOAD_BASE || 'https://solidkg.local/releases/download';
+  var base = process.env.SOLIDKG_DOWNLOAD_BASE || 'https://github.com/Valid-Systems/SolidKG/releases/download';
   var url = base + '/v' + version + '/' + asset;
 
   process.stderr.write(
     'solidkg: platform bundle missing (registry did not provide ' + pkg + ').\n' +
-    'solidkg: downloading ' + asset + ' from solidkg.local release artifacts (' + version + ')...\n'
+    'solidkg: downloading ' + asset + ' from GitHub Releases (' + version + ')...\n'
   );
 
   // Stage inside bundlesDir so the final rename is on the same filesystem (atomic,
@@ -259,7 +259,7 @@ function fail(reason, extraFixes) {
     '      npm i -g solidkg --registry=https://registry.npmjs.org\n' +
     (extraFixes || '') +
     '  - or use the standalone installer (no Node required):\n' +
-    '      curl -fsSL https://solidkg.local/install/install.sh | sh\n'
+    '      curl -fsSL https://raw.githubusercontent.com/Valid-Systems/SolidKG/main/scripts/install.sh | sh\n'
   );
   process.exit(1);
 }
