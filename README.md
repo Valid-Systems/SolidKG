@@ -17,9 +17,9 @@
 
 **KG** = Knowledge Graph
 
-Coding agents are good at reasoning once they have the right context. Finding that requires fine-tuned automated assistance.
+Coding agents reason well once they have the right context. Finding that context requires fine-tuned automated assistance.
 
-Tested error-free on 112 of the largest and most impactful OSS codebases, SolidKG indexes a project once, keeps it in sync, and gives agents an optimized structural view.
+SolidKG indexes a project once, keeps the index in sync, and gives agents a structural view of the code that is optimized for them. It was tested error-free on 112 of the largest and most impactful OSS codebases.
 
 - **Follow real flows.** Trace callers, routes, callbacks, UI render chains, framework conventions, and cross-language bridges.
 - **Return evidence, not summaries.** Results include verbatim source, graph relationships, provenance, and explicit uncertainty when static analysis cannot prove a path.
@@ -28,9 +28,9 @@ Tested error-free on 112 of the largest and most impactful OSS codebases, SolidK
 
 ## Quick start
 
-Published packages bundle the Node.js 24 runtime SolidKG executes on, so you do not need Node.js 24 installed separately.
+Published packages bundle the Node.js 24 runtime that SolidKG runs on, so you do not need to install Node.js 24 separately.
 
-> **Agent-led setup:** For a first installation, give [`docs/setup.md`](docs/setup.md) to your coding agent. It guides the agent through read-only preflight, approved configuration changes, project indexing, and a real `solidkg_explore` acceptance check.
+> **Agent-led setup:** For a first installation, give [`docs/setup.md`](docs/setup.md) to your coding agent. It walks the agent through a read-only preflight, approved configuration changes, project indexing, and a real `solidkg_explore` acceptance check.
 
 ```bash
 npm install -g solidkg
@@ -45,7 +45,7 @@ Then ask your coding agent a normal question:
 
 > How does authentication work in this project?
 
-The default MCP profile exposes one answer-producing tool, `solidkg_explore`, so the agent can send the question it already has and receive ranked source plus structural evidence in one response.
+The default MCP profile exposes one answer-producing tool, `solidkg_explore`. That way the agent can send the question it already has and receive ranked source plus structural evidence in one response.
 
 Prefer the CLI?
 
@@ -91,7 +91,7 @@ See the exact [language and framework coverage](docs/code-intelligence-capabilit
 
 ## Benchmark results
 
-A [July 2026 local OpenCode benchmark](docs/benchmarks/opencode-seven-arm-2026-07-12.md) ran 276 completed post-indexing sessions across ten repository-specific architecture questions, seven retrieval arms, and four repeats per launchable cell. Mean answer F1 was similar across all arms at 97.1% to 98.1%. SolidKG core had the lowest mean API-equivalent cost, while SolidKG + SCIP used the fewest agent tool calls.
+In a [July 2026 local OpenCode benchmark](docs/benchmarks/opencode-seven-arm-2026-07-12.md), 276 post-indexing sessions ran to completion. They covered ten repository-specific architecture questions, seven retrieval arms, and four repeats per launchable cell. Mean answer F1 was similar across all arms, from 97.1% to 98.1%. SolidKG core had the lowest mean API-equivalent cost, and SolidKG + SCIP used the fewest agent tool calls.
 
 | Arm | Completed | Mean F1 | Mean tokens | Tools/task | Session time | API-equivalent cost |
 |---|---:|---:|---:|---:|---:|---:|
@@ -103,21 +103,21 @@ A [July 2026 local OpenCode benchmark](docs/benchmarks/opencode-seven-arm-2026-0
 | Cartog | 40 | 97.4% | 124,735 | 15.9 | 74.0 s | $0.2789 |
 | Tilth | 40 | **98.1%** | 107,748 | 14.2 | 74.7 s | $0.2450 |
 
-Against the no-graph baseline, SolidKG core used a paired median 8 fewer tool calls per task, or 70.0% fewer; SolidKG + SCIP used 8.5 fewer, or 71.0% fewer. The default SolidKG profile packages retrieval into one answer-producing tool, so this measures agent interaction efficiency rather than computation alone. The raw exact sign-flip p-value was 0.00195, while the predeclared Holm-adjusted value was 0.140625.
+Against the no-graph baseline, SolidKG core used a paired median of 8 fewer tool calls per task, or 70.0% fewer. SolidKG + SCIP used 8.5 fewer, or 71.0% fewer. The default SolidKG profile packages retrieval into one answer-producing tool, so this measures agent interaction efficiency rather than computation alone. The raw exact sign-flip p-value was 0.00195. The predeclared Holm-adjusted value was 0.140625.
 
-The aggregate mean token values remain useful descriptive results, but the paired analysis did not show a reliable token or session-time reduction. The lower SolidKG core token mean was driven largely by the VS Code runs. CodeGraph completed 36 of 40 cells because its four .NET Runtime cells were unavailable, so its aggregate covers a different task mixture.
+The aggregate mean token values are still useful as a description of the runs. The paired analysis, however, did not show a reliable reduction in tokens or session time. The lower SolidKG core token mean came largely from the VS Code runs. CodeGraph completed 36 of 40 cells because its four .NET Runtime cells were unavailable, so its aggregate covers a different mix of tasks.
 
-Indexing time was excluded. The benchmark used one architecture question per public repository and did not test patches, builds, regressions, security, maintenance, or developer productivity. Two blinded reviewers from the same model family disagreed in at least one scored field on 269 of 276 answers, followed by separate AI adjudication. Raw trajectories, exact source snapshots, resolved configurations, scoring inputs, and the analysis package are not published here; see the detailed report for the complete methodology and limitations.
+Indexing time was excluded. The benchmark used one architecture question per public repository. It did not test patches, builds, regressions, security, maintenance, or developer productivity. Two blinded reviewers from the same model family disagreed in at least one scored field on 269 of 276 answers, and separate AI adjudication followed. Raw trajectories, exact source snapshots, resolved configurations, scoring inputs, and the analysis package are not published here. The detailed report has the complete methodology and limitations.
 
 ## Built for real codebases
 
 SolidKG goes beyond a flat symbol index:
 
-- **Semantic hyperedges** preserve multi-symbol relationships such as route bindings, event channels, UI render chains, dynamic dispatch, native bridges, and type contracts.
+- **Semantic hyperedges** keep multi-symbol relationships together: route bindings, event channels, UI render chains, dynamic dispatch, native bridges, and type contracts.
 - **Framework resolvers** connect routes, handlers, composition, and native bridges that syntax alone misses.
 - **Optional SCIP** adds compiler-grade navigation without replacing the always-available AST graph.
-- **Source-body retrieval** improves natural-language discovery while exact symbol, path, trace, semantic, and SCIP evidence stays higher priority.
-- **Architecture and snapshots** make package coupling and graph changes explicit instead of leaving them as review intuition.
+- **Source-body retrieval** improves natural-language discovery, while exact symbol, path, trace, semantic, and SCIP evidence keeps higher priority.
+- **Architecture and snapshots** make package coupling and graph changes explicit instead of leaving them to review intuition.
 
 Retrieval stays deterministic and transparent:
 
@@ -143,9 +143,9 @@ console.log(matches.length, impact.nodes.size, overview);
 graph.close();
 ```
 
-Architecture health is a read-only deterministic report of structural findings, metrics, evidence anchors, and per-signal coverage. It does not assign a score, grade, severity, or runtime verdict. Static unreferenced results are candidates, not proof that code is dead.
+Architecture health is a read-only, deterministic report of structural findings, metrics, evidence anchors, and per-signal coverage. It does not assign a score, grade, severity, or runtime verdict. Static unreferenced results are candidates, not proof that code is dead.
 
-Before this example, save the `before-refactor` snapshot with the command below. The example opens an existing index with a new read-only handle.
+Before you run this example, save the `before-refactor` snapshot with the command below. The example opens an existing index with a new read-only handle.
 
 ```typescript
 import SolidKG from "solidkg";
@@ -162,7 +162,7 @@ try {
 }
 ```
 
-Health drift always includes graph-diff counts. Its semantic comparison is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`; incompatible or unavailable analysis never produces a guessed finding comparison.
+Health drift always includes graph-diff counts. Its semantic comparison is `comparable`, `partially_compatible`, `incompatible_analysis`, or `baseline_analysis_unavailable`. Incompatible or unavailable analysis never produces a guessed finding comparison.
 
 ## Advanced workflows
 
@@ -175,13 +175,13 @@ solidkg architecture analyze --path .
 solidkg scip generate --path .
 ```
 
-Health and drift reads are read-only and require schema 11. If an existing index needs a schema upgrade, run `solidkg sync <project>` once with write access. Then retry the read. Human and MCP output caps each finding or delta category at 20 items and reports the remainder. CLI `--json` and TypeScript API results remain complete.
+Health and drift reads are read-only and require schema 11. If an existing index needs a schema upgrade, run `solidkg sync <project>` once with write access, then retry the read. Human and MCP output caps each finding or delta category at 20 items and reports the remainder. CLI `--json` and TypeScript API results remain complete.
 
-The compact MCP profile still exposes only `solidkg_explore`. Ask it explicit questions such as "Show repository architecture health" or "What architecture health drifted since snapshot before-refactor?". A drift label in an explore query must match one saved snapshot label exactly, including case. Set `SOLIDKG_MCP_TOOLS=all` to expose the advanced `solidkg_architecture` tool with `action="health"` and `solidkg_snapshot` with `action="drift"`. Run `solidkg <command> --help` for the complete CLI.
+The compact MCP profile still exposes only `solidkg_explore`. Ask it explicit questions such as "Show repository architecture health" or "What architecture health drifted since snapshot before-refactor?". A drift label in an explore query must match one saved snapshot label exactly, including case. To expose the advanced tools, set `SOLIDKG_MCP_TOOLS=all`: `solidkg_architecture` with `action="health"` and `solidkg_snapshot` with `action="drift"`. Run `solidkg <command> --help` for the complete CLI.
 
 ## Install from source
 
-The public source archive includes the maintained SCIP integrations and pinned native grammar manifest needed to reproduce supported behavior.
+The public source archive includes the maintained SCIP integrations and the pinned native grammar manifest that you need to reproduce supported behavior.
 
 Source checkout and development require Node.js 24 and the pnpm version pinned in `package.json` (`10.34.5`).
 
